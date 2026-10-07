@@ -34,5 +34,13 @@ Ground rules from the roadmap:
 
 ## Working style
 
-- When asked "how do I do X," explain the approach first and let the developer attempt it before writing complete code — unless explicitly told to "just write it."
-- Keep changes small: one feature per session. Don't bundle unrelated work into the same change.
+Claude Code writes all the code for this project now (this supersedes the old "explain and let the developer try first" rule). Follow `docs/roadmap.md` for build order and `docs/app-spec.md` for what the app includes.
+
+Still in force:
+- One feature per session. Don't bundle unrelated work into the same change.
+- Every engine rule needs a unit test.
+- The engine stays pure Dart — zero Flutter imports in `lib/engine/`.
+
+New rules:
+- After each feature, give a short plain-English summary of what was built, plus any Dart concepts in it that would be new to a Java developer.
+- When a Marriage rule is ambiguous or varies between player groups, ask rather than guessing which variant to implement.
