@@ -26,19 +26,37 @@ bool canSplitIntoSets(List<PlayingCard> cards, Jokers jokers) {
     final key = _key(remaining);
     if (dead.contains(key)) return false;
 
-    // Whatever the split, the first card must be in some set. Try every set
-    // made of it plus 2 or more of the other cards.
-    final first = remaining.first;
-    final rest = remaining.sublist(1);
-    for (var mask = 1; mask < 1 << rest.length; mask++) {
+    // Whatever the split, this card must be in some set. Starting from a
+    // natural card (when there is one) keeps the search small: any set
+    // holding it can only contain cards of its suit, cards of its rank, or
+    // wild cards, so only those "partners" are worth combining with it.
+    final firstIndex = remaining.indexWhere((c) => !jokers.isWild(c));
+    final first = remaining[firstIndex < 0 ? 0 : firstIndex];
+    final rest = [...remaining]..remove(first);
+    final partners = <PlayingCard>[];
+    final others = <PlayingCard>[];
+    for (final card in rest) {
+      final canJoin = firstIndex < 0 ||
+          jokers.isWild(card) ||
+          card.suit == first.suit ||
+          card.rank == first.rank;
+      if (canJoin) {
+        partners.add(card);
+      } else {
+        others.add(card);
+      }
+    }
+
+    // Try every set made of the first card plus 2 or more partners.
+    for (var mask = 1; mask < 1 << partners.length; mask++) {
       final set = [first];
-      final left = <PlayingCard>[];
-      for (var i = 0; i < rest.length; i++) {
-        // Bit i of the mask says whether rest[i] joins the set.
+      final left = [...others];
+      for (var i = 0; i < partners.length; i++) {
+        // Bit i of the mask says whether partners[i] joins the set.
         if (mask & (1 << i) != 0) {
-          set.add(rest[i]);
+          set.add(partners[i]);
         } else {
-          left.add(rest[i]);
+          left.add(partners[i]);
         }
       }
       if (set.length < 3) continue;

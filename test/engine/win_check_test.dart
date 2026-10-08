@@ -111,6 +111,34 @@ void main() {
       expect(canSplitIntoSets(cards, jokers), isTrue);
     });
 
+    test('order does not matter, even with a wild card listed first', () {
+      final cards = [
+        c(Suit.clubs, Rank.seven), // wild
+        c(Suit.diamonds, Rank.nine),
+        c(Suit.spades, Rank.two),
+        c(Suit.diamonds, Rank.nine),
+        c(Suit.spades, Rank.three),
+        c(Suit.hearts, Rank.six), // wild
+        c(Suit.clubs, Rank.nine),
+      ];
+
+      // 2♠ 3♠ + a joker, and 9♦ 9♣ + a joker… with one 9♦ left over: no.
+      expect(canSplitIntoSets(cards, jokers), isFalse);
+      // Without the spare 9♦ it splits.
+      expect(canSplitIntoSets([...cards]..removeAt(1), jokers), isTrue);
+    });
+
+    test('wild cards forming a set on face value still split', () {
+      // All three are wild with tiplu 7♥, but 6♥-7♥-8♥ is a pure sequence.
+      final cards = [
+        c(Suit.hearts, Rank.eight),
+        c(Suit.hearts, Rank.six),
+        c(Suit.hearts, Rank.seven),
+      ];
+
+      expect(canSplitIntoSets(cards, jokers), isTrue);
+    });
+
     test('a set of only jokers does not count', () {
       final cards = [
         c(Suit.clubs, Rank.seven),
