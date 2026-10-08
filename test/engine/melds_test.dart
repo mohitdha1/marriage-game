@@ -203,6 +203,34 @@ void main() {
     });
   });
 
+  group('isDoublee', () {
+    test('2 physically-identical cards is valid', () {
+      expect(
+        isDoublee([c(Suit.spades, Rank.nine), c(Suit.spades, Rank.nine)]),
+        isTrue,
+      );
+    });
+
+    test('same rank in different suits is invalid', () {
+      expect(
+        isDoublee([c(Suit.spades, Rank.nine), c(Suit.hearts, Rank.nine)]),
+        isFalse,
+      );
+    });
+
+    test('wrong card count is invalid', () {
+      expect(isDoublee([c(Suit.spades, Rank.nine)]), isFalse);
+      expect(
+        isDoublee([
+          c(Suit.spades, Rank.nine),
+          c(Suit.spades, Rank.nine),
+          c(Suit.spades, Rank.nine),
+        ]),
+        isFalse,
+      );
+    });
+  });
+
   // Tiplu 7♥: every 7 plus 6♥ (jhiplu) and 8♥ (poplu) is wild.
   final jokers = Jokers(c(Suit.hearts, Rank.seven));
 

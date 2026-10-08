@@ -8,6 +8,12 @@ bool isTunnella(List<PlayingCard> cards) {
   return cards[0] == cards[1] && cards[1] == cards[2];
 }
 
+/// A doublee is exactly 2 physically-identical cards (same suit AND rank).
+bool isDoublee(List<PlayingCard> cards) {
+  if (cards.length != 2) return false;
+  return cards[0] == cards[1];
+}
+
 /// A trial is 3 cards of the same rank across 3 strictly different suits.
 bool isTrial(List<PlayingCard> cards) {
   if (cards.length != 3) return false;
