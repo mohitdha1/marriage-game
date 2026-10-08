@@ -5,7 +5,7 @@ import 'package:marriage_game/engine/player_hand.dart';
 
 const c = PlayingCard.new;
 
-// Three pure sets: a 3-card sequence, a 4-card sequence, and a tunnella.
+// Pure sequences of 3 and 4 cards.
 final heartsRun = [
   c(Suit.hearts, Rank.three),
   c(Suit.hearts, Rank.four),
@@ -17,11 +17,22 @@ final spadesRun = [
   c(Suit.spades, Rank.jack),
   c(Suit.spades, Rank.queen),
 ];
-final kingTunnella = [
-  c(Suit.diamonds, Rank.king),
-  c(Suit.diamonds, Rank.king),
+final diamondsRun = [
+  c(Suit.diamonds, Rank.jack),
+  c(Suit.diamonds, Rank.queen),
   c(Suit.diamonds, Rank.king),
 ];
+
+List<PlayingCard> tunnellaOf(Suit suit, Rank rank) => [
+  c(suit, rank),
+  c(suit, rank),
+  c(suit, rank),
+];
+
+final kingTunnella = tunnellaOf(Suit.clubs, Rank.king);
+final aceTunnella = tunnellaOf(Suit.spades, Rank.ace);
+final fourTunnella = tunnellaOf(Suit.diamonds, Rank.four);
+final sevenTunnella = tunnellaOf(Suit.hearts, Rank.seven);
 
 // Cards that don't form any set, to pad hands out to 21.
 final fillers = [
@@ -40,9 +51,27 @@ final fillers = [
 
 final drawnCard = c(Suit.clubs, Rank.queen);
 
-/// A 21-card hand holding [heartsRun], [spadesRun] and [kingTunnella].
-PlayerHand pureSetsHand() =>
-    PlayerHand([...heartsRun, ...spadesRun, ...kingTunnella, ...fillers]);
+/// 21 cards with 3 pure sequences and no tunnellas.
+List<PlayingCard> noTunnellaCards() => [
+  ...heartsRun,
+  ...spadesRun,
+  ...diamondsRun,
+  ...fillers,
+];
+
+/// 21 cards with 2 pure sequences and 1 tunnella.
+List<PlayingCard> oneTunnellaCards() => [
+  ...heartsRun,
+  ...spadesRun,
+  ...kingTunnella,
+  ...fillers,
+];
+
+/// A hand that has made its opening show with [openingTunnellas].
+PlayerHand openedHand(
+  List<PlayingCard> cards, [
+  List<List<PlayingCard>> openingTunnellas = const [],
+]) => PlayerHand(cards)..showOpeningTunnellas(openingTunnellas);
 
 /// Seven doublees: 2♣2♣, 3♣3♣, … 8♣8♣.
 final doublees = [
@@ -58,29 +87,137 @@ final doublees = [
     [c(Suit.clubs, rank), c(Suit.clubs, rank)],
 ];
 
-/// A 21-card hand holding [doublees] plus 7 unpaired cards.
-PlayerHand doubleesHand() => PlayerHand([
+/// 21 cards: [doublees] plus 7 unpaired cards, no tunnellas.
+List<PlayingCard> doubleesCards() => [
   ...doublees.expand((pair) => pair),
   ...fillers.skip(4).take(7),
-]);
+];
 
 void main() {
   final jokers = Jokers(c(Suit.hearts, Rank.seven));
 
   group('PlayerHand before showing', () {
-    test('has not seen the joker and cannot see the round jokers', () {
-      final hand = pureSetsHand();
+    test('has not opened or seen the joker', () {
+      final hand = PlayerHand(noTunnellaCards());
 
+      expect(hand.hasOpened, isFalse);
       expect(hand.hasSeenJoker, isFalse);
       expect(hand.showKind, isNull);
+      expect(hand.openingTunnellas, isEmpty);
       expect(hand.shownSets, isEmpty);
       expect(hand.visibleJokers(jokers), isNull);
     });
   });
 
+  group('PlayerHand.showOpeningTunnellas', () {
+    test('a hand with no tunnellas opens with an empty show', () {
+      final hand = openedHand(noTunnellaCards());
+
+      expect(hand.hasOpened, isTrue);
+      expect(hand.openingTunnellas, isEmpty);
+      expect(hand.cards.length, 21);
+      expect(hand.pureSetsStillNeeded, 3);
+    });
+
+    test('a dealt tunnella is laid down and counts toward the 3 sets', () {
+      final hand = openedHand(oneTunnellaCards(), [kingTunnella]);
+
+      expect(hand.openingTunnellas, [kingTunnella]);
+      expect(hand.cards.length, 18);
+      expect(hand.pureSetsStillNeeded, 2);
+      expect(hand.hasSeenJoker, isFalse);
+    });
+
+    test('every dealt tunnella must be shown', () {
+      final hand = PlayerHand([...kingTunnella, ...aceTunnella, ...fillers]);
+
+      expect(
+        () => hand.showOpeningTunnellas([kingTunnella]),
+        throwsArgumentError,
+      );
+      expect(() => hand.showOpeningTunnellas([]), throwsArgumentError);
+    });
+
+    test('with more than 3 tunnellas, the player picks exactly 3', () {
+      final cards = [
+        ...kingTunnella,
+        ...aceTunnella,
+        ...fourTunnella,
+        ...sevenTunnella,
+        ...fillers.take(9),
+      ];
+
+      expect(
+        () => PlayerHand(cards).showOpeningTunnellas([
+          kingTunnella,
+          aceTunnella,
+          fourTunnella,
+          sevenTunnella,
+        ]),
+        throwsArgumentError,
+      );
+      expect(
+        () =>
+            PlayerHand(cards).showOpeningTunnellas([kingTunnella, aceTunnella]),
+        throwsArgumentError,
+      );
+
+      final hand = PlayerHand(cards)
+        ..showOpeningTunnellas([kingTunnella, aceTunnella, sevenTunnella]);
+
+      expect(hand.openingTunnellas.length, 3);
+      expect(hand.pureSetsStillNeeded, 0);
+      expect(
+        hand.cards.where((card) => card == fourTunnella.first).length,
+        3,
+        reason: 'the tunnella not picked stays in hand',
+      );
+    });
+
+    test('a set that is not a tunnella is rejected', () {
+      final hand = PlayerHand(oneTunnellaCards());
+
+      expect(() => hand.showOpeningTunnellas([heartsRun]), throwsArgumentError);
+    });
+
+    test('a tunnella that is not in the hand is rejected', () {
+      final hand = PlayerHand(oneTunnellaCards());
+
+      expect(
+        () => hand.showOpeningTunnellas([aceTunnella]),
+        throwsArgumentError,
+      );
+    });
+
+    test('a rejected opening show leaves the hand unchanged', () {
+      final hand = PlayerHand(oneTunnellaCards());
+      final before = hand.cards;
+
+      expect(() => hand.showOpeningTunnellas([]), throwsArgumentError);
+      expect(hand.cards, before);
+      expect(hand.hasOpened, isFalse);
+    });
+
+    test('the opening show can only be made once', () {
+      final hand = openedHand(oneTunnellaCards(), [kingTunnella]);
+
+      expect(() => hand.showOpeningTunnellas([]), throwsStateError);
+    });
+
+    test('drawing or showing before the opening show throws', () {
+      final hand = PlayerHand(noTunnellaCards());
+
+      expect(() => hand.draw(drawnCard), throwsStateError);
+      expect(
+        () => hand.showPureSets([heartsRun, spadesRun, diamondsRun]),
+        throwsStateError,
+      );
+    });
+  });
+
   group('PlayerHand draw and discard', () {
     test('drawing adds the card and starts the turn', () {
-      final hand = pureSetsHand()..draw(drawnCard);
+      final hand = openedHand(noTunnellaCards())..draw(drawnCard);
 
       expect(hand.cards.length, 22);
       expect(hand.cards, contains(drawnCard));
@@ -88,29 +225,30 @@ void main() {
     });
 
     test('drawing twice without discarding throws', () {
-      final hand = pureSetsHand()..draw(drawnCard);
+      final hand = openedHand(noTunnellaCards())..draw(drawnCard);
 
       expect(() => hand.draw(drawnCard), throwsStateError);
     });
 
     test('discarding removes one copy and ends the turn', () {
-      final hand = pureSetsHand()
+      final cards = [...noTunnellaCards(), heartsRun.first];
+      final hand = openedHand(cards)
         ..draw(drawnCard)
-        ..discard(kingTunnella.first);
+        ..discard(heartsRun.first);
 
-      expect(hand.cards.length, 21);
-      expect(hand.cards.where((card) => card == kingTunnella.first).length, 2);
+      expect(hand.cards.length, 22);
+      expect(hand.cards.where((card) => card == heartsRun.first).length, 1);
       expect(hand.hasDrawn, isFalse);
     });
 
     test('discarding before drawing throws', () {
-      final hand = pureSetsHand();
+      final hand = openedHand(noTunnellaCards());
 
       expect(() => hand.discard(fillers.first), throwsStateError);
     });
 
     test('discarding a card not in the hand throws and keeps the turn', () {
-      final hand = pureSetsHand()..draw(drawnCard);
+      final hand = openedHand(noTunnellaCards())..draw(drawnCard);
 
       expect(
         () => hand.discard(c(Suit.hearts, Rank.king)),
@@ -122,22 +260,38 @@ void main() {
   });
 
   group('PlayerHand.showPureSets', () {
-    test('showing 3 pure sets after drawing sees the joker', () {
-      final hand = pureSetsHand()..draw(drawnCard);
+    test('after drawing, 3 pure sets sees the joker', () {
+      final hand = openedHand(noTunnellaCards())..draw(drawnCard);
 
-      hand.showPureSets([heartsRun, spadesRun, kingTunnella]);
+      hand.showPureSets([heartsRun, spadesRun, diamondsRun]);
 
       expect(hand.hasSeenJoker, isTrue);
       expect(hand.showKind, ShowKind.pureSets);
-      expect(hand.shownSets, [heartsRun, spadesRun, kingTunnella]);
+      expect(hand.shownSets, [heartsRun, spadesRun, diamondsRun]);
       expect(hand.cards.length, 22 - 10);
       expect(hand.visibleJokers(jokers), same(jokers));
     });
 
+    test('an opening tunnella means only 2 more sets are needed', () {
+      final hand = openedHand(oneTunnellaCards(), [kingTunnella])
+        ..draw(drawnCard);
+
+      expect(
+        () => hand.showPureSets([heartsRun, spadesRun, diamondsRun]),
+        throwsArgumentError,
+      );
+
+      hand.showPureSets([heartsRun, spadesRun]);
+
+      expect(hand.hasSeenJoker, isTrue);
+      expect(hand.shownSets, [heartsRun, spadesRun]);
+      expect(hand.openingTunnellas, [kingTunnella]);
+    });
+
     test('after showing, the player still discards to end the turn', () {
-      final hand = pureSetsHand()
+      final hand = openedHand(noTunnellaCards())
         ..draw(drawnCard)
-        ..showPureSets([heartsRun, spadesRun, kingTunnella]);
+        ..showPureSets([heartsRun, spadesRun, diamondsRun]);
 
       expect(hand.hasDrawn, isTrue);
       expect(() => hand.draw(fillers.first), throwsStateError);
@@ -147,37 +301,67 @@ void main() {
       expect(hand.cards.length, 11);
     });
 
-    test('a 5-card pure sequence can be shown', () {
-      final longRun = [...spadesRun, c(Suit.spades, Rank.king)];
-      final hand = PlayerHand([...heartsRun, ...longRun, ...kingTunnella])
-        ..draw(drawnCard);
-
-      hand.showPureSets([heartsRun, longRun, kingTunnella]);
+    test('sets ready from the deal can be shown before the first draw', () {
+      final hand = openedHand(noTunnellaCards())
+        ..showPureSets([heartsRun, spadesRun, diamondsRun]);
 
       expect(hand.hasSeenJoker, isTrue);
+      expect(hand.hasDrawn, isFalse);
+      expect(hand.cards.length, 11);
+
+      // The first turn then carries on as normal.
+      hand
+        ..draw(drawnCard)
+        ..discard(drawnCard);
+      expect(hand.cards.length, 11);
     });
 
-    test('showing before drawing throws', () {
-      final hand = pureSetsHand();
+    test('3 opening tunnellas see the joker with an empty show', () {
+      final hand = openedHand(
+        [...kingTunnella, ...aceTunnella, ...fourTunnella, ...fillers],
+        [kingTunnella, aceTunnella, fourTunnella],
+      )..showPureSets([]);
+
+      expect(hand.hasSeenJoker, isTrue);
+      expect(hand.shownSets, isEmpty);
+    });
+
+    test('after the first draw, showing without drawing throws', () {
+      final hand = openedHand(noTunnellaCards())
+        ..draw(drawnCard)
+        ..discard(drawnCard);
 
       expect(
-        () => hand.showPureSets([heartsRun, spadesRun, kingTunnella]),
+        () => hand.showPureSets([heartsRun, spadesRun, diamondsRun]),
         throwsStateError,
       );
     });
 
-    test('showing fewer or more than 3 sets throws', () {
-      final hand = pureSetsHand()..draw(drawnCard);
+    test('a tunnella completed by drawing counts as a pure set', () {
+      // Only 2 kings at the deal, so nothing to open with; drawing the
+      // third makes a tunnella, which counts (but isn't an opening one).
+      final hand =
+          openedHand([
+              ...heartsRun,
+              ...spadesRun,
+              ...kingTunnella.take(2),
+              ...fillers,
+            ])
+            ..draw(kingTunnella.first)
+            ..showPureSets([heartsRun, spadesRun, kingTunnella]);
 
-      expect(
-        () => hand.showPureSets([heartsRun, spadesRun]),
-        throwsArgumentError,
-      );
-      expect(
-        () =>
-            hand.showPureSets([heartsRun, spadesRun, kingTunnella, heartsRun]),
-        throwsArgumentError,
-      );
+      expect(hand.hasSeenJoker, isTrue);
+      expect(hand.openingTunnellas, isEmpty);
+    });
+
+    test('a 5-card pure sequence can be shown', () {
+      final longRun = [...spadesRun, c(Suit.spades, Rank.king)];
+      final hand = openedHand([...heartsRun, ...longRun, ...diamondsRun])
+        ..draw(drawnCard);
+
+      hand.showPureSets([heartsRun, longRun, diamondsRun]);
+
+      expect(hand.hasSeenJoker, isTrue);
     });
 
     test('a trial does not count as a pure set', () {
@@ -186,7 +370,7 @@ void main() {
         c(Suit.spades, Rank.ace),
         c(Suit.diamonds, Rank.ace),
       ];
-      final hand = PlayerHand([...heartsRun, ...spadesRun, ...trial])
+      final hand = openedHand([...heartsRun, ...spadesRun, ...trial])
         ..draw(drawnCard);
 
       expect(
@@ -203,7 +387,7 @@ void main() {
         c(Suit.clubs, Rank.seven),
         c(Suit.spades, Rank.five),
       ];
-      final hand = PlayerHand([...heartsRun, ...spadesRun, ...jokerRun])
+      final hand = openedHand([...heartsRun, ...spadesRun, ...jokerRun])
         ..draw(drawnCard);
 
       expect(
@@ -213,31 +397,31 @@ void main() {
     });
 
     test('showing cards that are not in the hand throws', () {
-      final hand = PlayerHand([...heartsRun, ...spadesRun, ...fillers])
+      final hand = openedHand([...heartsRun, ...spadesRun, ...fillers])
         ..draw(drawnCard);
 
       expect(
-        () => hand.showPureSets([heartsRun, spadesRun, kingTunnella]),
+        () => hand.showPureSets([heartsRun, spadesRun, diamondsRun]),
         throwsArgumentError,
       );
     });
 
     test('the same card cannot be used in two sets', () {
       // Only one copy of 3♥-4♥-5♥ is held, so it can't be shown twice.
-      final hand = pureSetsHand()..draw(drawnCard);
+      final hand = openedHand(noTunnellaCards())..draw(drawnCard);
 
       expect(
-        () => hand.showPureSets([heartsRun, heartsRun, kingTunnella]),
+        () => hand.showPureSets([heartsRun, heartsRun, diamondsRun]),
         throwsArgumentError,
       );
     });
 
     test('a rejected show leaves the hand unchanged', () {
-      final hand = pureSetsHand()..draw(drawnCard);
+      final hand = openedHand(noTunnellaCards())..draw(drawnCard);
       final before = hand.cards;
 
       expect(
-        () => hand.showPureSets([heartsRun, heartsRun, kingTunnella]),
+        () => hand.showPureSets([heartsRun, heartsRun, diamondsRun]),
         throwsArgumentError,
       );
       expect(hand.cards, before);
@@ -246,7 +430,7 @@ void main() {
     });
 
     test('a show that would leave nothing to discard throws', () {
-      final hand = PlayerHand([
+      final hand = openedHand([
         ...heartsRun,
         ...spadesRun.take(3),
         ...kingTunnella.take(2),
@@ -263,15 +447,15 @@ void main() {
     });
 
     test('a player cannot show a second time', () {
-      final hand = pureSetsHand()
+      final hand = openedHand(noTunnellaCards())
         ..draw(drawnCard)
-        ..showPureSets([heartsRun, spadesRun, kingTunnella])
+        ..showPureSets([heartsRun, spadesRun, diamondsRun])
         ..discard(drawnCard)
         ..draw(drawnCard);
 
       expect(() => hand.showDoublees(doublees), throwsStateError);
       expect(
-        () => hand.showPureSets([heartsRun, spadesRun, kingTunnella]),
+        () => hand.showPureSets([heartsRun, spadesRun, diamondsRun]),
         throwsStateError,
       );
     });
@@ -279,7 +463,7 @@ void main() {
 
   group('PlayerHand.showDoublees', () {
     test('showing 7 doublees after drawing sees the joker', () {
-      final hand = doubleesHand()..draw(drawnCard);
+      final hand = openedHand(doubleesCards())..draw(drawnCard);
 
       hand.showDoublees(doublees);
 
@@ -290,8 +474,14 @@ void main() {
       expect(hand.visibleJokers(jokers), same(jokers));
     });
 
+    test('doublees cannot be shown before the first draw', () {
+      final hand = openedHand(doubleesCards());
+
+      expect(() => hand.showDoublees(doublees), throwsStateError);
+    });
+
     test('showing fewer than 7 doublees throws', () {
-      final hand = doubleesHand()..draw(drawnCard);
+      final hand = openedHand(doubleesCards())..draw(drawnCard);
 
       expect(
         () => hand.showDoublees(doublees.take(6).toList()),
@@ -301,7 +491,7 @@ void main() {
 
     test('a pair of the same rank in different suits is not a doublee', () {
       final mixedPair = [c(Suit.hearts, Rank.nine), c(Suit.spades, Rank.nine)];
-      final hand = PlayerHand([
+      final hand = openedHand([
         ...doublees.take(6).expand((pair) => pair),
         ...mixedPair,
       ])..draw(drawnCard);
@@ -310,12 +500,6 @@ void main() {
         () => hand.showDoublees([...doublees.take(6), mixedPair]),
         throwsArgumentError,
       );
-    });
-
-    test('showing before drawing throws', () {
-      final hand = doubleesHand();
-
-      expect(() => hand.showDoublees(doublees), throwsStateError);
     });
   });
 }
