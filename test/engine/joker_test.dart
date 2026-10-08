@@ -137,5 +137,25 @@ void main() {
       expect(flipped.tiplu, stockTop);
       expect(shoe.length, 156 - 105 - 1);
     });
+
+    test('the flipped card is out of play: only 2 tiplus are ever dealt or '
+        'drawn', () {
+      for (final seed in [1, 2, 3, 4, 5]) {
+        final config = GameConfig();
+        final shoe = Shoe.fromConfig(config)..shuffle(Random(seed));
+        final hands = shoe.deal(config);
+        final flipped = Jokers.flipFrom(shoe);
+
+        // Draw the whole remaining stock, as if the round ran to the end.
+        final drawn = [for (; !shoe.isEmpty;) shoe.draw()];
+        final inPlay = [...hands.expand((hand) => hand), ...drawn];
+
+        expect(
+          inPlay.where((card) => card == flipped.tiplu).length,
+          2,
+          reason: 'seed $seed',
+        );
+      }
+    });
   });
 }
