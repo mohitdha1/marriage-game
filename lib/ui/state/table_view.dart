@@ -1,0 +1,68 @@
+import '../../engine/card.dart';
+import '../../engine/round.dart';
+
+/// One player's seat as everyone at the table can see it.
+class SeatView {
+  const SeatView({
+    required this.seat,
+    required this.name,
+    required this.cardCount,
+  });
+
+  final int seat;
+  final String name;
+
+  /// Cards still held, not counting any laid down.
+  final int cardCount;
+}
+
+/// An immutable snapshot of a [Round] as seen from [you]'s seat: what the
+/// table screen draws. It shows only what that player is allowed to see —
+/// their own cards, but just a count for everyone else's.
+class TableView {
+  const TableView({
+    required this.you,
+    required this.opponents,
+    required this.hand,
+    required this.stockCount,
+    required this.topDiscard,
+  });
+
+  /// Builds the view for [humanSeat]. [opponents] are listed in turn order
+  /// starting from the player after [humanSeat], which the table screen lays
+  /// out clockwise from the left.
+  factory TableView.fromRound(
+    Round round, {
+    required int humanSeat,
+    required String Function(int seat) nameOf,
+  }) {
+    final playerCount = round.hands.length;
+    SeatView seatView(int seat) => SeatView(
+      seat: seat,
+      name: nameOf(seat),
+      cardCount: round.hands[seat].cards.length,
+    );
+
+    return TableView(
+      you: seatView(humanSeat),
+      opponents: [
+        for (var i = 1; i < playerCount; i++)
+          seatView((humanSeat + i) % playerCount),
+      ],
+      hand: round.hands[humanSeat].cards,
+      stockCount: round.stockCount,
+      topDiscard: round.topDiscard,
+    );
+  }
+
+  final SeatView you;
+  final List<SeatView> opponents;
+
+  /// The human player's cards, in the order they hold them.
+  final List<PlayingCard> hand;
+
+  final int stockCount;
+
+  /// The face-up card on the discard pile, or `null` if it's empty.
+  final PlayingCard? topDiscard;
+}
