@@ -1,8 +1,5 @@
-import 'dart:math';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/card.dart';
-import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/joker.dart';
 import 'package:marriage_game/engine/shoe.dart';
 
@@ -112,50 +109,6 @@ void main() {
       final wildCount = Shoe(3).cards.where(jokers.isWild).length;
 
       expect(wildCount, 18);
-    });
-  });
-
-  group('Jokers.flipFrom', () {
-    test('the top card of the shoe becomes the tiplu and leaves the shoe', () {
-      final shoe = Shoe(3)..shuffle(Random(4));
-      final top = shoe.cards.last;
-
-      final flipped = Jokers.flipFrom(shoe);
-
-      expect(flipped.tiplu, top);
-      expect(shoe.length, 155);
-    });
-
-    test('after dealing, the joker is flipped from the remaining stock', () {
-      final config = GameConfig();
-      final shoe = Shoe.fromConfig(config)..shuffle(Random(21));
-      shoe.deal(config);
-      final stockTop = shoe.cards.last;
-
-      final flipped = Jokers.flipFrom(shoe);
-
-      expect(flipped.tiplu, stockTop);
-      expect(shoe.length, 156 - 105 - 1);
-    });
-
-    test('the flipped card is out of play: only 2 tiplus are ever dealt or '
-        'drawn', () {
-      for (final seed in [1, 2, 3, 4, 5]) {
-        final config = GameConfig();
-        final shoe = Shoe.fromConfig(config)..shuffle(Random(seed));
-        final hands = shoe.deal(config);
-        final flipped = Jokers.flipFrom(shoe);
-
-        // Draw the whole remaining stock, as if the round ran to the end.
-        final drawn = [for (; !shoe.isEmpty;) shoe.draw()];
-        final inPlay = [...hands.expand((hand) => hand), ...drawn];
-
-        expect(
-          inPlay.where((card) => card == flipped.tiplu).length,
-          2,
-          reason: 'seed $seed',
-        );
-      }
     });
   });
 }

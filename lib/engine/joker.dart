@@ -1,5 +1,4 @@
 import 'card.dart';
-import 'shoe.dart';
 
 /// The role a card plays once the joker (tiplu) for the round is known.
 enum JokerKind {
@@ -20,17 +19,14 @@ enum JokerKind {
   ordinary,
 }
 
-/// The jokers for one round, all derived from the flipped [tiplu].
+/// The jokers for one round, all derived from the [tiplu]: the card the
+/// first player to show picks from the stock.
 ///
 /// Every [JokerKind] is wild: any card of the tiplu's rank (whatever the
 /// suit), plus the jhiplu and poplu. Jhiplu/poplu wrap around the ace, so a
 /// tiplu of A gives poplu 2, and a tiplu of 2 gives jhiplu A.
 class Jokers {
   const Jokers(this.tiplu);
-
-  /// Flips the top card of [shoe] — normally the stock left after dealing —
-  /// to become the tiplu. The flipped card leaves the shoe.
-  factory Jokers.flipFrom(Shoe shoe) => Jokers(shoe.draw());
 
   final PlayingCard tiplu;
 
