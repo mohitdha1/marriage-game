@@ -58,8 +58,9 @@ String numbersOf(List<PlayingCard> hand, List<PlayingCard> cards) {
 }
 
 void main() {
-  // You (seat 0) hold 3 pure runs plus K♠ K♦ 7♣ 10♦ J♦ 8♥ 2♦. Drawing Q♦
-  // and picking 7♥ as the tiplu lets you show and then win by discarding 2♦.
+  // The human player (seat 0) holds 3 pure runs plus K♠ K♦ 7♣ 10♦ J♦ 8♥ 2♦.
+  // Drawing Q♦ and picking 7♥ as the tiplu lets them show and then win by
+  // discarding 2♦.
   final heartsRun = run(Suit.hearts, [Rank.three, Rank.four, Rank.five]);
   final spadesRun = run(Suit.spades, [Rank.two, Rank.three, Rank.four]);
   final clubsRun = run(Suit.clubs, [Rank.nine, Rank.ten, Rank.jack]);

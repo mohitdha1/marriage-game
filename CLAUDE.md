@@ -44,3 +44,4 @@ Still in force:
 New rules:
 - After each feature, give a short plain-English summary of what was built, plus any Dart concepts in it that would be new to a Java developer.
 - When a Marriage rule is ambiguous or varies between player groups, ask rather than guessing which variant to implement.
+- Comments describe what the code does or why, in neutral wording, never addressing the reader ("Root widget of the application", not "This widget is the root of your application").
