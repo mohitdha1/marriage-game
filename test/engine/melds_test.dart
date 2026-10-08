@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/card.dart';
+import 'package:marriage_game/engine/joker.dart';
 import 'package:marriage_game/engine/melds.dart';
 
 const c = PlayingCard.new;
@@ -197,6 +198,254 @@ void main() {
           c(Suit.spades, Rank.queen),
           c(Suit.clubs, Rank.queen),
         ]),
+        isFalse,
+      );
+    });
+  });
+
+  // Tiplu 7♥: every 7 plus 6♥ (jhiplu) and 8♥ (poplu) is wild.
+  final jokers = Jokers(c(Suit.hearts, Rank.seven));
+
+  group('isSequenceWithJokers', () {
+    test('a joker can fill a gap in the middle', () {
+      expect(
+        isSequenceWithJokers([
+          c(Suit.spades, Rank.three),
+          c(Suit.clubs, Rank.seven),
+          c(Suit.spades, Rank.five),
+        ], jokers),
+        isTrue,
+      );
+    });
+
+    test('a joker can extend either end', () {
+      expect(
+        isSequenceWithJokers([
+          c(Suit.spades, Rank.three),
+          c(Suit.spades, Rank.four),
+          c(Suit.clubs, Rank.seven),
+        ], jokers),
+        isTrue,
+      );
+    });
+
+    test('a joker can extend an ace-high run (Q-K-joker as A)', () {
+      expect(
+        isSequenceWithJokers([
+          c(Suit.spades, Rank.queen),
+          c(Suit.spades, Rank.king),
+          c(Suit.diamonds, Rank.seven),
+        ], jokers),
+        isTrue,
+      );
+    });
+
+    test('a joker can extend an ace-low run (A-2-joker as 3)', () {
+      expect(
+        isSequenceWithJokers([
+          c(Suit.spades, Rank.ace),
+          c(Suit.spades, Rank.two),
+          c(Suit.clubs, Rank.seven),
+        ], jokers),
+        isTrue,
+      );
+    });
+
+    test('a joker cannot make the run wrap round the ace (K-joker-2)', () {
+      expect(
+        isSequenceWithJokers([
+          c(Suit.spades, Rank.king),
+          c(Suit.clubs, Rank.seven),
+          c(Suit.spades, Rank.two),
+        ], jokers),
+        isFalse,
+      );
+    });
+
+    test('several jokers with one natural card is valid', () {
+      expect(
+        isSequenceWithJokers([
+          c(Suit.spades, Rank.nine),
+          c(Suit.clubs, Rank.seven),
+          c(Suit.hearts, Rank.six),
+        ], jokers),
+        isTrue,
+      );
+    });
+
+    test('a 5-card sequence with a joker is valid', () {
+      expect(
+        isSequenceWithJokers([
+          c(Suit.spades, Rank.two),
+          c(Suit.spades, Rank.three),
+          c(Suit.clubs, Rank.seven),
+          c(Suit.spades, Rank.five),
+          c(Suit.spades, Rank.six),
+        ], jokers),
+        isTrue,
+      );
+    });
+
+    test('all jokers with no natural card is invalid', () {
+      expect(
+        isSequenceWithJokers([
+          c(Suit.clubs, Rank.seven),
+          c(Suit.spades, Rank.seven),
+          c(Suit.hearts, Rank.eight),
+        ], jokers),
+        isFalse,
+      );
+    });
+
+    test('wild cards forming a run on face value are still a sequence', () {
+      final cards = [
+        c(Suit.hearts, Rank.six),
+        c(Suit.hearts, Rank.seven),
+        c(Suit.hearts, Rank.eight),
+      ];
+
+      expect(isSequenceWithJokers(cards, jokers), isTrue);
+    });
+
+    test('tiplu in its natural place keeps the sequence pure', () {
+      expect(
+        isPureSequence([
+          c(Suit.hearts, Rank.six),
+          c(Suit.hearts, Rank.seven),
+          c(Suit.hearts, Rank.eight),
+        ]),
+        isTrue,
+      );
+    });
+
+    test('natural cards in different suits are invalid', () {
+      expect(
+        isSequenceWithJokers([
+          c(Suit.spades, Rank.three),
+          c(Suit.clubs, Rank.four),
+          c(Suit.clubs, Rank.seven),
+        ], jokers),
+        isFalse,
+      );
+    });
+
+    test('a gap too wide for the jokers available is invalid', () {
+      expect(
+        isSequenceWithJokers([
+          c(Suit.spades, Rank.three),
+          c(Suit.clubs, Rank.seven),
+          c(Suit.spades, Rank.nine),
+        ], jokers),
+        isFalse,
+      );
+    });
+
+    test('duplicate natural cards are invalid', () {
+      expect(
+        isSequenceWithJokers([
+          c(Suit.spades, Rank.four),
+          c(Suit.spades, Rank.four),
+          c(Suit.clubs, Rank.seven),
+        ], jokers),
+        isFalse,
+      );
+    });
+
+    test('fewer than 3 or more than 5 cards is invalid', () {
+      expect(
+        isSequenceWithJokers([
+          c(Suit.spades, Rank.four),
+          c(Suit.clubs, Rank.seven),
+        ], jokers),
+        isFalse,
+      );
+      expect(
+        isSequenceWithJokers([
+          c(Suit.spades, Rank.two),
+          c(Suit.spades, Rank.three),
+          c(Suit.spades, Rank.four),
+          c(Suit.spades, Rank.five),
+          c(Suit.spades, Rank.six),
+          c(Suit.clubs, Rank.seven),
+        ], jokers),
+        isFalse,
+      );
+    });
+  });
+
+  group('isTrialWithJokers', () {
+    test('a joker can stand in for a missing suit', () {
+      expect(
+        isTrialWithJokers([
+          c(Suit.hearts, Rank.queen),
+          c(Suit.spades, Rank.queen),
+          c(Suit.clubs, Rank.seven),
+        ], jokers),
+        isTrue,
+      );
+    });
+
+    test('two jokers with one natural card is valid', () {
+      expect(
+        isTrialWithJokers([
+          c(Suit.hearts, Rank.queen),
+          c(Suit.clubs, Rank.seven),
+          c(Suit.hearts, Rank.eight),
+        ], jokers),
+        isTrue,
+      );
+    });
+
+    test('all jokers with no natural card is invalid', () {
+      expect(
+        isTrialWithJokers([
+          c(Suit.clubs, Rank.seven),
+          c(Suit.hearts, Rank.six),
+          c(Suit.hearts, Rank.eight),
+        ], jokers),
+        isFalse,
+      );
+    });
+
+    test('wild cards forming a trial on face value are still a trial', () {
+      expect(
+        isTrialWithJokers([
+          c(Suit.clubs, Rank.seven),
+          c(Suit.spades, Rank.seven),
+          c(Suit.diamonds, Rank.seven),
+        ], jokers),
+        isTrue,
+      );
+    });
+
+    test('natural cards sharing a suit are invalid', () {
+      expect(
+        isTrialWithJokers([
+          c(Suit.hearts, Rank.queen),
+          c(Suit.hearts, Rank.queen),
+          c(Suit.clubs, Rank.seven),
+        ], jokers),
+        isFalse,
+      );
+    });
+
+    test('natural cards of different ranks are invalid', () {
+      expect(
+        isTrialWithJokers([
+          c(Suit.hearts, Rank.queen),
+          c(Suit.spades, Rank.king),
+          c(Suit.clubs, Rank.seven),
+        ], jokers),
+        isFalse,
+      );
+    });
+
+    test('wrong card count is invalid', () {
+      expect(
+        isTrialWithJokers([
+          c(Suit.hearts, Rank.queen),
+          c(Suit.clubs, Rank.seven),
+        ], jokers),
         isFalse,
       );
     });
