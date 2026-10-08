@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/main.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
+import 'package:marriage_game/ui/state/table_state.dart';
 import 'package:marriage_game/ui/state/table_view.dart';
 import 'package:marriage_game/ui/table/card_view.dart';
 import 'package:marriage_game/ui/table/hand_fan.dart';
@@ -47,10 +48,12 @@ Future<void> pumpTable(
   );
 }
 
-/// The snapshot the screen is currently drawing.
-TableView currentTable(WidgetTester tester) => ProviderScope.containerOf(
+/// The state the screen is currently drawing.
+TableState currentState(WidgetTester tester) => ProviderScope.containerOf(
   tester.element(find.byType(TableScreen)),
 ).read(tableProvider);
+
+TableView currentTable(WidgetTester tester) => currentState(tester).view;
 
 void main() {
   testWidgets('the app opens on the table screen', (tester) async {
@@ -92,7 +95,7 @@ void main() {
         .toList();
 
     expect(faces, hasLength(21));
-    expect(faces, currentTable(tester).hand);
+    expect(faces, currentState(tester).hand.map((c) => c.card));
   });
 
   testWidgets('the centre shows the stock size and the top discard', (

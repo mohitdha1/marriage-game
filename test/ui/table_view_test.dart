@@ -77,6 +77,29 @@ void main() {
       expect(view.topDiscard, c(Suit.spades, Rank.king));
     });
 
+    test('tracks whose turn it is and whether the human has drawn', () {
+      final round = fourPlayerRound()
+        ..showOpeningTunnellas(0, [])
+        ..showOpeningTunnellas(1, [])
+        ..showOpeningTunnellas(2, [])
+        ..showOpeningTunnellas(3, []);
+
+      final before = TableView.fromRound(round, humanSeat: 0, nameOf: nameOf);
+      expect(before.currentSeat, 0);
+      expect(before.isYourTurn, isTrue);
+      expect(before.youHaveDrawn, isFalse);
+      expect(before.winner, isNull);
+
+      round.draw(DrawSource.stock);
+      final after = TableView.fromRound(round, humanSeat: 0, nameOf: nameOf);
+      expect(after.youHaveDrawn, isTrue);
+
+      round.discard(c(Suit.clubs, Rank.two));
+      final next = TableView.fromRound(round, humanSeat: 0, nameOf: nameOf);
+      expect(next.currentSeat, 1);
+      expect(next.isYourTurn, isFalse);
+    });
+
     test('an empty discard pile shows as null', () {
       final round = Round.fromCards(
         config: GameConfig(playerCount: 2),

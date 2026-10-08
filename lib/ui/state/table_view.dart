@@ -26,6 +26,9 @@ class TableView {
     required this.hand,
     required this.stockCount,
     required this.topDiscard,
+    required this.currentSeat,
+    required this.youHaveDrawn,
+    required this.winner,
   });
 
   /// Builds the view for [humanSeat]. [opponents] are listed in turn order
@@ -52,6 +55,9 @@ class TableView {
       hand: round.hands[humanSeat].cards,
       stockCount: round.stockCount,
       topDiscard: round.topDiscard,
+      currentSeat: round.currentSeat,
+      youHaveDrawn: round.hands[humanSeat].hasDrawn,
+      winner: round.winner == null ? null : seatView(round.winner!),
     );
   }
 
@@ -65,4 +71,15 @@ class TableView {
 
   /// The face-up card on the discard pile, or `null` if it's empty.
   final PlayingCard? topDiscard;
+
+  /// The seat whose turn it is.
+  final int currentSeat;
+
+  /// Whether the human player has drawn this turn and now owes a discard.
+  final bool youHaveDrawn;
+
+  /// Who won the round, or `null` while it's still being played.
+  final SeatView? winner;
+
+  bool get isYourTurn => winner == null && currentSeat == you.seat;
 }

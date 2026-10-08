@@ -1,21 +1,36 @@
 import 'package:flutter/material.dart';
 
 import '../../engine/card.dart';
+import '../../engine/round.dart';
+import '../state/table_state.dart';
 import 'card_view.dart';
 
 /// The middle of the table: the face-down stock and the face-up discard
 /// pile, side by side.
+///
+/// Tap the stock (or drag it onto the hand) to draw from it. Tap the discard
+/// pile to take its top card, or — once you've drawn — to discard the
+/// selected card. A card dragged from the hand onto the discard pile is
+/// discarded.
 class TableCenter extends StatelessWidget {
   const TableCenter({
     super.key,
     required this.stockCount,
     required this.topDiscard,
     required this.cardWidth,
+    this.onStockTap,
+    this.onDiscardPileTap,
+    this.onCardDropped,
   });
 
   final int stockCount;
   final PlayingCard? topDiscard;
   final double cardWidth;
+  final VoidCallback? onStockTap;
+  final VoidCallback? onDiscardPileTap;
+
+  /// Called with the id of a hand card dropped on the discard pile.
+  final void Function(int cardId)? onCardDropped;
 
   @override
   Widget build(BuildContext context) {
@@ -24,18 +39,48 @@ class TableCenter extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         _Pile(
+          key: const Key('stock'),
           label: 'Stock · $stockCount',
           labelKey: const Key('stock-count'),
+          onTap: onStockTap,
           child: stockCount == 0
               ? CardSlot(width: cardWidth)
-              : _StackedBacks(width: cardWidth),
+              : Draggable<DrawSource>(
+                  data: DrawSource.stock,
+                  feedback: CardBack(width: cardWidth),
+                  childWhenDragging: _StackedBacks(width: cardWidth),
+                  child: _StackedBacks(width: cardWidth),
+                ),
         ),
         SizedBox(width: cardWidth * 0.6),
-        _Pile(
-          label: 'Discard',
-          child: discard == null
-              ? CardSlot(width: cardWidth)
-              : CardFace(discard, width: cardWidth),
+        DragTarget<HandCard>(
+          onAcceptWithDetails: (details) =>
+              onCardDropped?.call(details.data.id),
+          builder: (context, candidates, rejected) {
+            final face = discard == null
+                ? CardSlot(width: cardWidth)
+                : CardFace(
+                    discard,
+                    width: cardWidth,
+                    highlighted: candidates.isNotEmpty,
+                  );
+            return _Pile(
+              key: const Key('discard-pile'),
+              label: 'Discard',
+              onTap: onDiscardPileTap,
+              child: discard == null
+                  ? face
+                  : Draggable<DrawSource>(
+                      data: DrawSource.discardPile,
+                      feedback: Material(
+                        color: Colors.transparent,
+                        child: CardFace(discard, width: cardWidth),
+                      ),
+                      childWhenDragging: CardSlot(width: cardWidth),
+                      child: face,
+                    ),
+            );
+          },
         ),
       ],
     );
@@ -43,25 +88,35 @@ class TableCenter extends StatelessWidget {
 }
 
 class _Pile extends StatelessWidget {
-  const _Pile({required this.label, required this.child, this.labelKey});
+  const _Pile({
+    super.key,
+    required this.label,
+    required this.child,
+    this.labelKey,
+    this.onTap,
+  });
 
   final String label;
   final Key? labelKey;
   final Widget child;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        child,
-        const SizedBox(height: 4),
-        Text(
-          label,
-          key: labelKey,
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
-        ),
-      ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          child,
+          const SizedBox(height: 4),
+          Text(
+            label,
+            key: labelKey,
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+        ],
+      ),
     );
   }
 }

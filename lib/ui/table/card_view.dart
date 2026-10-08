@@ -8,10 +8,18 @@ const cardAspectRatio = 2.5 / 3.5;
 /// A face-up card: rank and suit in the corner, a large suit in the middle.
 /// Placeholder art until the Phase 3 card faces.
 class CardFace extends StatelessWidget {
-  const CardFace(this.card, {super.key, required this.width});
+  const CardFace(
+    this.card, {
+    super.key,
+    required this.width,
+    this.highlighted = false,
+  });
 
   final PlayingCard card;
   final double width;
+
+  /// Draws a bright border, for a selected card.
+  final bool highlighted;
 
   bool get _isRed => card.suit == Suit.hearts || card.suit == Suit.diamonds;
 
@@ -24,6 +32,7 @@ class CardFace extends StatelessWidget {
       child: _CardShape(
         width: width,
         color: Colors.white,
+        highlighted: highlighted,
         child: Stack(
           children: [
             Positioned(
@@ -123,11 +132,13 @@ class _CardShape extends StatelessWidget {
     required this.width,
     required this.color,
     required this.child,
+    this.highlighted = false,
   });
 
   final double width;
   final Color color;
   final Widget child;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -137,7 +148,9 @@ class _CardShape extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(width * 0.1),
-        border: Border.all(color: const Color(0x33000000)),
+        border: highlighted
+            ? Border.all(color: const Color(0xFFFFC107), width: 2.5)
+            : Border.all(color: const Color(0x33000000)),
         boxShadow: const [
           BoxShadow(
             color: Color(0x40000000),
