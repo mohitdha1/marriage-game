@@ -11,6 +11,7 @@ class GameConfig {
     this.kidnapEnabled = false,
     this.manCardsEnabled = false,
     this.supermanCardEnabled = false,
+    this.jokerDiscardPenaltyEnabled = true,
   }) {
     if (playerCount < 2 || playerCount > 5) {
       throw ArgumentError.value(
@@ -28,4 +29,8 @@ class GameConfig {
   final bool kidnapEnabled;
   final bool manCardsEnabled;
   final bool supermanCardEnabled;
+
+  /// House rule: a player who has seen the joker and then discards a wild
+  /// card pays [ScoringTable.jokerDiscardPenalty] to the round's winner.
+  final bool jokerDiscardPenaltyEnabled;
 }

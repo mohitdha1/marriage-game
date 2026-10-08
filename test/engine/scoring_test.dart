@@ -309,6 +309,70 @@ void main() {
       expect(result.net, [8 + 15, -8, -15]);
     });
 
+    test('each joker discarded after seeing costs 15, paid to the winner', () {
+      final result = scoreRound(
+        hands: [seenHand(), seenHand(), unseenHand()],
+        winner: 0,
+        jokers: jokers,
+        jokerDiscards: [0, 2, 0],
+      );
+
+      expect(result.penalties, [0, 30, 0]);
+      // Seat 1 pays 3 (seen) + 30 penalty; seat 2 pays 10 (unseen).
+      expect(result.net, [3 + 30 + 10, -33, -10]);
+    });
+
+    test('the winner\'s own joker discards cost nothing', () {
+      final result = scoreRound(
+        hands: [seenHand(), seenHand()],
+        winner: 0,
+        jokers: jokers,
+        jokerDiscards: [3, 0],
+      );
+
+      expect(result.penalties, [0, 0]);
+      expect(result.net, [3, -3]);
+    });
+
+    test('settlement with penalties still sums to zero', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(held: [alter]),
+          seenHand(held: [tiplu, tiplu]),
+          unseenHand(),
+          seenHand(held: [jhiplu, tiplu, poplu]),
+        ],
+        winner: 3,
+        jokers: jokers,
+        jokerDiscards: [1, 2, 0, 1],
+      );
+
+      expect(result.penalties, [15, 30, 0, 0]);
+      expect(result.net.fold(0, (sum, n) => sum + n), 0);
+    });
+
+    test('without joker discard counts, nobody pays a penalty', () {
+      final result = scoreRound(
+        hands: [seenHand(), seenHand()],
+        winner: 0,
+        jokers: jokers,
+      );
+
+      expect(result.penalties, [0, 0]);
+    });
+
+    test('joker discard counts must cover every seat', () {
+      expect(
+        () => scoreRound(
+          hands: [seenHand(), seenHand()],
+          winner: 0,
+          jokers: jokers,
+          jokerDiscards: [1],
+        ),
+        throwsArgumentError,
+      );
+    });
+
     test('the winner must have seen the joker', () {
       expect(
         () => scoreRound(

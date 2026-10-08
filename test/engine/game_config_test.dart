@@ -13,6 +13,7 @@ void main() {
       expect(config.kidnapEnabled, isFalse);
       expect(config.manCardsEnabled, isFalse);
       expect(config.supermanCardEnabled, isFalse);
+      expect(config.jokerDiscardPenaltyEnabled, isTrue);
     });
 
     test('every field can be overridden', () {
@@ -24,6 +25,7 @@ void main() {
         kidnapEnabled: true,
         manCardsEnabled: true,
         supermanCardEnabled: true,
+        jokerDiscardPenaltyEnabled: false,
       );
 
       expect(config.deckCount, 2);
@@ -33,6 +35,7 @@ void main() {
       expect(config.kidnapEnabled, isTrue);
       expect(config.manCardsEnabled, isTrue);
       expect(config.supermanCardEnabled, isTrue);
+      expect(config.jokerDiscardPenaltyEnabled, isFalse);
     });
   });
 

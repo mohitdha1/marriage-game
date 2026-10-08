@@ -1,4 +1,5 @@
 import 'card.dart';
+import 'game_config.dart';
 import 'joker.dart';
 import 'player_hand.dart';
 
@@ -26,6 +27,10 @@ abstract final class ScoringTable {
   static const winnerFromSeen = 3;
   static const winnerFromUnseen = 10;
   static const dubleeWinBonus = 5;
+
+  /// Paid to the winner for each wild card a player discarded after seeing
+  /// the joker, when [GameConfig.jokerDiscardPenaltyEnabled] is on.
+  static const jokerDiscardPenalty = 15;
 }
 
 /// One player's maal points for a round, itemised for the scoreboard.
@@ -136,7 +141,12 @@ int _lookup(List<int> table, int count, String name) {
 
 /// The outcome of one round.
 class RoundScore {
-  RoundScore({required this.winner, required this.maal, required this.net});
+  RoundScore({
+    required this.winner,
+    required this.maal,
+    required this.net,
+    List<int>? penalties,
+  }) : penalties = penalties ?? List.filled(net.length, 0);
 
   /// Seat index of the player who won the round.
   final int winner;
@@ -147,6 +157,10 @@ class RoundScore {
   /// Each player's points won (+) or lost (−) this round, by seat. Always
   /// sums to zero.
   final List<int> net;
+
+  /// Joker-discard penalty points each player paid the winner, by seat;
+  /// already included in [net].
+  final List<int> penalties;
 }
 
 /// Settles a round won by the player at seat [winner].
@@ -155,11 +169,25 @@ class RoundScore {
 /// players, minus everyone's maal combined. On top of that, every other
 /// player pays the winner 3 if they saw the joker or 10 if they didn't, plus
 /// 5 more if the winner showed doublees.
+///
+/// [jokerDiscards] is how many wild cards each seat discarded after seeing
+/// the joker; each one costs [ScoringTable.jokerDiscardPenalty], paid to the
+/// winner. The round passes all zeros when that house rule is off. The
+/// winner's own joker discards cost nothing, since they'd be paying
+/// themselves.
 RoundScore scoreRound({
   required List<PlayerHand> hands,
   required int winner,
   required Jokers jokers,
+  List<int>? jokerDiscards,
 }) {
+  if (jokerDiscards != null && jokerDiscards.length != hands.length) {
+    throw ArgumentError.value(
+      jokerDiscards.length,
+      'jokerDiscards',
+      'must have one count per seat',
+    );
+  }
   if (winner < 0 || winner >= hands.length) {
     throw ArgumentError.value(winner, 'winner', 'is not a seat at the table');
   }
@@ -176,6 +204,7 @@ RoundScore scoreRound({
   final net = [for (final m in maal) m.total * hands.length - totalMaal];
 
   final dubleeWin = hands[winner].showKind == ShowKind.doublees;
+  final penalties = List.filled(hands.length, 0);
   for (var seat = 0; seat < hands.length; seat++) {
     if (seat == winner) continue;
     var payment = hands[seat].hasSeenJoker
@@ -184,9 +213,20 @@ RoundScore scoreRound({
     if (dubleeWin) payment += ScoringTable.dubleeWinBonus;
     net[seat] -= payment;
     net[winner] += payment;
+
+    final penalty =
+        (jokerDiscards?[seat] ?? 0) * ScoringTable.jokerDiscardPenalty;
+    penalties[seat] = penalty;
+    net[seat] -= penalty;
+    net[winner] += penalty;
   }
 
-  return RoundScore(winner: winner, maal: maal, net: net);
+  return RoundScore(
+    winner: winner,
+    maal: maal,
+    net: net,
+    penalties: penalties,
+  );
 }
 
 /// Running totals across a match. There's no round limit: players stop
