@@ -25,11 +25,11 @@ bool isTrial(List<PlayingCard> cards) {
   return suits.length == 3;
 }
 
-/// A pure sequence is 3 to 5 consecutive same-suit cards, with no jokers
+/// A pure sequence is 3 or more consecutive same-suit cards, with no jokers
 /// involved. Ace can act as high (Q-K-A) or low (A-2-3), but never wraps
-/// (K-A-2 is not valid either way).
+/// (K-A-2 is not valid either way), so the longest possible run is 13 cards.
 bool isPureSequence(List<PlayingCard> cards) {
-  if (cards.length < 3 || cards.length > 5) return false;
+  if (cards.length < 3) return false;
 
   final suit = cards.first.suit;
   if (!cards.every((c) => c.suit == suit)) return false;
@@ -43,7 +43,7 @@ bool isPureSequence(List<PlayingCard> cards) {
   return _isConsecutive(aceLowValues);
 }
 
-/// A sequence is 3 to 5 same-suit cards in a run, where wild cards (see
+/// A sequence is 3 or more same-suit cards in a run, where wild cards (see
 /// [Jokers.isWild]) can fill any gaps or extend either end. At least one
 /// card must be a natural (non-wild) card, unless the cards already form a
 /// pure sequence on their face values. Ace is high or low, never wrapping,
@@ -53,7 +53,8 @@ bool isPureSequence(List<PlayingCard> cards) {
 /// natural place (e.g. tiplu 7♥ in 6♥-7♥-8♥) still counts as pure, because
 /// [isPureSequence] only looks at face values.
 bool isSequenceWithJokers(List<PlayingCard> cards, Jokers jokers) {
-  if (cards.length < 3 || cards.length > 5) return false;
+  // Without wrapping round the ace, a run can't be longer than 13 ranks.
+  if (cards.length < 3 || cards.length > Rank.values.length) return false;
   if (isPureSequence(cards)) return true;
 
   final naturals = cards.where((c) => !jokers.isWild(c)).toList();

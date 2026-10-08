@@ -354,8 +354,12 @@ void main() {
       expect(hand.openingTunnellas, isEmpty);
     });
 
-    test('a 5-card pure sequence can be shown', () {
-      final longRun = [...spadesRun, c(Suit.spades, Rank.king)];
+    test('a 6-card pure sequence counts as one of the 3 sets', () {
+      final longRun = [
+        c(Suit.spades, Rank.eight),
+        ...spadesRun,
+        c(Suit.spades, Rank.king),
+      ];
       final hand = openedHand([...heartsRun, ...longRun, ...diamondsRun])
         ..draw(drawnCard);
 

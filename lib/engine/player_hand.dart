@@ -132,7 +132,7 @@ class PlayerHand {
     _hasDrawn = false;
   }
 
-  /// Shows [pureSetsStillNeeded] pure sets — each a pure sequence (3 to 5
+  /// Shows [pureSetsStillNeeded] pure sets — each a pure sequence (3 or more
   /// cards) or a tunnella — to see the joker. Allowed after drawing, or
   /// before the player's first draw if the sets came straight from the deal.
   /// If 3 opening tunnellas were shown, pass an empty list.

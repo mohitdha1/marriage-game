@@ -29,7 +29,7 @@ void main() {
       );
     });
 
-    test('5 consecutive same-suit cards (the max) is valid', () {
+    test('5 consecutive same-suit cards is valid', () {
       expect(
         isPureSequence([
           c(Suit.clubs, Rank.three),
@@ -42,7 +42,7 @@ void main() {
       );
     });
 
-    test('6 consecutive same-suit cards exceeds the cap', () {
+    test('6 or more consecutive same-suit cards is valid (no upper cap)', () {
       expect(
         isPureSequence([
           c(Suit.clubs, Rank.three),
@@ -51,6 +51,23 @@ void main() {
           c(Suit.clubs, Rank.six),
           c(Suit.clubs, Rank.seven),
           c(Suit.clubs, Rank.eight),
+        ]),
+        isTrue,
+      );
+    });
+
+    test('a full 13-card suit from 2 to A is valid', () {
+      expect(
+        isPureSequence([for (final r in Rank.values) c(Suit.spades, r)]),
+        isTrue,
+      );
+    });
+
+    test('a 14-card run would have to wrap, so is invalid', () {
+      expect(
+        isPureSequence([
+          c(Suit.spades, Rank.ace),
+          for (final r in Rank.values) c(Suit.spades, r),
         ]),
         isFalse,
       );
@@ -379,7 +396,7 @@ void main() {
       );
     });
 
-    test('fewer than 3 or more than 5 cards is invalid', () {
+    test('fewer than 3 cards is invalid', () {
       expect(
         isSequenceWithJokers([
           c(Suit.spades, Rank.four),
@@ -387,6 +404,9 @@ void main() {
         ], jokers),
         isFalse,
       );
+    });
+
+    test('6 or more cards with a joker is valid (no upper cap)', () {
       expect(
         isSequenceWithJokers([
           c(Suit.spades, Rank.two),
@@ -395,6 +415,20 @@ void main() {
           c(Suit.spades, Rank.five),
           c(Suit.spades, Rank.six),
           c(Suit.clubs, Rank.seven),
+        ], jokers),
+        isTrue,
+      );
+    });
+
+    test('more than 13 cards is invalid even with jokers', () {
+      // 12 natural spades (all but the 7) plus 2 jokers: one would fill the
+      // 7, but the other has nowhere to go without wrapping.
+      expect(
+        isSequenceWithJokers([
+          for (final r in Rank.values)
+            if (r != Rank.seven) c(Suit.spades, r),
+          c(Suit.clubs, Rank.seven),
+          c(Suit.diamonds, Rank.seven),
         ], jokers),
         isFalse,
       );
