@@ -14,6 +14,19 @@ bool isDoublee(List<PlayingCard> cards) {
   return cards[0] == cards[1];
 }
 
+/// Every separate tunnella in [cards]: one for each 3 copies of a card, in
+/// the order the cards first appear.
+List<List<PlayingCard>> findTunnellas(List<PlayingCard> cards) {
+  final copies = <PlayingCard, int>{};
+  for (final card in cards) {
+    copies[card] = (copies[card] ?? 0) + 1;
+  }
+  return [
+    for (final MapEntry(key: card, value: n) in copies.entries)
+      for (var i = 0; i < n ~/ 3; i++) [card, card, card],
+  ];
+}
+
 /// A trial is 3 cards of the same rank across 3 strictly different suits.
 bool isTrial(List<PlayingCard> cards) {
   if (cards.length != 3) return false;

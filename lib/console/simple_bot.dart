@@ -211,12 +211,6 @@ class SimpleBot {
   }
 }
 
-/// Every separate tunnella in [cards]: one for each 3 copies of a card.
-List<List<PlayingCard>> findTunnellas(List<PlayingCard> cards) => [
-  for (final MapEntry(key: card, value: n) in _countCopies(cards).entries)
-    for (var i = 0; i < n ~/ 3; i++) [card, card, card],
-];
-
 Map<PlayingCard, int> _countCopies(List<PlayingCard> cards) {
   final copies = <PlayingCard, int>{};
   for (final card in cards) {

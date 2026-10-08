@@ -2,6 +2,7 @@ import 'dart:math';
 
 import '../engine/card.dart';
 import '../engine/game_config.dart';
+import '../engine/melds.dart';
 import '../engine/player_hand.dart';
 import '../engine/round.dart';
 import '../engine/scoring.dart';

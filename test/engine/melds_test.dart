@@ -220,6 +220,43 @@ void main() {
     });
   });
 
+  group('findTunnellas', () {
+    test('finds each card held 3 times', () {
+      final kings = [for (var i = 0; i < 3; i++) c(Suit.clubs, Rank.king)];
+      final twos = [for (var i = 0; i < 3; i++) c(Suit.hearts, Rank.two)];
+
+      expect(findTunnellas([...kings, c(Suit.spades, Rank.ace), ...twos]), [
+        kings,
+        twos,
+      ]);
+    });
+
+    test('2 copies, or the same rank in other suits, are not tunnellas', () {
+      expect(
+        findTunnellas([
+          c(Suit.clubs, Rank.king),
+          c(Suit.clubs, Rank.king),
+          c(Suit.hearts, Rank.king),
+          c(Suit.spades, Rank.king),
+        ]),
+        isEmpty,
+      );
+    });
+
+    test('copies need not be next to each other', () {
+      expect(
+        findTunnellas([
+          c(Suit.clubs, Rank.nine),
+          c(Suit.hearts, Rank.two),
+          c(Suit.clubs, Rank.nine),
+          c(Suit.spades, Rank.ace),
+          c(Suit.clubs, Rank.nine),
+        ]),
+        hasLength(1),
+      );
+    });
+  });
+
   group('isDoublee', () {
     test('2 physically-identical cards is valid', () {
       expect(
