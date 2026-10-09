@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/card.dart';
 import '../../engine/round.dart';
+import '../scoreboard/scoreboard_screen.dart';
 import '../state/table_controller.dart';
 import '../state/table_state.dart';
 import '../state/table_view.dart';
@@ -33,6 +34,18 @@ class TableScreen extends ConsumerWidget {
     final state = ref.watch(tableProvider);
     final table = state.view;
     final controller = ref.read(tableProvider.notifier);
+
+    // When a round ends, give the player a moment to see the winning move,
+    // then show the scores.
+    ref.listen(tableProvider.select((s) => s.roundScores.length), (
+      previous,
+      next,
+    ) {
+      if (next <= (previous ?? 0)) return;
+      Future.delayed(scoreboardDelay, () {
+        if (context.mounted) _openScoreboard(context);
+      });
+    });
 
     ref.listen(tableProvider.select((s) => s.noticeId), (previous, next) {
       final notice = ref.read(tableProvider).notice;
@@ -83,11 +96,23 @@ class TableScreen extends ConsumerWidget {
                       ),
                     Align(
                       alignment: Alignment.topLeft,
-                      child: FilledButton.tonalIcon(
-                        key: const Key('sort-button'),
-                        onPressed: controller.sortHand,
-                        icon: const Icon(Icons.sort),
-                        label: const Text('Sort'),
+                      child: Row(
+                        key: const Key('top-left-buttons'),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton.filledTonal(
+                            key: const Key('sort-button'),
+                            tooltip: 'Sort by suit, then rank',
+                            onPressed: controller.sortHand,
+                            icon: const Icon(Icons.sort),
+                          ),
+                          IconButton.filledTonal(
+                            key: const Key('scores-button'),
+                            tooltip: 'Scores',
+                            onPressed: () => _openScoreboard(context),
+                            icon: const Icon(Icons.leaderboard),
+                          ),
+                        ],
                       ),
                     ),
                     Align(
@@ -187,6 +212,16 @@ class TableScreen extends ConsumerWidget {
   }
 }
 
+/// How long the table stays on screen after a round ends before the
+/// scoreboard opens.
+const scoreboardDelay = Duration(milliseconds: 1500);
+
+void _openScoreboard(BuildContext context) {
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (_) => const ScoreboardScreen()));
+}
+
 /// What the human player should do next, in a few words.
 String statusLine(TableState state) {
   final table = state.view;
@@ -265,7 +300,9 @@ class _ActionBar extends StatelessWidget {
       );
 }
 
-/// The joker, once the human player has seen it, in the top corner.
+/// The joker in the top corner, as a small card: the tiplu face up once the
+/// human player has seen it, or face down while it's picked but hidden from
+/// them. Kept to a card's width so it never crowds the seats.
 class _JokerChip extends StatelessWidget {
   const _JokerChip({required this.table});
 
@@ -274,30 +311,21 @@ class _JokerChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final jokers = table.yourJokers;
-    final String label;
-    if (jokers != null) {
-      label = 'Joker';
-    } else if (table.isJokerChosen) {
-      label = 'Joker hidden';
-    } else {
-      return const SizedBox.shrink();
-    }
-    return Container(
-      key: const Key('joker-chip'),
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: const Color(0x55000000),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white)),
-          if (jokers != null) ...[
-            const SizedBox(width: 6),
-            CardFace(jokers.tiplu, width: 24, wild: true),
-          ],
-        ],
+    if (jokers == null && !table.isJokerChosen) return const SizedBox.shrink();
+    return Tooltip(
+      message: jokers == null
+          ? 'The joker has been picked; show your sets to see it'
+          : 'Joker: ${jokers.tiplu}',
+      child: Container(
+        key: const Key('joker-chip'),
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: const Color(0x55000000),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: jokers == null
+            ? const CardBack(width: 28)
+            : CardFace(jokers.tiplu, width: 28, wild: true),
       ),
     );
   }

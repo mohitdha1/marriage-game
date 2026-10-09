@@ -7,6 +7,7 @@ import 'package:marriage_game/engine/card.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/main.dart';
+import 'package:marriage_game/ui/scoreboard/scoreboard_screen.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_state.dart';
 import 'package:marriage_game/ui/table/card_view.dart';
@@ -50,7 +51,7 @@ Future<void> pumpTable(
         randomProvider.overrideWithValue(Random(0)),
         botThinkingTimeProvider.overrideWithValue(() => thinkingTime),
         roundFactoryProvider.overrideWithValue(
-          () => Round.fromCards(
+          (seat) => Round.fromCards(
             config: GameConfig(playerCount: 2),
             random: Random(0),
             hands: [
@@ -360,6 +361,13 @@ void main() {
 
       expect(status(tester), 'You won the round.');
       expect(find.text('You won the round!'), findsOneWidget);
+
+      // After a moment, the scoreboard opens on its own.
+      expect(find.byType(ScoreboardScreen), findsNothing);
+      await tester.pump(scoreboardDelay);
+      await tester.pumpAndSettle();
+      expect(find.byType(ScoreboardScreen), findsOneWidget);
+      expect(find.text('Round 1: You won'), findsOneWidget);
     });
 
     testWidgets('Show and Group only appear when they can be used', (

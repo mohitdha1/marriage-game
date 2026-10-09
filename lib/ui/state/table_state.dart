@@ -1,4 +1,5 @@
 import '../../engine/card.dart';
+import '../../engine/scoring.dart';
 import 'table_view.dart';
 
 /// One card in the human player's hand, with an [id] that stays the same
@@ -36,6 +37,10 @@ class TableState {
     this.revealingJoker = false,
     this.winningDiscards = const {},
     this.botMoves = const {},
+    this.roundNumber = 1,
+    this.seatNames = const [],
+    this.roundScores = const [],
+    this.totals = const [],
     this.notice,
     this.noticeId = 0,
   });
@@ -71,6 +76,18 @@ class TableState {
   /// Each bot's latest move in a few words, by seat, shown at its seat.
   final Map<int, String> botMoves;
 
+  /// Which round of the match this is, counting from 1.
+  final int roundNumber;
+
+  /// Every player's name, by seat.
+  final List<String> seatNames;
+
+  /// The scores of every finished round in the match, oldest first.
+  final List<RoundScore> roundScores;
+
+  /// Each player's running match total, by seat.
+  final List<int> totals;
+
   /// A message to show the player, such as why a move wasn't allowed.
   final String? notice;
 
@@ -101,6 +118,8 @@ class TableState {
     bool? revealingJoker,
     Set<int>? winningDiscards,
     Map<int, String>? botMoves,
+    List<RoundScore>? roundScores,
+    List<int>? totals,
     String? notice,
   }) => TableState(
     view: view ?? this.view,
@@ -112,6 +131,10 @@ class TableState {
     revealingJoker: revealingJoker ?? this.revealingJoker,
     winningDiscards: winningDiscards ?? this.winningDiscards,
     botMoves: botMoves ?? this.botMoves,
+    roundNumber: roundNumber,
+    seatNames: seatNames,
+    roundScores: roundScores ?? this.roundScores,
+    totals: totals ?? this.totals,
     notice: notice ?? this.notice,
     noticeId: notice != null ? noticeId + 1 : noticeId,
   );

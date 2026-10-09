@@ -9,6 +9,7 @@ import '../../engine/game_config.dart';
 import '../../engine/melds.dart';
 import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
+import '../../engine/scoring.dart';
 import '../../engine/win_check.dart';
 import 'table_state.dart';
 import 'table_view.dart';
@@ -22,10 +23,11 @@ final gameConfigProvider = Provider<GameConfig>((ref) => GameConfig());
 final randomProvider = Provider<Random>((ref) => Random());
 
 /// Starts a new round. Tests override it to deal known cards.
-final roundFactoryProvider = Provider<Round Function()>((ref) {
+final roundFactoryProvider = Provider<Round Function(int firstSeat)>((ref) {
   final config = ref.watch(gameConfigProvider);
   final random = ref.watch(randomProvider);
-  return () => Round.deal(config: config, random: random);
+  return (firstSeat) =>
+      Round.deal(config: config, random: random, firstSeat: firstSeat);
 });
 
 /// How well the bots play. Medium for Quick Play; the lobby will let players
@@ -59,19 +61,27 @@ final tableProvider = NotifierProvider<TableController, TableState>(
 /// each bot's move, so the player watches the game unfold. The human player
 /// can't move while a bot is thinking.
 class TableController extends Notifier<TableState> {
+  late Round Function(int firstSeat) _newRound;
   late Round _round;
   late Map<int, BotPlayer> _bots;
   late Duration Function() _thinkingTime;
+  late MatchScore _match;
   Future<void>? _botsPlaying;
   var _nextCardId = 0;
+  var _firstSeat = 0;
+  var _roundNumber = 1;
+  var _roundRecorded = false;
 
   @override
   TableState build() {
-    _round = ref.watch(roundFactoryProvider)();
+    _newRound = ref.watch(roundFactoryProvider);
     _thinkingTime = ref.watch(botThinkingTimeProvider);
-    _botsPlaying = null;
-    _nextCardId = 0;
+    _firstSeat = 0;
+    _roundNumber = 1;
+    _round = _newRound(_firstSeat);
+    _match = MatchScore(_round.hands.length);
 
+    // The same bots play every round of the match.
     final random = ref.watch(randomProvider);
     final difficulty = ref.watch(botDifficultyProvider);
     final botSeats = [
@@ -87,6 +97,26 @@ class TableController extends Notifier<TableState> {
           random: random,
         ),
     };
+
+    return _setUpRound();
+  }
+
+  /// Deals the next round once the current one is over. The first player
+  /// moves one seat round the table, and match totals carry on.
+  void startNextRound() {
+    if (!_round.isOver) return;
+    _firstSeat = (_firstSeat + 1) % _round.hands.length;
+    _roundNumber++;
+    _round = _newRound(_firstSeat);
+    state = _setUpRound();
+  }
+
+  /// Makes the opening shows for the newly dealt [_round] and returns its
+  /// first state.
+  TableState _setUpRound() {
+    _botsPlaying = null;
+    _nextCardId = 0;
+    _roundRecorded = false;
 
     for (final MapEntry(key: seat, value: bot) in _bots.entries) {
       _round.showOpeningTunnellas(
@@ -109,6 +139,12 @@ class TableController extends Notifier<TableState> {
       view: _snapshot(),
       hand: _reconcile(const []),
       openingChoice: mustChoose ? tunnellas : null,
+      roundNumber: _roundNumber,
+      seatNames: [
+        for (var seat = 0; seat < _round.hands.length; seat++) _nameOf(seat),
+      ],
+      roundScores: List.unmodifiable(_match.rounds),
+      totals: List.unmodifiable(_match.totals),
     );
   }
 
@@ -345,6 +381,12 @@ class TableController extends Notifier<TableState> {
     Set<int> removed = const {},
     Map<int, String>? botMoves,
   }) {
+    // Score a finished round once, however it ended.
+    if (_round.isOver && !_roundRecorded) {
+      _match.addRound(_round.score());
+      _roundRecorded = true;
+    }
+
     final hand = _reconcile([
       for (final handCard in state.hand)
         if (!removed.contains(handCard.id)) handCard,
@@ -360,6 +402,8 @@ class TableController extends Notifier<TableState> {
       groups: groups,
       winningDiscards: _winningDiscards(hand),
       botMoves: botMoves,
+      roundScores: List.unmodifiable(_match.rounds),
+      totals: List.unmodifiable(_match.totals),
       notice: notice,
     );
   }

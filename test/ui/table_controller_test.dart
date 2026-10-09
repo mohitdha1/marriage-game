@@ -46,7 +46,7 @@ ProviderContainer tableWith({
   List<PlayingCard>? botHand,
   List<PlayingCard>? stock,
   List<PlayingCard>? discardPile,
-  int firstSeat = 0,
+  int? firstSeat,
   Duration thinkingTime = Duration.zero,
 }) {
   final container = ProviderContainer(
@@ -54,7 +54,7 @@ ProviderContainer tableWith({
       randomProvider.overrideWithValue(Random(0)),
       botThinkingTimeProvider.overrideWithValue(() => thinkingTime),
       roundFactoryProvider.overrideWithValue(
-        () => Round.fromCards(
+        (seat) => Round.fromCards(
           config: GameConfig(playerCount: 2),
           random: Random(0),
           hands: [yourHand ?? yourCards, botHand ?? idleBotCards],
@@ -67,7 +67,7 @@ ProviderContainer tableWith({
                 queenOfDiamonds,
               ],
           discardPile: discardPile ?? [kingOfClubs],
-          firstSeat: firstSeat,
+          firstSeat: firstSeat ?? seat,
         ),
       ),
     ],
@@ -710,6 +710,95 @@ void main() {
         ),
         'Drew, won!',
       );
+    });
+  });
+
+  group('Match', () {
+    ProviderContainer wonByYou() {
+      final container =
+          tableWith(
+              yourHand: [
+                ...yourCards.take(9),
+                c(Suit.spades, Rank.king),
+                c(Suit.diamonds, Rank.king),
+                c(Suit.clubs, Rank.seven),
+                c(Suit.diamonds, Rank.ten),
+                c(Suit.diamonds, Rank.jack),
+                c(Suit.hearts, Rank.eight),
+                twoOfDiamonds,
+              ],
+            )
+            ..controller.draw(DrawSource.stock)
+            ..group(heartsRun)
+            ..group(spadesRun)
+            ..group(clubsRun)
+            ..controller.showGroups()
+            ..controller.pickTiplu(1);
+      container.controller
+        ..toggleSelected(container.idOf(twoOfDiamonds))
+        ..declareWin();
+      return container;
+    }
+
+    test('a finished round is scored and added to the match', () {
+      final container = wonByYou();
+      final table = container.table;
+
+      expect(table.roundScores, hasLength(1));
+      expect(table.roundScores.single.winner, 0);
+      expect(table.totals, table.roundScores.single.net);
+      expect(table.seatNames.first, 'You');
+      expect(table.seatNames[1], table.view.opponents.single.name);
+    });
+
+    test('a round won by a bot is scored too', () async {
+      final container = tableWith(
+        botHand: [
+          ...run(Suit.spades, [Rank.jack, Rank.queen, Rank.king]),
+          ...run(Suit.clubs, [Rank.four, Rank.five, Rank.six]),
+          ...run(Suit.diamonds, [Rank.ace, Rank.two, Rank.three]),
+          c(Suit.hearts, Rank.eight),
+          c(Suit.clubs, Rank.queen),
+          queenOfDiamonds,
+        ],
+        stock: [c(Suit.hearts, Rank.seven), c(Suit.clubs, Rank.two)],
+      )..controller.tapDiscardPile();
+      await container.controller.discard(
+        container.idOf(c(Suit.hearts, Rank.three)),
+      );
+
+      expect(container.table.roundScores.single.winner, 1);
+    });
+
+    test('Next round only works once the round is over', () {
+      final container = tableWith()..controller.startNextRound();
+
+      expect(container.table.roundNumber, 1);
+    });
+
+    test('Next round deals afresh, rotates the first player, and keeps the '
+        'totals and the bots', () async {
+      final container = wonByYou();
+      final names = container.table.seatNames;
+      final totals = container.table.totals;
+
+      container.controller.startNextRound();
+      final table = container.table;
+
+      expect(table.roundNumber, 2);
+      expect(table.view.winner, isNull);
+      expect(table.hand, hasLength(yourCards.take(9).length + 7));
+      expect(table.groups, isEmpty);
+      expect(table.botMoves, isEmpty);
+      expect(table.roundScores, hasLength(1));
+      expect(table.totals, totals);
+      expect(table.seatNames, names);
+      // The bot (seat 1) goes first this time; once it has played, it's
+      // your turn.
+      expect(table.view.currentSeat, 1);
+      await Future<void>.delayed(Duration.zero);
+      await container.controller.botsSettled;
+      expect(container.table.view.isYourTurn, isTrue);
     });
   });
 }

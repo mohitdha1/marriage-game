@@ -54,7 +54,7 @@ void main() {
           randomProvider.overrideWithValue(Random(0)),
           botThinkingTimeProvider.overrideWithValue(() => Duration.zero),
           roundFactoryProvider.overrideWithValue(
-            () => Round.fromCards(
+            (seat) => Round.fromCards(
               config: GameConfig(playerCount: playerCount),
               random: Random(0),
               hands: [
@@ -116,6 +116,8 @@ void main() {
           'status line': find.byKey(const Key('status-line')),
           'action buttons': find.byKey(const Key('action-bar')),
           'your laid-down sets': find.byKey(const Key('your-laid-down-sets')),
+        'sort and scores buttons': find.byKey(const Key('top-left-buttons')),
+        'joker chip': find.byKey(const Key('joker-chip')),
         };
         final seats = find.byType(OpponentSeat);
         expect(seats, findsNWidgets(players - 1));
