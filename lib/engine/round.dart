@@ -6,6 +6,7 @@ import 'joker.dart';
 import 'player_hand.dart';
 import 'scoring.dart';
 import 'shoe.dart';
+import 'table_event.dart';
 import 'win_check.dart';
 
 /// Where a player takes their card from at the start of a turn.
@@ -85,6 +86,7 @@ class Round {
   final List<PlayingCard> _stock;
   final List<PlayingCard> _discardPile;
   final List<int> _jokerDiscards;
+  final List<TableEvent> _events = [];
   int _currentSeat;
   Jokers? _jokers;
   PlayingCard? _takenFromDiscardPile;
@@ -123,6 +125,9 @@ class Round {
   /// (always 0 when [GameConfig.jokerDiscardPenaltyEnabled] is off).
   List<int> get jokerDiscards => List.unmodifiable(_jokerDiscards);
 
+  /// Everything every player has seen happen so far, oldest first.
+  List<TableEvent> get events => List.unmodifiable(_events);
+
   bool get isOver => _winner != null;
 
   /// The seat that won, or `null` while the round is still being played.
@@ -133,6 +138,9 @@ class Round {
   void showOpeningTunnellas(int seat, List<List<PlayingCard>> tunnellas) {
     _checkNotOver();
     _hands[seat].showOpeningTunnellas(tunnellas);
+    if (tunnellas.isNotEmpty) {
+      _events.add(OpenedTunnellas(seat, _copySets(tunnellas)));
+    }
   }
 
   /// Starts the current player's turn by taking a card from [source], and
@@ -163,6 +171,13 @@ class Round {
       _discardPile.removeLast();
       _takenFromDiscardPile = card;
     }
+    _events.add(
+      DrewCard(
+        _currentSeat,
+        source,
+        source == DrawSource.discardPile ? card : null,
+      ),
+    );
     return card;
   }
 
@@ -170,13 +185,23 @@ class Round {
   /// [PlayerHand.showPureSets]. The first player to show must also pass
   /// [tipluPosition] to pick the tiplu; later players must not.
   void showPureSets(List<List<PlayingCard>> sets, {int? tipluPosition}) {
-    _showThenPickTiplu(tipluPosition, () => _currentHand.showPureSets(sets));
+    _showThenPickTiplu(
+      tipluPosition,
+      ShowKind.pureSets,
+      sets,
+      () => _currentHand.showPureSets(sets),
+    );
   }
 
   /// The current player shows 7 doublees to see the joker. See
   /// [PlayerHand.showDoublees]. [tipluPosition] works as in [showPureSets].
   void showDoublees(List<List<PlayingCard>> pairs, {int? tipluPosition}) {
-    _showThenPickTiplu(tipluPosition, () => _currentHand.showDoublees(pairs));
+    _showThenPickTiplu(
+      tipluPosition,
+      ShowKind.doublees,
+      pairs,
+      () => _currentHand.showDoublees(pairs),
+    );
   }
 
   /// Ends the current player's turn by discarding [card], and passes the
@@ -184,6 +209,7 @@ class Round {
   void discard(PlayingCard card) {
     _checkNotOver();
     _discardFromCurrentHand(card);
+    _events.add(DiscardedCard(_currentSeat, card));
     _currentSeat = (_currentSeat + 1) % _hands.length;
   }
 
@@ -225,6 +251,7 @@ class Round {
 
     _discardFromCurrentHand(card);
     _winner = _currentSeat;
+    _events.add(WonRound(_currentSeat, card));
   }
 
   /// Settles the finished round. See [scoreRound].
@@ -239,7 +266,12 @@ class Round {
     );
   }
 
-  void _showThenPickTiplu(int? tipluPosition, void Function() show) {
+  void _showThenPickTiplu(
+    int? tipluPosition,
+    ShowKind kind,
+    List<List<PlayingCard>> sets,
+    void Function() show,
+  ) {
     _checkNotOver();
     _checkEveryoneOpened();
     if (_jokers != null) {
@@ -251,6 +283,7 @@ class Round {
         );
       }
       show();
+      _events.add(ShowedSets(_currentSeat, kind, _copySets(sets)));
       return;
     }
 
@@ -270,6 +303,7 @@ class Round {
     }
     show();
     _jokers = Jokers(_stock.removeAt(_stock.length - 1 - tipluPosition));
+    _events.add(ShowedSets(_currentSeat, kind, _copySets(sets)));
   }
 
   void _discardFromCurrentHand(PlayingCard card) {
@@ -308,7 +342,11 @@ class Round {
       ..clear()
       ..add(top);
     fisherYatesShuffle(_stock, _random);
+    _events.add(StockReshuffled(_currentSeat));
   }
+
+  static List<List<PlayingCard>> _copySets(List<List<PlayingCard>> sets) =>
+      List.unmodifiable(sets.map(List<PlayingCard>.unmodifiable));
 
   void _checkNotOver() {
     if (isOver) throw StateError('The round is over');

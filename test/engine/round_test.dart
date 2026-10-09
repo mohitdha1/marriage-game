@@ -6,6 +6,7 @@ import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/player_hand.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/engine/shoe.dart';
+import 'package:marriage_game/engine/table_event.dart';
 
 const c = PlayingCard.new;
 
@@ -544,6 +545,94 @@ void main() {
       expect(score.maal.map((m) => m.total), [2, 2]);
       expect(score.penalties, [15, 0]);
       expect(score.net, [-18, 18]);
+    });
+  });
+
+  group('Round.events', () {
+    test('opening tunnellas are recorded; an empty opening is not', () {
+      final kings = [for (var i = 0; i < 3; i++) c(Suit.spades, Rank.king)];
+      final round = Round.fromCards(
+        config: GameConfig(playerCount: 2),
+        random: Random(0),
+        hands: [
+          [...kings, ...runA],
+          seat1Cards,
+        ],
+        stock: stock,
+        discardPile: [firstDiscard],
+      )
+        ..showOpeningTunnellas(0, [kings])
+        ..showOpeningTunnellas(1, []);
+
+      expect(round.events, hasLength(1));
+      final opened = round.events.single as OpenedTunnellas;
+      expect(opened.seat, 0);
+      expect(opened.tunnellas, [kings]);
+    });
+
+    test('a stock draw hides the card; a discard-pile draw reveals it', () {
+      final round = table()
+        ..draw(DrawSource.stock)
+        ..discard(c(Suit.diamonds, Rank.two))
+        ..draw(DrawSource.discardPile);
+
+      final draws = round.events.whereType<DrewCard>().toList();
+      expect(draws[0].seat, 0);
+      expect(draws[0].source, DrawSource.stock);
+      expect(draws[0].card, isNull);
+      expect(draws[1].seat, 1);
+      expect(draws[1].source, DrawSource.discardPile);
+      expect(draws[1].card, c(Suit.diamonds, Rank.two));
+    });
+
+    test('shows, discards and wins are recorded in order', () {
+      final round = seat0HasShown()..declareWin(c(Suit.diamonds, Rank.two));
+
+      expect(round.events.map((e) => e.runtimeType), [
+        DrewCard,
+        ShowedSets,
+        WonRound,
+      ]);
+      final shown = round.events[1] as ShowedSets;
+      expect(shown.kind, ShowKind.pureSets);
+      expect(shown.sets, [runA, runB, runC]);
+      expect((round.events[2] as WonRound).card, c(Suit.diamonds, Rank.two));
+    });
+
+    test('a discard records who discarded what', () {
+      final round = table()
+        ..draw(DrawSource.stock)
+        ..discard(c(Suit.diamonds, Rank.two));
+
+      final discard = round.events.last as DiscardedCard;
+      expect(discard.seat, 0);
+      expect(discard.card, c(Suit.diamonds, Rank.two));
+    });
+
+    test('a reshuffled stock is recorded', () {
+      final round = table(
+        stockCards: [],
+        discardPile: [c(Suit.clubs, Rank.ace), firstDiscard],
+      )..draw(DrawSource.stock);
+
+      expect(round.events.first, isA<StockReshuffled>());
+    });
+
+    test('refused moves record nothing', () {
+      final round = table();
+
+      expect(() => round.discard(firstDiscard), throwsStateError);
+      expect(
+        () => round.showPureSets([runA, runB, runD], tipluPosition: 0),
+        throwsArgumentError,
+      );
+      expect(round.events, isEmpty);
+    });
+
+    test('the event list cannot be changed from outside', () {
+      final round = table()..draw(DrawSource.stock);
+
+      expect(() => round.events.clear(), throwsUnsupportedError);
     });
   });
 }
