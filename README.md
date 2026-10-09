@@ -19,7 +19,7 @@ The game is built in phases (see [`docs/roadmap.md`](docs/roadmap.md)):
 - **Phase 2, the Flutter UI and bots, is in progress.** The landscape table
   screen is playable against bots at three difficulty levels: draw, discard,
   group and show sets, see the joker, win, and follow the scores round by
-  round.
+  round, with sound effects.
 
 ### How the code is organised
 
@@ -30,6 +30,7 @@ The game is built in phases (see [`docs/roadmap.md`](docs/roadmap.md)):
 | `lib/ui/` | The Flutter app: Riverpod state (`ui/state/`) and the table screen's widgets (`ui/table/`). |
 | `lib/console/` | The terminal version of the game. It only turns commands into engine calls and engine state into text. |
 | `bin/marriage.dart` | Command-line entry point for the console game. |
+| `tool/generate_sounds.dart` | Synthesises the placeholder sound effects into `assets/sounds/` (run with `dart run tool/generate_sounds.dart`). |
 | `test/` | Unit tests for every engine rule and the bots, widget tests for the table screen, and tests that script whole console games. |
 | `docs/` | [`roadmap.md`](docs/roadmap.md) (phased build plan) and [`app-spec.md`](docs/app-spec.md) (product spec). |
 

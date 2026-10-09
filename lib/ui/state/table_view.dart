@@ -2,6 +2,7 @@ import '../../engine/card.dart';
 import '../../engine/joker.dart';
 import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
+import '../../engine/table_event.dart';
 
 /// One player's seat as everyone at the table can see it.
 class SeatView {
@@ -48,6 +49,7 @@ class TableView {
     this.isJokerChosen = false,
     this.yourJokers,
     this.pureSetsStillNeeded = PlayerHand.pureSetsToShow,
+    this.events = const [],
   });
 
   /// Builds the view for [humanSeat]. [opponents] are listed in turn order
@@ -88,6 +90,7 @@ class TableView {
       isJokerChosen: round.isJokerChosen,
       yourJokers: round.jokersFor(humanSeat),
       pureSetsStillNeeded: yours.pureSetsStillNeeded,
+      events: round.events,
     );
   }
 
@@ -120,6 +123,9 @@ class TableView {
   /// How many pure sets the human player still has to show, after counting
   /// their opening tunnellas.
   final int pureSetsStillNeeded;
+
+  /// Everything every player has seen happen this round, oldest first.
+  final List<TableEvent> events;
 
   bool get youHaveSeenJoker => you.hasSeenJoker;
 

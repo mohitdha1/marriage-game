@@ -8,6 +8,7 @@ import 'package:marriage_game/engine/card.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/main.dart';
+import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/table/hand_fan.dart';
 import 'package:marriage_game/ui/table/opponent_seat.dart';
@@ -53,6 +54,7 @@ void main() {
         overrides: [
           randomProvider.overrideWithValue(Random(0)),
           botThinkingTimeProvider.overrideWithValue(() => Duration.zero),
+          soundEffectsProvider.overrideWithValue(const SilentSoundEffects()),
           roundFactoryProvider.overrideWithValue(
             (seat) => Round.fromCards(
               config: GameConfig(playerCount: playerCount),
@@ -116,8 +118,8 @@ void main() {
           'status line': find.byKey(const Key('status-line')),
           'action buttons': find.byKey(const Key('action-bar')),
           'your laid-down sets': find.byKey(const Key('your-laid-down-sets')),
-        'sort and scores buttons': find.byKey(const Key('top-left-buttons')),
-        'joker chip': find.byKey(const Key('joker-chip')),
+          'sort and scores buttons': find.byKey(const Key('top-left-buttons')),
+          'joker chip': find.byKey(const Key('joker-chip')),
         };
         final seats = find.byType(OpponentSeat);
         expect(seats, findsNWidgets(players - 1));

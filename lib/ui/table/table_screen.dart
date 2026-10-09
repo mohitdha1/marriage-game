@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../engine/card.dart';
 import '../../engine/round.dart';
 import '../scoreboard/scoreboard_screen.dart';
+import '../sound/sound_effects.dart';
 import '../state/table_controller.dart';
 import '../state/table_state.dart';
 import '../state/table_view.dart';
@@ -34,6 +35,7 @@ class TableScreen extends ConsumerWidget {
     final state = ref.watch(tableProvider);
     final table = state.view;
     final controller = ref.read(tableProvider.notifier);
+    final sounds = ref.read(soundEffectsProvider);
 
     // When a round ends, give the player a moment to see the winning move,
     // then show the scores.
@@ -175,7 +177,10 @@ class TableScreen extends ConsumerWidget {
                         groupOf: state.groupOf,
                         jokers: jokers,
                         cardWidth: cardWidth,
-                        onCardTap: controller.toggleSelected,
+                        onCardTap: (id) {
+                          sounds.play(Sfx.select);
+                          controller.toggleSelected(id);
+                        },
                         onDraw: controller.draw,
                       ),
                     ),
