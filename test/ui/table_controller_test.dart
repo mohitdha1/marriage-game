@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/card.dart';
 import 'package:marriage_game/engine/game_config.dart';
+import 'package:marriage_game/bots/bot_personality.dart';
+import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_state.dart';
@@ -45,10 +47,12 @@ ProviderContainer tableWith({
   List<PlayingCard>? stock,
   List<PlayingCard>? discardPile,
   int firstSeat = 0,
+  Duration thinkingTime = Duration.zero,
 }) {
   final container = ProviderContainer(
     overrides: [
       randomProvider.overrideWithValue(Random(0)),
+      botThinkingTimeProvider.overrideWithValue(() => thinkingTime),
       roundFactoryProvider.overrideWithValue(
         () => Round.fromCards(
           config: GameConfig(playerCount: 2),
@@ -251,10 +255,10 @@ void main() {
   group('Discarding', () {
     test(
       'discarding ends the turn; the bot plays and it is your turn again',
-      () {
+      () async {
         final container = tableWith()..controller.draw(DrawSource.stock);
 
-        container.controller.discard(container.idOf(twoOfDiamonds));
+        await container.controller.discard(container.idOf(twoOfDiamonds));
 
         final table = container.table;
         expect(table.hand.map((c) => c.card), isNot(contains(twoOfDiamonds)));
@@ -313,7 +317,7 @@ void main() {
   });
 
   group('Bots', () {
-    test('a bot that wins ends the round, and the player is told', () {
+    test('a bot that wins ends the round, and the player is told', () async {
       // The bot holds 3 runs and 8♥ Q♣ Q♦. After you discard 3♥ it draws
       // 2♣, shows, picks 7♥ (the only stock card left) as the tiplu, and
       // wins with 8♥ as a joker in a Q trial.
@@ -329,11 +333,14 @@ void main() {
         stock: [c(Suit.hearts, Rank.seven), c(Suit.clubs, Rank.two)],
       )..controller.tapDiscardPile();
 
-      container.controller.discard(container.idOf(c(Suit.hearts, Rank.three)));
+      await container.controller.discard(
+        container.idOf(c(Suit.hearts, Rank.three)),
+      );
 
       final table = container.table;
-      expect(table.view.winner?.name, 'Bot 1');
-      expect(table.notice, 'Bot 1 won the round.');
+      final bot = table.view.opponents.single.name;
+      expect(table.view.winner?.name, bot);
+      expect(table.notice, '$bot won the round.');
       expect(table.view.isYourTurn, isFalse);
     });
   });
@@ -444,33 +451,36 @@ void main() {
       expect(container.table.view.youHaveSeenJoker, isFalse);
     });
 
-    test('once a bot has picked the tiplu, Show sees it straight away', () {
-      // The bot shows on its first turn (picking the tiplu) but can't win.
-      final container = tableWith(
-        botHand: [
-          ...run(Suit.spades, [Rank.jack, Rank.queen, Rank.king]),
-          ...run(Suit.clubs, [Rank.four, Rank.five, Rank.six]),
-          ...run(Suit.diamonds, [Rank.ace, Rank.two, Rank.three]),
-          c(Suit.hearts, Rank.nine),
-          c(Suit.clubs, Rank.queen),
-        ],
-      )..controller.draw(DrawSource.stock);
-      container.controller.discard(container.idOf(twoOfDiamonds));
-      expect(container.table.view.isJokerChosen, isTrue);
-      expect(container.table.view.yourJokers, isNull);
-      expect(container.table.view.opponents.single.hasSeenJoker, isTrue);
+    test(
+      'once a bot has picked the tiplu, Show sees it straight away',
+      () async {
+        // The bot shows on its first turn (picking the tiplu) but can't win.
+        final container = tableWith(
+          botHand: [
+            ...run(Suit.spades, [Rank.jack, Rank.queen, Rank.king]),
+            ...run(Suit.clubs, [Rank.four, Rank.five, Rank.six]),
+            ...run(Suit.diamonds, [Rank.ace, Rank.two, Rank.three]),
+            c(Suit.hearts, Rank.nine),
+            c(Suit.clubs, Rank.queen),
+          ],
+        )..controller.draw(DrawSource.stock);
+        await container.controller.discard(container.idOf(twoOfDiamonds));
+        expect(container.table.view.isJokerChosen, isTrue);
+        expect(container.table.view.yourJokers, isNull);
+        expect(container.table.view.opponents.single.hasSeenJoker, isTrue);
 
-      container
-        ..controller.draw(DrawSource.stock)
-        ..group(heartsRun)
-        ..group(spadesRun)
-        ..group(clubsRun)
-        ..controller.showGroups();
+        container
+          ..controller.draw(DrawSource.stock)
+          ..group(heartsRun)
+          ..group(spadesRun)
+          ..group(clubsRun)
+          ..controller.showGroups();
 
-      expect(container.table.pickingTiplu, isFalse);
-      expect(container.table.view.yourJokers, isNotNull);
-      expect(container.table.revealingJoker, isTrue);
-    });
+        expect(container.table.pickingTiplu, isFalse);
+        expect(container.table.view.yourJokers, isNotNull);
+        expect(container.table.revealingJoker, isTrue);
+      },
+    );
 
     test('7 grouped pairs are shown as doublees', () {
       final pairs = [
@@ -575,6 +585,131 @@ void main() {
       final container = tableWith()..controller.draw(DrawSource.stock);
 
       expect(container.table.winningDiscards, isEmpty);
+    });
+  });
+
+  group('Bot turns', () {
+    test('bots have personality names and avatar colours', () {
+      final bot = tableWith().table.view.opponents.single;
+
+      expect(BotPersonality.all.map((p) => p.name), contains(bot.name));
+      expect(bot.avatarColor, isNotNull);
+    });
+
+    test('you cannot move while a bot is thinking', () async {
+      final container = tableWith(
+        thinkingTime: const Duration(milliseconds: 30),
+      )..controller.draw(DrawSource.stock);
+
+      final botsPlaying = container.controller.discard(
+        container.idOf(twoOfDiamonds),
+      );
+      final bot = container.table.view.opponents.single.name;
+      expect(container.table.view.isYourTurn, isFalse);
+
+      container.controller.draw(DrawSource.stock);
+      expect(container.table.notice, 'Wait for $bot to play.');
+      expect(container.table.view.youHaveDrawn, isFalse);
+
+      await botsPlaying;
+      expect(container.table.view.isYourTurn, isTrue);
+      container.controller.draw(DrawSource.stock);
+      expect(container.table.view.youHaveDrawn, isTrue);
+    });
+
+    test('each bot\'s latest move is shown at its seat', () async {
+      final container = tableWith()..controller.draw(DrawSource.stock);
+
+      await container.controller.discard(container.idOf(twoOfDiamonds));
+
+      final seat = container.table.view.opponents.single.seat;
+      expect(container.table.botMoves[seat], startsWith('Drew, threw '));
+    });
+
+    test('once the round is over, moves are refused', () async {
+      final container = tableWith(
+        botHand: [
+          ...run(Suit.spades, [Rank.jack, Rank.queen, Rank.king]),
+          ...run(Suit.clubs, [Rank.four, Rank.five, Rank.six]),
+          ...run(Suit.diamonds, [Rank.ace, Rank.two, Rank.three]),
+          c(Suit.hearts, Rank.eight),
+          c(Suit.clubs, Rank.queen),
+          queenOfDiamonds,
+        ],
+        stock: [c(Suit.hearts, Rank.seven), c(Suit.clubs, Rank.two)],
+      )..controller.tapDiscardPile();
+      await container.controller.discard(
+        container.idOf(c(Suit.hearts, Rank.three)),
+      );
+
+      container.controller.draw(DrawSource.stock);
+
+      expect(container.table.notice, 'The round is over.');
+    });
+
+    test(
+      'a bot that plays first moves as soon as the table is ready',
+      () async {
+        final container = tableWith(firstSeat: 1);
+        expect(container.table.view.isYourTurn, isFalse);
+
+        await Future<void>.delayed(Duration.zero);
+        await container.controller.botsSettled;
+
+        expect(container.table.view.isYourTurn, isTrue);
+      },
+    );
+
+    test('a game with Hard bots plays normally', () async {
+      final container = ProviderContainer(
+        overrides: [
+          randomProvider.overrideWithValue(Random(4)),
+          botThinkingTimeProvider.overrideWithValue(() => Duration.zero),
+          botDifficultyProvider.overrideWithValue(BotDifficulty.hard),
+          gameConfigProvider.overrideWithValue(GameConfig(playerCount: 3)),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      for (
+        var turn = 0;
+        turn < 5 && container.table.view.winner == null;
+        turn++
+      ) {
+        container.controller.draw(DrawSource.stock);
+        await container.controller.discard(container.table.hand.last.id);
+      }
+      expect(container.table.view.opponents, hasLength(2));
+    });
+  });
+
+  group('describeBotTurn', () {
+    test('describes a draw, a show and a discard', () {
+      expect(
+        describeBotTurn(
+          BotTurn(
+            drewFrom: DrawSource.discardPile,
+            drawn: c(Suit.clubs, Rank.seven),
+            shown: [heartsRun],
+            discarded: c(Suit.diamonds, Rank.nine),
+          ),
+        ),
+        'Took 7♣, showed, threw 9♦',
+      );
+    });
+
+    test('describes a win', () {
+      expect(
+        describeBotTurn(
+          BotTurn(
+            drewFrom: DrawSource.stock,
+            drawn: c(Suit.clubs, Rank.seven),
+            discarded: c(Suit.diamonds, Rank.nine),
+            won: true,
+          ),
+        ),
+        'Drew, won!',
+      );
     });
   });
 }

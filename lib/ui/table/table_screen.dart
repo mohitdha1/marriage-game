@@ -78,6 +78,7 @@ class TableScreen extends ConsumerWidget {
                           isCurrentTurn:
                               table.winner == null &&
                               table.currentSeat == table.opponents[i].seat,
+                          lastMove: state.botMoves[table.opponents[i].seat],
                         ),
                       ),
                     Align(
@@ -94,7 +95,7 @@ class TableScreen extends ConsumerWidget {
                       child: _JokerChip(table: table),
                     ),
                     Align(
-                      alignment: const Alignment(0, -0.35),
+                      alignment: const Alignment(0, -0.3),
                       child: Column(
                         key: const Key('table-centre'),
                         mainAxisSize: MainAxisSize.min,
@@ -192,7 +193,14 @@ String statusLine(TableState state) {
   final winner = table.winner;
   if (winner != null) return '${winner.name} won the round.';
   if (state.openingChoice != null) return 'Choose your opening tunnellas.';
-  if (!table.isYourTurn) return 'Waiting for the other players…';
+  if (!table.isYourTurn) {
+    final thinking = table.opponents.where(
+      (seat) => seat.seat == table.currentSeat,
+    );
+    return thinking.isEmpty
+        ? 'Waiting for the other players…'
+        : '${thinking.single.name} is thinking…';
+  }
   if (!table.youHaveDrawn) return 'Your turn: draw a card.';
   if (table.youHaveSeenJoker) return 'Discard a card, or win.';
   return 'Select a card to discard.';

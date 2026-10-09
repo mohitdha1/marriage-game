@@ -210,7 +210,10 @@ void main() {
       game.game.playMatch();
 
       expect(game.text, contains('You discarded 2♦.'));
-      expect(game.text, contains('Bot 2 draws from the stock'));
+      expect(
+        game.text,
+        contains('${game.game.nameOf(1)} draws from the stock'),
+      );
     });
 
     test('running out of input stops the game cleanly', () {
@@ -296,9 +299,9 @@ void main() {
 
       game.game.playMatch(rounds: 3);
 
-      expect(game.text, contains('Bot 1 plays first'));
-      expect(game.text, contains('Bot 2 plays first'));
-      expect(game.text, contains('Bot 3 plays first'));
+      for (var seat = 0; seat < 3; seat++) {
+        expect(game.text, contains('${game.game.nameOf(seat)} plays first'));
+      }
     });
   });
 }

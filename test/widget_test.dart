@@ -39,6 +39,7 @@ Future<void> pumpTable(
     ProviderScope(
       overrides: [
         randomProvider.overrideWithValue(Random(seed)),
+        botThinkingTimeProvider.overrideWithValue(() => Duration.zero),
         gameConfigProvider.overrideWithValue(
           GameConfig(playerCount: playerCount),
         ),
@@ -68,7 +69,9 @@ void main() {
     await pumpTable(tester);
 
     expect(find.byType(OpponentSeat), findsNWidgets(4));
-    for (final name in ['Bot 1', 'Bot 2', 'Bot 3', 'Bot 4']) {
+    final names = currentTable(tester).opponents.map((s) => s.name).toList();
+    expect(names.toSet(), hasLength(4), reason: 'every bot has its own name');
+    for (final name in names) {
       expect(find.text(name), findsOneWidget);
     }
     for (var seat = 1; seat <= 4; seat++) {

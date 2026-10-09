@@ -6,7 +6,8 @@ import '../engine/melds.dart';
 import '../engine/player_hand.dart';
 import '../engine/round.dart';
 import '../engine/scoring.dart';
-import 'simple_bot.dart';
+import '../bots/bot_personality.dart';
+import '../bots/bot_player.dart';
 
 /// Reads one line of input, or returns `null` when input has ended.
 typedef ReadLine = String? Function();
@@ -18,7 +19,8 @@ typedef WriteLine = void Function(String line);
 typedef RoundDealer = Round Function(int firstSeat);
 
 /// A text version of the game: one human at [humanSeat] against
-/// [SimpleBot]s, or bots only when [humanSeat] is `null`.
+/// [BotPlayer]s at [difficulty], or bots only when [humanSeat] is `null`.
+/// Each bot gets its own personality and name.
 ///
 /// All the rules come from the engine. This class only turns typed commands
 /// into engine calls and engine state into text, and reports the engine's
@@ -32,8 +34,9 @@ class ConsoleGame {
     required this.writeLine,
     this.humanSeat = 0,
     this.maxTurns = 500,
+    this.difficulty = BotDifficulty.medium,
     RoundDealer? dealRound,
-  }) : _bot = SimpleBot(random),
+  }) : _bots = _seatBots(config, humanSeat, difficulty, random),
        _dealRound =
            dealRound ??
            ((firstSeat) => Round.deal(
@@ -54,13 +57,40 @@ class ConsoleGame {
   /// nothing.
   final int maxTurns;
 
+  /// How well the bots play.
+  final BotDifficulty difficulty;
+
   final MatchScore match;
-  final SimpleBot _bot;
+
+  /// The bot playing each seat that isn't the human's.
+  final Map<int, BotPlayer> _bots;
   final RoundDealer _dealRound;
 
   bool get _botsOnly => humanSeat == null;
 
-  String nameOf(int seat) => seat == humanSeat ? 'You' : 'Bot ${seat + 1}';
+  String nameOf(int seat) =>
+      seat == humanSeat ? 'You' : _bots[seat]!.personality.name;
+
+  static Map<int, BotPlayer> _seatBots(
+    GameConfig config,
+    int? humanSeat,
+    BotDifficulty difficulty,
+    Random random,
+  ) {
+    final seats = [
+      for (var seat = 0; seat < config.playerCount; seat++)
+        if (seat != humanSeat) seat,
+    ];
+    final personalities = BotPersonality.pick(seats.length, random);
+    return {
+      for (var i = 0; i < seats.length; i++)
+        seats[i]: BotPlayer(
+          difficulty: difficulty,
+          personality: personalities[i],
+          random: random,
+        ),
+    };
+  }
 
   /// Plays rounds, rotating who goes first. A bots-only game plays
   /// [rounds] rounds; with a human, there's no limit — they're asked after
@@ -97,7 +127,7 @@ class ConsoleGame {
     for (var seat = 0; seat < config.playerCount; seat++) {
       final tunnellas = seat == humanSeat
           ? _humanOpeningTunnellas(round.hands[seat])
-          : _bot.openingTunnellas(round.hands[seat].cards);
+          : _bots[seat]!.openingTunnellas(round.hands[seat].cards);
       round.showOpeningTunnellas(seat, tunnellas);
       if (tunnellas.isNotEmpty) {
         writeLine('${nameOf(seat)} opened with ${_sets(tunnellas)}.');
@@ -130,7 +160,7 @@ class ConsoleGame {
 
   void _botTurn(Round round) {
     final name = nameOf(round.currentSeat);
-    final turn = _bot.takeTurn(round);
+    final turn = _bots[round.currentSeat]!.takeTurn(round);
 
     final parts = [
       turn.drewFrom == DrawSource.stock

@@ -37,6 +37,7 @@ Future<void> pumpTable(
   WidgetTester tester, {
   List<PlayingCard>? yourHand,
   int firstSeat = 0,
+  Duration thinkingTime = Duration.zero,
 }) async {
   tester.view
     ..physicalSize = const Size(844, 390)
@@ -47,6 +48,7 @@ Future<void> pumpTable(
     ProviderScope(
       overrides: [
         randomProvider.overrideWithValue(Random(0)),
+        botThinkingTimeProvider.overrideWithValue(() => thinkingTime),
         roundFactoryProvider.overrideWithValue(
           () => Round.fromCards(
             config: GameConfig(playerCount: 2),
@@ -128,7 +130,7 @@ void main() {
     await tester.tap(lastHandCard(tester));
     await tester.pump();
     await tester.tap(find.byKey(const Key('discard-pile')));
-    await tester.pump();
+    await tester.pumpAndSettle(); // let the bot play
 
     // The bot has played, and it is your turn again.
     final state = stateOf(tester);
@@ -396,7 +398,7 @@ void main() {
       }
       await tester.pump();
       await tester.tap(find.text('Show these 3'));
-      await tester.pump();
+      await tester.pumpAndSettle(); // let the bot play
 
       // The bot has had its turn; now it's yours, and its seat is calm.
       expect(
@@ -405,5 +407,37 @@ void main() {
       );
       expect(stateOf(tester).view.isYourTurn, isTrue);
     });
+  });
+
+  testWidgets('a bot visibly thinks, then its move appears at its seat', (
+    tester,
+  ) async {
+    await pumpTable(tester, thinkingTime: const Duration(seconds: 1));
+    final bot = stateOf(tester).view.opponents.single;
+
+    await tester.tap(find.byKey(const Key('stock')));
+    await tester.pump();
+    await tester.tap(lastHandCard(tester));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('discard-pile')));
+    await tester.pump();
+
+    // During the pause: the bot's seat glows and the status says so.
+    expect(status(tester), '${bot.name} is thinking…');
+    expect(
+      tester.widget<OpponentSeat>(find.byType(OpponentSeat)).isCurrentTurn,
+      isTrue,
+    );
+
+    // Tapping the stock now is refused.
+    await tester.tap(find.byKey(const Key('stock')));
+    await tester.pump();
+    expect(find.text('Wait for ${bot.name} to play.'), findsOneWidget);
+
+    // After the pause, the bot has moved and it's your turn.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(status(tester), 'Your turn: draw a card.');
+    expect(find.byKey(Key('last-move-${bot.seat}')), findsOneWidget);
   });
 }

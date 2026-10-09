@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -51,6 +52,7 @@ void main() {
       ProviderScope(
         overrides: [
           randomProvider.overrideWithValue(Random(0)),
+          botThinkingTimeProvider.overrideWithValue(() => Duration.zero),
           roundFactoryProvider.overrideWithValue(
             () => Round.fromCards(
               config: GameConfig(playerCount: playerCount),
@@ -90,9 +92,15 @@ void main() {
       ..showGroups()
       ..pickTiplu(0)
       ..dismissReveal()
+      ..draw(DrawSource.stock);
+    // Let every bot take a turn, so each seat shows its last move too.
+    unawaited(controller.discard(container.read(tableProvider).hand.last.id));
+    await tester.pumpAndSettle();
+    controller
       ..draw(DrawSource.stock)
       ..toggleSelected(container.read(tableProvider).hand.last.id);
     await tester.pump();
+    expect(container.read(tableProvider).botMoves, hasLength(playerCount - 1));
   }
 
   for (final MapEntry(key: name, value: size) in screens.entries) {

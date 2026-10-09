@@ -16,16 +16,20 @@ The game is built in phases (see [`docs/roadmap.md`](docs/roadmap.md)):
 - **Phase 1, the rules engine, is complete.** A pure-Dart engine runs a full
   game, from the deal through turns, the joker-seen flow, winning and
   scoring, and you can play it in the terminal.
-- **Phase 2, the Flutter UI and bots, is next.**
+- **Phase 2, the Flutter UI and bots, is in progress.** The landscape table
+  screen is playable against bots at three difficulty levels: draw, discard,
+  group and show sets, see the joker, and win.
 
 ### How the code is organised
 
 | Path | What's there |
 |---|---|
 | `lib/engine/` | The rules engine: cards, the shoe, sets, jokers, hands, rounds, scoring. Pure Dart with **no Flutter imports**, and the single source of truth for the rules. |
-| `lib/console/` | The terminal version of the game and a simple placeholder bot. It only turns commands into engine calls and engine state into text. |
+| `lib/bots/` | Computer players at three levels (Easy, Medium, Hard) with named personalities. Pure Dart; they only see what a player at the table could. |
+| `lib/ui/` | The Flutter app: Riverpod state (`ui/state/`) and the table screen's widgets (`ui/table/`). |
+| `lib/console/` | The terminal version of the game. It only turns commands into engine calls and engine state into text. |
 | `bin/marriage.dart` | Command-line entry point for the console game. |
-| `test/` | Unit tests for every engine rule, plus tests that script whole console games. |
+| `test/` | Unit tests for every engine rule and the bots, widget tests for the table screen, and tests that script whole console games. |
 | `docs/` | [`roadmap.md`](docs/roadmap.md) (phased build plan) and [`app-spec.md`](docs/app-spec.md) (product spec). |
 
 ## Running the console game
@@ -42,6 +46,7 @@ You play the first seat against bots. Options:
 
 ```sh
 dart run bin/marriage.dart --players=3            # 2 to 5 players (default 5)
+dart run bin/marriage.dart --difficulty=hard      # easy, medium or hard bots
 dart run bin/marriage.dart --seed=42              # repeatable shuffle
 dart run bin/marriage.dart --bots-only --rounds=3 # watch bots play 3 rounds
 dart run bin/marriage.dart --help

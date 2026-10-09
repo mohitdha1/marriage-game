@@ -12,10 +12,14 @@ class OpponentSeat extends StatelessWidget {
     super.key,
     required this.seat,
     this.isCurrentTurn = false,
+    this.lastMove,
   });
 
   final SeatView seat;
   final bool isCurrentTurn;
+
+  /// The player's latest move in a few words, such as "Took 7♣, threw 9♦".
+  final String? lastMove;
 
   static const _glow = Color(0xFFFFD54F);
 
@@ -41,7 +45,7 @@ class OpponentSeat extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundColor: const Color(0xFFFFE0B2),
+            backgroundColor: Color(seat.avatarColor ?? 0xFFFFE0B2),
             foregroundColor: const Color(0xFF4E342E),
             child: Text(
               seat.name.characters.first,
@@ -87,6 +91,17 @@ class OpponentSeat extends StatelessWidget {
                   ],
                 ],
               ),
+              if (lastMove != null)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 140),
+                  child: Text(
+                    lastMove!,
+                    key: Key('last-move-${seat.seat}'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                ),
             ],
           ),
         ],

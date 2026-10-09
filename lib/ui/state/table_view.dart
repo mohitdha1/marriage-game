@@ -11,6 +11,7 @@ class SeatView {
     required this.cardCount,
     this.hasSeenJoker = false,
     this.laidDown = const [],
+    this.avatarColor,
   });
 
   final int seat;
@@ -25,6 +26,9 @@ class SeatView {
   /// Sets this player has laid face up: opening tunnellas, then the sets
   /// shown to see the joker.
   final List<List<PlayingCard>> laidDown;
+
+  /// The avatar's background colour as 0xAARRGGBB, if this player has one.
+  final int? avatarColor;
 }
 
 /// An immutable snapshot of a [Round] as seen from [you]'s seat: what the
@@ -53,6 +57,7 @@ class TableView {
     Round round, {
     required int humanSeat,
     required String Function(int seat) nameOf,
+    int? Function(int seat)? avatarOf,
   }) {
     final playerCount = round.hands.length;
     SeatView seatView(int seat) {
@@ -63,6 +68,7 @@ class TableView {
         cardCount: hand.cards.length,
         hasSeenJoker: hand.hasSeenJoker,
         laidDown: [...hand.openingTunnellas, ...hand.shownSets],
+        avatarColor: avatarOf?.call(seat),
       );
     }
 

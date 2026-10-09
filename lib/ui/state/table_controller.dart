@@ -2,7 +2,8 @@ import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../console/simple_bot.dart';
+import '../../bots/bot_personality.dart';
+import '../../bots/bot_player.dart';
 import '../../engine/card.dart';
 import '../../engine/game_config.dart';
 import '../../engine/melds.dart';
@@ -27,6 +28,19 @@ final roundFactoryProvider = Provider<Round Function()>((ref) {
   return () => Round.deal(config: config, random: random);
 });
 
+/// How well the bots play. Medium for Quick Play; the lobby will let players
+/// choose.
+final botDifficultyProvider = Provider<BotDifficulty>(
+  (ref) => BotDifficulty.medium,
+);
+
+/// How long a bot "thinks" before each move: a slightly different pause
+/// every time, so bots feel human. Tests override it with no pause.
+final botThinkingTimeProvider = Provider<Duration Function()>((ref) {
+  final random = ref.watch(randomProvider);
+  return () => Duration(milliseconds: 700 + random.nextInt(701));
+});
+
 /// The seat the person using this device plays.
 const humanSeat = 0;
 
@@ -40,24 +54,44 @@ final tableProvider = NotifierProvider<TableController, TableState>(
 /// source of truth: every move goes through it, and when it refuses one, its
 /// reason is shown to the player as a notice.
 ///
-/// Bot seats are played by the console's [SimpleBot] for now; real bots
-/// arrive in Phase 2 step 4.
+/// Every other seat is a [BotPlayer] with its own personality. Bots play one
+/// at a time after a short thinking pause, and the table is published after
+/// each bot's move, so the player watches the game unfold. The human player
+/// can't move while a bot is thinking.
 class TableController extends Notifier<TableState> {
   late Round _round;
-  late SimpleBot _bot;
+  late Map<int, BotPlayer> _bots;
+  late Duration Function() _thinkingTime;
+  Future<void>? _botsPlaying;
   var _nextCardId = 0;
 
   @override
   TableState build() {
     _round = ref.watch(roundFactoryProvider)();
-    _bot = SimpleBot(ref.watch(randomProvider));
+    _thinkingTime = ref.watch(botThinkingTimeProvider);
+    _botsPlaying = null;
     _nextCardId = 0;
 
-    for (var seat = 0; seat < _round.hands.length; seat++) {
-      if (seat == humanSeat) continue;
+    final random = ref.watch(randomProvider);
+    final difficulty = ref.watch(botDifficultyProvider);
+    final botSeats = [
+      for (var seat = 0; seat < _round.hands.length; seat++)
+        if (seat != humanSeat) seat,
+    ];
+    final personalities = BotPersonality.pick(botSeats.length, random);
+    _bots = {
+      for (var i = 0; i < botSeats.length; i++)
+        botSeats[i]: BotPlayer(
+          difficulty: difficulty,
+          personality: personalities[i],
+          random: random,
+        ),
+    };
+
+    for (final MapEntry(key: seat, value: bot) in _bots.entries) {
       _round.showOpeningTunnellas(
         seat,
-        _bot.openingTunnellas(_round.hands[seat].cards),
+        bot.openingTunnellas(_round.hands[seat].cards),
       );
     }
 
@@ -67,7 +101,8 @@ class TableController extends Notifier<TableState> {
     final mustChoose = tunnellas.length > PlayerHand.maxOpeningTunnellas;
     if (!mustChoose) {
       _round.showOpeningTunnellas(humanSeat, tunnellas);
-      _playBots();
+      // If a bot goes first, start it once this first state is in place.
+      Future.microtask(_playBots);
     }
 
     return TableState(
@@ -107,30 +142,36 @@ class TableController extends Notifier<TableState> {
       _publish(notice: 'Choose 3 different tunnellas.');
       return;
     }
-    var shown = false;
-    _act(() {
-      _round.showOpeningTunnellas(humanSeat, [
+    final shown = _act(
+      () => _round.showOpeningTunnellas(humanSeat, [
         for (final i in picks) choice[i],
-      ]);
-      shown = true;
+      ]),
+    );
+    if (shown) {
+      state = state.copyWith(openingChoice: () => null);
       _playBots();
-    });
-    if (shown) state = state.copyWith(openingChoice: () => null);
+    }
   }
 
   /// Draws from [source] to start the human player's turn.
-  void draw(DrawSource source) => _act(() => _round.draw(source));
+  void draw(DrawSource source) {
+    if (!_checkYourTurn()) return;
+    _act(() => _round.draw(source));
+  }
 
   /// Discards the card with [cardId] to end the human player's turn; the
-  /// bots then play until it's the human player's turn again.
-  void discard(int cardId) {
+  /// bots then play until it's the human player's turn again. The returned
+  /// future completes once they have.
+  Future<void> discard(int cardId) async {
     final card = _cardWithId(cardId);
-    if (card == null) return;
-    _act(() {
-      _round.discard(card);
-      _playBots();
-    }, removing: {cardId});
+    if (card == null || !_checkYourTurn()) return;
+    if (_act(() => _round.discard(card), removing: {cardId})) {
+      await _playBots();
+    }
   }
+
+  /// Completes once any bots that are playing have finished their turns.
+  Future<void> get botsSettled => _botsPlaying ?? Future.value();
 
   /// Groups the selected cards into a set to show. Grouped cards move
   /// together to the left of the hand, in the order the groups were made.
@@ -164,6 +205,7 @@ class TableController extends Notifier<TableState> {
   /// Shows the grouped sets to see the joker. If nobody has picked the tiplu
   /// yet, the player picks it first ([pickTiplu]), then the sets are shown.
   void showGroups() {
+    if (!_checkYourTurn()) return;
     if (state.groups.isEmpty) {
       _publish(notice: 'Group your sets first, then tap Show.');
       return;
@@ -190,6 +232,7 @@ class TableController extends Notifier<TableState> {
   /// Finishes the round by discarding the selected card, if that leaves a
   /// winning hand.
   void declareWin() {
+    if (!_checkYourTurn()) return;
     final selected = state.singleSelected;
     if (selected == null) {
       _publish(notice: 'Select the card to discard, then tap Win.');
@@ -221,7 +264,8 @@ class TableController extends Notifier<TableState> {
 
   /// Tapping the discard pile takes its top card at the start of a turn, or
   /// discards the selected card once the player has drawn.
-  void tapDiscardPile() {
+  Future<void> tapDiscardPile() async {
+    if (!_checkYourTurn()) return;
     if (!state.view.youHaveDrawn) {
       draw(DrawSource.discardPile);
       return;
@@ -231,7 +275,19 @@ class TableController extends Notifier<TableState> {
       _publish(notice: 'Select one card, then tap the discard pile.');
       return;
     }
-    discard(selected.id);
+    await discard(selected.id);
+  }
+
+  /// Whether the human player may move now; if not, says why.
+  bool _checkYourTurn() {
+    if (state.view.isYourTurn) return true;
+    final winner = state.view.winner;
+    _publish(
+      notice: winner != null
+          ? 'The round is over.'
+          : 'Wait for ${_nameOf(_round.currentSeat)} to play.',
+    );
+    return false;
   }
 
   PlayingCard? _cardWithId(int id) {
@@ -265,13 +321,30 @@ class TableController extends Notifier<TableState> {
     return accepted;
   }
 
-  void _playBots() {
+  /// Plays bot turns, with a thinking pause before each, until it's the
+  /// human player's turn or the round is over. Only one run happens at a
+  /// time; calling again while bots are playing joins the current run.
+  Future<void> _playBots() =>
+      _botsPlaying ??= _runBots().whenComplete(() => _botsPlaying = null);
+
+  Future<void> _runBots() async {
     while (!_round.isOver && _round.currentSeat != humanSeat) {
-      _bot.takeTurn(_round);
+      await Future<void>.delayed(_thinkingTime());
+      if (!ref.mounted) return;
+      final seat = _round.currentSeat;
+      final turn = _bots[seat]!.takeTurn(_round);
+      _publish(
+        notice: turn.won ? '${_nameOf(seat)} won the round.' : null,
+        botMoves: {...state.botMoves, seat: describeBotTurn(turn)},
+      );
     }
   }
 
-  void _publish({String? notice, Set<int> removed = const {}}) {
+  void _publish({
+    String? notice,
+    Set<int> removed = const {},
+    Map<int, String>? botMoves,
+  }) {
     final hand = _reconcile([
       for (final handCard in state.hand)
         if (!removed.contains(handCard.id)) handCard,
@@ -286,6 +359,7 @@ class TableController extends Notifier<TableState> {
       selected: state.selected.where(ids.contains).toSet(),
       groups: groups,
       winningDiscards: _winningDiscards(hand),
+      botMoves: botMoves,
       notice: notice,
     );
   }
@@ -347,11 +421,26 @@ class TableController extends Notifier<TableState> {
     ];
   }
 
-  TableView _snapshot() =>
-      TableView.fromRound(_round, humanSeat: humanSeat, nameOf: _nameOf);
+  TableView _snapshot() => TableView.fromRound(
+    _round,
+    humanSeat: humanSeat,
+    nameOf: _nameOf,
+    avatarOf: (seat) => _bots[seat]?.personality.avatarColor,
+  );
 
-  /// Placeholder names until the Phase 2 bots get their own.
-  static String _nameOf(int seat) => seat == humanSeat ? 'You' : 'Bot $seat';
+  String _nameOf(int seat) =>
+      seat == humanSeat ? 'You' : _bots[seat]!.personality.name;
+}
+
+/// A bot's turn in a few words, for its seat: "Took 7♣, threw 9♦".
+String describeBotTurn(BotTurn turn) {
+  final parts = [
+    turn.drewFrom == DrawSource.discardPile ? 'took ${turn.drawn}' : 'drew',
+    if (turn.shown.isNotEmpty) 'showed',
+    if (turn.won) 'won!' else 'threw ${turn.discarded}',
+  ];
+  final text = parts.join(', ');
+  return text[0].toUpperCase() + text.substring(1);
 }
 
 /// The engine's reason for refusing a move, naming the card when there is

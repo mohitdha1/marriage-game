@@ -35,6 +35,7 @@ class TableState {
     this.pickingTiplu = false,
     this.revealingJoker = false,
     this.winningDiscards = const {},
+    this.botMoves = const {},
     this.notice,
     this.noticeId = 0,
   });
@@ -67,6 +68,9 @@ class TableState {
   /// Ids of the cards that, if discarded now, would leave a winning hand.
   final Set<int> winningDiscards;
 
+  /// Each bot's latest move in a few words, by seat, shown at its seat.
+  final Map<int, String> botMoves;
+
   /// A message to show the player, such as why a move wasn't allowed.
   final String? notice;
 
@@ -96,6 +100,7 @@ class TableState {
     bool? pickingTiplu,
     bool? revealingJoker,
     Set<int>? winningDiscards,
+    Map<int, String>? botMoves,
     String? notice,
   }) => TableState(
     view: view ?? this.view,
@@ -106,6 +111,7 @@ class TableState {
     pickingTiplu: pickingTiplu ?? this.pickingTiplu,
     revealingJoker: revealingJoker ?? this.revealingJoker,
     winningDiscards: winningDiscards ?? this.winningDiscards,
+    botMoves: botMoves ?? this.botMoves,
     notice: notice ?? this.notice,
     noticeId: notice != null ? noticeId + 1 : noticeId,
   );
