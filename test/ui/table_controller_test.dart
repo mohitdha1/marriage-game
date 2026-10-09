@@ -44,6 +44,7 @@ ProviderContainer tableWith({
   List<PlayingCard>? botHand,
   List<PlayingCard>? stock,
   List<PlayingCard>? discardPile,
+  int firstSeat = 0,
 }) {
   final container = ProviderContainer(
     overrides: [
@@ -62,6 +63,7 @@ ProviderContainer tableWith({
                 queenOfDiamonds,
               ],
           discardPile: discardPile ?? [kingOfClubs],
+          firstSeat: firstSeat,
         ),
       ),
     ],
@@ -73,6 +75,20 @@ ProviderContainer tableWith({
 extension on ProviderContainer {
   TableState get table => read(tableProvider);
   TableController get controller => read(tableProvider.notifier);
+
+  /// Selects the hand cards equal to [cards] (one copy each) and groups
+  /// them.
+  void group(List<PlayingCard> cards) {
+    final used = <int>{};
+    for (final card in cards) {
+      final id = table.hand
+          .firstWhere((c) => c.card == card && !used.contains(c.id))
+          .id;
+      used.add(id);
+      controller.toggleSelected(id);
+    }
+    controller.groupSelected();
+  }
 
   /// The id of the first card in hand equal to [card].
   int idOf(PlayingCard card) =>
@@ -319,6 +335,246 @@ void main() {
       expect(table.view.winner?.name, 'Bot 1');
       expect(table.notice, 'Bot 1 won the round.');
       expect(table.view.isYourTurn, isFalse);
+    });
+  });
+
+  group('Grouping', () {
+    test('grouping needs at least 2 selected cards', () {
+      final container = tableWith();
+      container.controller
+        ..toggleSelected(container.idOf(twoOfDiamonds))
+        ..groupSelected();
+
+      expect(container.table.notice, 'Select 2 or more cards to group.');
+      expect(container.table.groups, isEmpty);
+    });
+
+    test('grouped cards move to the left, in the order they were grouped', () {
+      final container = tableWith()
+        ..group(clubsRun)
+        ..group(heartsRun);
+
+      expect(container.table.hand.take(6).map((c) => c.card), [
+        ...clubsRun,
+        ...heartsRun,
+      ]);
+      expect(container.table.groups, hasLength(2));
+      expect(container.table.groupOf(container.idOf(clubsRun.first)), 0);
+      expect(container.table.groupOf(container.idOf(heartsRun.first)), 1);
+      expect(container.table.groupOf(container.idOf(twoOfDiamonds)), isNull);
+      expect(container.table.selected, isEmpty);
+    });
+
+    test('grouping a card that is already grouped moves it', () {
+      final container = tableWith()
+        ..group(heartsRun)
+        ..group([heartsRun.first, twoOfDiamonds]);
+
+      expect(container.table.groups, hasLength(2));
+      expect(container.table.groups.first, hasLength(2));
+    });
+
+    test('Ungroup clears every group', () {
+      final container = tableWith()..group(heartsRun);
+
+      container.controller.clearGroups();
+
+      expect(container.table.groups, isEmpty);
+    });
+  });
+
+  group('Showing', () {
+    test('Show with nothing grouped explains what to do', () {
+      final container = tableWith()..controller.showGroups();
+
+      expect(container.table.notice, 'Group your sets first, then tap Show.');
+    });
+
+    test('the first to show picks the tiplu, then sees the joker', () {
+      final container = tableWith()
+        ..controller.draw(DrawSource.stock) // Q♦; stock is now 2♣, 7♥, 5♣
+        ..group(heartsRun)
+        ..group(spadesRun)
+        ..group(clubsRun);
+
+      container.controller.showGroups();
+      expect(container.table.pickingTiplu, isTrue);
+      expect(container.table.view.isJokerChosen, isFalse);
+
+      container.controller.pickTiplu(1);
+
+      final table = container.table;
+      expect(table.pickingTiplu, isFalse);
+      expect(table.view.yourJokers?.tiplu, c(Suit.hearts, Rank.seven));
+      expect(table.view.youHaveSeenJoker, isTrue);
+      expect(table.revealingJoker, isTrue);
+      expect(table.groups, isEmpty);
+      expect(table.view.you.laidDown, [heartsRun, spadesRun, clubsRun]);
+      expect(
+        table.hand.map((c) => c.card),
+        isNot(anyElement(isIn([...heartsRun, ...spadesRun, ...clubsRun]))),
+      );
+
+      container.controller.dismissReveal();
+      expect(container.table.revealingJoker, isFalse);
+    });
+
+    test('a refused show keeps the groups and does not use up the tiplu', () {
+      final container = tableWith()
+        ..controller.draw(DrawSource.stock)
+        ..group(heartsRun)
+        ..group(spadesRun)
+        ..controller.showGroups()
+        ..controller.pickTiplu(1);
+
+      expect(container.table.notice, 'must show exactly 3');
+      expect(container.table.view.isJokerChosen, isFalse);
+      expect(container.table.groups, hasLength(2));
+      expect(container.table.revealingJoker, isFalse);
+    });
+
+    test('cancelling the tiplu pick shows nothing', () {
+      final container = tableWith()
+        ..controller.draw(DrawSource.stock)
+        ..group(heartsRun)
+        ..controller.showGroups()
+        ..controller.cancelTipluPick();
+
+      expect(container.table.pickingTiplu, isFalse);
+      expect(container.table.view.youHaveSeenJoker, isFalse);
+    });
+
+    test('once a bot has picked the tiplu, Show sees it straight away', () {
+      // The bot shows on its first turn (picking the tiplu) but can't win.
+      final container = tableWith(
+        botHand: [
+          ...run(Suit.spades, [Rank.jack, Rank.queen, Rank.king]),
+          ...run(Suit.clubs, [Rank.four, Rank.five, Rank.six]),
+          ...run(Suit.diamonds, [Rank.ace, Rank.two, Rank.three]),
+          c(Suit.hearts, Rank.nine),
+          c(Suit.clubs, Rank.queen),
+        ],
+      )..controller.draw(DrawSource.stock);
+      container.controller.discard(container.idOf(twoOfDiamonds));
+      expect(container.table.view.isJokerChosen, isTrue);
+      expect(container.table.view.yourJokers, isNull);
+      expect(container.table.view.opponents.single.hasSeenJoker, isTrue);
+
+      container
+        ..controller.draw(DrawSource.stock)
+        ..group(heartsRun)
+        ..group(spadesRun)
+        ..group(clubsRun)
+        ..controller.showGroups();
+
+      expect(container.table.pickingTiplu, isFalse);
+      expect(container.table.view.yourJokers, isNotNull);
+      expect(container.table.revealingJoker, isTrue);
+    });
+
+    test('7 grouped pairs are shown as doublees', () {
+      final pairs = [
+        for (final rank in [
+          Rank.two,
+          Rank.three,
+          Rank.four,
+          Rank.five,
+          Rank.nine,
+          Rank.ten,
+          Rank.jack,
+        ])
+          [c(Suit.clubs, rank), c(Suit.clubs, rank)],
+      ];
+      final container = tableWith(
+        yourHand: [...pairs.expand((p) => p), c(Suit.spades, Rank.king)],
+      )..controller.draw(DrawSource.stock);
+      for (final pair in pairs) {
+        container.group(pair);
+      }
+
+      container.controller
+        ..showGroups()
+        ..pickTiplu(1);
+
+      expect(container.table.view.youHaveSeenJoker, isTrue);
+      expect(container.table.view.you.laidDown, pairs);
+    });
+  });
+
+  group('Winning', () {
+    // After drawing Q♦ and showing the 3 runs with 7♥ as the tiplu, the hand
+    // is K♠ K♦ 7♣ 10♦ J♦ 8♥ 2♦ Q♦: discarding 2♦ wins (K♠ K♦ + joker,
+    // 10♦ J♦ Q♦ + joker), discarding 10♦ doesn't.
+    ProviderContainer readyToWin() =>
+        tableWith(
+            yourHand: [
+              ...yourCards.take(9),
+              c(Suit.spades, Rank.king),
+              c(Suit.diamonds, Rank.king),
+              c(Suit.clubs, Rank.seven),
+              c(Suit.diamonds, Rank.ten),
+              c(Suit.diamonds, Rank.jack),
+              c(Suit.hearts, Rank.eight),
+              twoOfDiamonds,
+            ],
+          )
+          ..controller.draw(DrawSource.stock)
+          ..group(heartsRun)
+          ..group(spadesRun)
+          ..group(clubsRun)
+          ..controller.showGroups()
+          ..controller.pickTiplu(1);
+
+    test('the cards that would win if discarded are known', () {
+      final container = readyToWin();
+
+      expect(
+        container.table.winningDiscards,
+        contains(container.idOf(twoOfDiamonds)),
+      );
+      expect(
+        container.table.winningDiscards,
+        isNot(contains(container.idOf(c(Suit.diamonds, Rank.ten)))),
+      );
+    });
+
+    test('Win with nothing selected explains what to do', () {
+      final container = readyToWin()..controller.declareWin();
+
+      expect(
+        container.table.notice,
+        'Select the card to discard, then tap Win.',
+      );
+    });
+
+    test('a discard that does not win is refused', () {
+      final container = readyToWin();
+      container.controller
+        ..toggleSelected(container.idOf(c(Suit.diamonds, Rank.ten)))
+        ..declareWin();
+
+      expect(
+        container.table.notice,
+        '10♦ does not leave a winning hand when discarded',
+      );
+      expect(container.table.view.winner, isNull);
+    });
+
+    test('a winning discard ends the round', () {
+      final container = readyToWin();
+      container.controller
+        ..toggleSelected(container.idOf(twoOfDiamonds))
+        ..declareWin();
+
+      expect(container.table.view.winner?.name, 'You');
+      expect(container.table.notice, 'You won the round!');
+      expect(container.table.winningDiscards, isEmpty);
+    });
+
+    test('nothing wins before the joker is seen', () {
+      final container = tableWith()..controller.draw(DrawSource.stock);
+
+      expect(container.table.winningDiscards, isEmpty);
     });
   });
 }

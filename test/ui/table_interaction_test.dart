@@ -11,8 +11,11 @@ import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_state.dart';
 import 'package:marriage_game/ui/table/card_view.dart';
 import 'package:marriage_game/ui/table/hand_fan.dart';
+import 'package:marriage_game/ui/table/joker_reveal.dart';
 import 'package:marriage_game/ui/table/opening_picker.dart';
+import 'package:marriage_game/ui/table/opponent_seat.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
+import 'package:marriage_game/ui/table/tiplu_picker.dart';
 
 const c = PlayingCard.new;
 
@@ -33,6 +36,7 @@ final kingOfClubs = c(Suit.clubs, Rank.king);
 Future<void> pumpTable(
   WidgetTester tester, {
   List<PlayingCard>? yourHand,
+  int firstSeat = 0,
 }) async {
   tester.view
     ..physicalSize = const Size(844, 390)
@@ -62,6 +66,7 @@ Future<void> pumpTable(
               queenOfDiamonds,
             ],
             discardPile: [kingOfClubs],
+            firstSeat: firstSeat,
           ),
         ),
       ],
@@ -113,12 +118,12 @@ void main() {
   testWidgets('tap the stock to draw, then select and tap the pile to '
       'discard', (tester) async {
     await pumpTable(tester);
-    expect(status(tester), contains('tap the stock or the discard pile'));
+    expect(status(tester), 'Your turn: draw a card.');
 
     await tester.tap(find.byKey(const Key('stock')));
     await tester.pump();
     expect(stateOf(tester).hand.last.card, queenOfDiamonds);
-    expect(status(tester), contains('Select a card'));
+    expect(status(tester), 'Select a card to discard.');
 
     await tester.tap(lastHandCard(tester));
     await tester.pump();
@@ -129,7 +134,7 @@ void main() {
     final state = stateOf(tester);
     expect(state.hand.map((c) => c.card), isNot(contains(queenOfDiamonds)));
     expect(state.view.isYourTurn, isTrue);
-    expect(status(tester), contains('tap the stock or the discard pile'));
+    expect(status(tester), 'Your turn: draw a card.');
   });
 
   testWidgets('a refused move pops up the reason', (tester) async {
@@ -244,6 +249,161 @@ void main() {
 
     expect(find.byType(OpeningPicker), findsNothing);
     expect(stateOf(tester).hand, hasLength(4));
-    expect(status(tester), contains('tap the stock or the discard pile'));
+    expect(status(tester), 'Your turn: draw a card.');
+  });
+
+  group('Turn flow', () {
+    final heartsRun = [
+      c(Suit.hearts, Rank.three),
+      c(Suit.hearts, Rank.four),
+      c(Suit.hearts, Rank.five),
+    ];
+    final spadesRun = [
+      c(Suit.spades, Rank.two),
+      c(Suit.spades, Rank.three),
+      c(Suit.spades, Rank.four),
+    ];
+    final clubsRun = [
+      c(Suit.clubs, Rank.nine),
+      c(Suit.clubs, Rank.ten),
+      c(Suit.clubs, Rank.jack),
+    ];
+    final twoOfDiamonds = c(Suit.diamonds, Rank.two);
+    final winnableHand = [
+      ...heartsRun,
+      ...spadesRun,
+      ...clubsRun,
+      c(Suit.spades, Rank.king),
+      c(Suit.diamonds, Rank.king),
+      c(Suit.clubs, Rank.seven),
+      c(Suit.diamonds, Rank.ten),
+      c(Suit.diamonds, Rank.jack),
+      c(Suit.hearts, Rank.eight),
+      twoOfDiamonds,
+    ];
+
+    TableController controllerOf(WidgetTester tester) =>
+        ProviderScope.containerOf(
+          tester.element(find.byType(TableScreen)),
+        ).read(tableProvider.notifier);
+
+    /// Selects one copy of each of [cards].
+    void select(WidgetTester tester, List<PlayingCard> cards) {
+      final used = <int>{};
+      for (final card in cards) {
+        final id = stateOf(
+          tester,
+        ).hand.firstWhere((h) => h.card == card && !used.contains(h.id)).id;
+        used.add(id);
+        controllerOf(tester).toggleSelected(id);
+      }
+    }
+
+    testWidgets('draw, group, show, pick the tiplu, see it revealed, and win', (
+      tester,
+    ) async {
+      await pumpTable(tester, yourHand: winnableHand);
+      expect(find.byKey(const Key('joker-chip')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('stock')));
+      await tester.pump();
+
+      // Group the three runs with the Group button.
+      for (final run in [heartsRun, spadesRun, clubsRun]) {
+        select(tester, run);
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('group-button')));
+        await tester.pump();
+      }
+      expect(stateOf(tester).groups, hasLength(3));
+
+      // First to show: pick the tiplu from the face-down stock.
+      await tester.tap(find.byKey(const Key('show-button')));
+      await tester.pump();
+      expect(find.byType(TipluPicker), findsOneWidget);
+      await tester.tap(find.byKey(const Key('stock-card-1')));
+      await tester.pump();
+
+      // The reveal flips the tiplu over.
+      expect(find.byType(JokerReveal), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.text('The joker is 7♥'), findsOneWidget);
+      await tester.tap(find.text('Got it'));
+      await tester.pump();
+      expect(find.byType(JokerReveal), findsNothing);
+
+      // The joker stays in the corner, and wild cards in hand get a badge.
+      expect(find.byKey(const Key('joker-chip')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(HandFan),
+          matching: find.byKey(const Key('joker-badge')),
+        ),
+        findsNWidgets(2), // 7♣ and 8♥
+      );
+      expect(find.byKey(const Key('your-laid-down-sets')), findsOneWidget);
+
+      // Win is offered only for a card whose discard wins.
+      select(tester, [c(Suit.diamonds, Rank.ten)]);
+      await tester.pump();
+      final win = find.byKey(const Key('win-button'));
+      expect(tester.widget<FilledButton>(win).onPressed, isNull);
+
+      controllerOf(tester).toggleSelected(stateOf(tester).selected.single);
+      select(tester, [twoOfDiamonds]);
+      await tester.pump();
+      expect(tester.widget<FilledButton>(win).onPressed, isNotNull);
+      await tester.tap(win);
+      await tester.pump();
+
+      expect(status(tester), 'You won the round.');
+      expect(find.text('You won the round!'), findsOneWidget);
+    });
+
+    testWidgets('Show and Group only appear when they can be used', (
+      tester,
+    ) async {
+      await pumpTable(tester, yourHand: winnableHand);
+
+      expect(find.byKey(const Key('group-button')), findsNothing);
+      expect(find.byKey(const Key('show-button')), findsNothing);
+      expect(find.byKey(const Key('win-button')), findsNothing);
+
+      select(tester, heartsRun);
+      await tester.pump();
+      expect(find.byKey(const Key('group-button')), findsOneWidget);
+    });
+
+    testWidgets('the opponent whose turn it is glows', (tester) async {
+      // A bot plays first, but waits while you choose opening tunnellas.
+      await pumpTable(
+        tester,
+        firstSeat: 1,
+        yourHand: [
+          for (final rank in [Rank.two, Rank.five, Rank.nine, Rank.king])
+            ...tunnellaOf(c(Suit.clubs, rank)),
+        ],
+      );
+
+      expect(
+        tester.widget<OpponentSeat>(find.byType(OpponentSeat)).isCurrentTurn,
+        isTrue,
+      );
+      expect(status(tester), 'Choose your opening tunnellas.');
+
+      for (final i in [0, 1, 2]) {
+        await tester.tap(find.byKey(Key('opening-tunnella-$i')));
+      }
+      await tester.pump();
+      await tester.tap(find.text('Show these 3'));
+      await tester.pump();
+
+      // The bot has had its turn; now it's yours, and its seat is calm.
+      expect(
+        tester.widget<OpponentSeat>(find.byType(OpponentSeat)).isCurrentTurn,
+        isFalse,
+      );
+      expect(stateOf(tester).view.isYourTurn, isTrue);
+    });
   });
 }

@@ -13,6 +13,8 @@ class CardFace extends StatelessWidget {
     super.key,
     required this.width,
     this.highlighted = false,
+    this.wild = false,
+    this.groupColor,
   });
 
   final PlayingCard card;
@@ -20,6 +22,12 @@ class CardFace extends StatelessWidget {
 
   /// Draws a bright border, for a selected card.
   final bool highlighted;
+
+  /// Marks the card as a joker with a small badge.
+  final bool wild;
+
+  /// Colour of the strip along the top of a card in a grouped set.
+  final Color? groupColor;
 
   bool get _isRed => card.suit == Suit.hearts || card.suit == Suit.diamonds;
 
@@ -60,6 +68,36 @@ class CardFace extends StatelessWidget {
                 ],
               ),
             ),
+            if (groupColor != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                height: width * 0.07,
+                child: ColoredBox(color: groupColor!),
+              ),
+            if (wild)
+              Positioned(
+                right: width * 0.06,
+                bottom: width * 0.06,
+                child: Container(
+                  key: const Key('joker-badge'),
+                  padding: EdgeInsets.symmetric(horizontal: width * 0.05),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6A1B9A),
+                    borderRadius: BorderRadius.circular(width * 0.05),
+                  ),
+                  child: Text(
+                    'J',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: width * 0.18,
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ),
             Center(
               child: Padding(
                 padding: EdgeInsets.only(top: width * 0.25),

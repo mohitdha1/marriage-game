@@ -31,6 +31,10 @@ class TableState {
     required this.hand,
     this.selected = const {},
     this.openingChoice,
+    this.groups = const [],
+    this.pickingTiplu = false,
+    this.revealingJoker = false,
+    this.winningDiscards = const {},
     this.notice,
     this.noticeId = 0,
   });
@@ -48,6 +52,21 @@ class TableState {
   /// they choose.
   final List<List<PlayingCard>>? openingChoice;
 
+  /// Sets the human player has grouped, ready to show, as lists of card ids.
+  /// Grouped cards sit together at the left of the hand.
+  final List<List<int>> groups;
+
+  /// Whether the human player is the first to show and is picking the tiplu
+  /// from the stock. Their grouped sets are shown once they pick.
+  final bool pickingTiplu;
+
+  /// Whether the joker reveal is on screen, right after the human player
+  /// has seen the joker.
+  final bool revealingJoker;
+
+  /// Ids of the cards that, if discarded now, would leave a winning hand.
+  final Set<int> winningDiscards;
+
   /// A message to show the player, such as why a move wasn't allowed.
   final String? notice;
 
@@ -60,17 +79,33 @@ class TableState {
       ? hand.firstWhere((c) => c.id == selected.single)
       : null;
 
+  /// The group [cardId] belongs to, as an index into [groups], or `null`.
+  int? groupOf(int cardId) {
+    for (var i = 0; i < groups.length; i++) {
+      if (groups[i].contains(cardId)) return i;
+    }
+    return null;
+  }
+
   TableState copyWith({
     TableView? view,
     List<HandCard>? hand,
     Set<int>? selected,
     List<List<PlayingCard>>? Function()? openingChoice,
+    List<List<int>>? groups,
+    bool? pickingTiplu,
+    bool? revealingJoker,
+    Set<int>? winningDiscards,
     String? notice,
   }) => TableState(
     view: view ?? this.view,
     hand: hand ?? this.hand,
     selected: selected ?? this.selected,
     openingChoice: openingChoice != null ? openingChoice() : this.openingChoice,
+    groups: groups ?? this.groups,
+    pickingTiplu: pickingTiplu ?? this.pickingTiplu,
+    revealingJoker: revealingJoker ?? this.revealingJoker,
+    winningDiscards: winningDiscards ?? this.winningDiscards,
     notice: notice ?? this.notice,
     noticeId: notice != null ? noticeId + 1 : noticeId,
   );

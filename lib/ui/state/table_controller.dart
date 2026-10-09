@@ -8,6 +8,7 @@ import '../../engine/game_config.dart';
 import '../../engine/melds.dart';
 import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
+import '../../engine/win_check.dart';
 import 'table_state.dart';
 import 'table_view.dart';
 
@@ -128,7 +129,94 @@ class TableController extends Notifier<TableState> {
     _act(() {
       _round.discard(card);
       _playBots();
-    });
+    }, removing: {cardId});
+  }
+
+  /// Groups the selected cards into a set to show. Grouped cards move
+  /// together to the left of the hand, in the order the groups were made.
+  void groupSelected() {
+    if (state.selected.length < 2) {
+      _publish(notice: 'Select 2 or more cards to group.');
+      return;
+    }
+    final newGroup = [
+      for (final handCard in state.hand)
+        if (state.selected.contains(handCard.id)) handCard.id,
+    ];
+    final groups = [
+      for (final group in state.groups)
+        [
+          for (final id in group)
+            if (!state.selected.contains(id)) id,
+        ],
+      newGroup,
+    ].where((group) => group.isNotEmpty).toList();
+    state = state.copyWith(
+      groups: groups,
+      hand: _groupedFirst(state.hand, groups),
+      selected: {},
+    );
+  }
+
+  /// Breaks up every group.
+  void clearGroups() => state = state.copyWith(groups: []);
+
+  /// Shows the grouped sets to see the joker. If nobody has picked the tiplu
+  /// yet, the player picks it first ([pickTiplu]), then the sets are shown.
+  void showGroups() {
+    if (state.groups.isEmpty) {
+      _publish(notice: 'Group your sets first, then tap Show.');
+      return;
+    }
+    if (!state.view.isJokerChosen) {
+      state = state.copyWith(pickingTiplu: true);
+      return;
+    }
+    _showGroups(tipluPosition: null);
+  }
+
+  /// Picks the stock card at [position] (0 is the top) as the tiplu, and
+  /// shows the grouped sets.
+  void pickTiplu(int position) {
+    state = state.copyWith(pickingTiplu: false);
+    _showGroups(tipluPosition: position);
+  }
+
+  void cancelTipluPick() => state = state.copyWith(pickingTiplu: false);
+
+  /// Closes the joker reveal.
+  void dismissReveal() => state = state.copyWith(revealingJoker: false);
+
+  /// Finishes the round by discarding the selected card, if that leaves a
+  /// winning hand.
+  void declareWin() {
+    final selected = state.singleSelected;
+    if (selected == null) {
+      _publish(notice: 'Select the card to discard, then tap Win.');
+      return;
+    }
+    _act(() => _round.declareWin(selected.card), removing: {selected.id});
+  }
+
+  void _showGroups({required int? tipluPosition}) {
+    final sets = [
+      for (final group in state.groups)
+        [for (final id in group) _cardWithId(id)!],
+    ];
+    final ids = {for (final group in state.groups) ...group};
+    final isDoublees =
+        sets.length == PlayerHand.doubleesToShow &&
+        sets.every((set) => set.length == 2);
+    final shown = _act(() {
+      if (isDoublees) {
+        _round.showDoublees(sets, tipluPosition: tipluPosition);
+      } else {
+        _round.showPureSets(sets, tipluPosition: tipluPosition);
+      }
+    }, removing: ids);
+    if (shown) {
+      state = state.copyWith(groups: [], revealingJoker: true);
+    }
   }
 
   /// Tapping the discard pile takes its top card at the start of a turn, or
@@ -154,8 +242,10 @@ class TableController extends Notifier<TableState> {
   }
 
   /// Runs [move] against the engine, turning a refused move into a notice,
-  /// then publishes the new state.
-  void _act(void Function() move) {
+  /// then publishes the new state. [removing] names the hand cards the move
+  /// takes out of the hand, so the right copy goes when there are
+  /// duplicates. Returns whether the engine accepted the move.
+  bool _act(void Function() move, {Set<int> removing = const {}}) {
     String? notice;
     try {
       move();
@@ -164,11 +254,15 @@ class TableController extends Notifier<TableState> {
     } on StateError catch (e) {
       notice = e.message;
     }
+    final accepted = notice == null;
     final winner = _round.winner;
-    if (notice == null && winner != null && winner != humanSeat) {
-      notice = '${_nameOf(winner)} won the round.';
+    if (accepted && winner != null) {
+      notice = winner == humanSeat
+          ? 'You won the round!'
+          : '${_nameOf(winner)} won the round.';
     }
-    _publish(notice: notice);
+    _publish(notice: notice, removed: accepted ? removing : const {});
+    return accepted;
   }
 
   void _playBots() {
@@ -177,15 +271,53 @@ class TableController extends Notifier<TableState> {
     }
   }
 
-  void _publish({String? notice}) {
-    final hand = _reconcile(state.hand);
+  void _publish({String? notice, Set<int> removed = const {}}) {
+    final hand = _reconcile([
+      for (final handCard in state.hand)
+        if (!removed.contains(handCard.id)) handCard,
+    ]);
     final ids = {for (final c in hand) c.id};
+    final groups = [
+      for (final group in state.groups) group.where(ids.contains).toList(),
+    ].where((group) => group.isNotEmpty).toList();
     state = state.copyWith(
       view: _snapshot(),
       hand: hand,
       selected: state.selected.where(ids.contains).toSet(),
+      groups: groups,
+      winningDiscards: _winningDiscards(hand),
       notice: notice,
     );
+  }
+
+  /// Ids of the cards in [hand] that would leave a winning hand if
+  /// discarded now. Empty unless it's the human player's turn, they've drawn
+  /// and they've seen the joker.
+  Set<int> _winningDiscards(List<HandCard> hand) {
+    final player = _round.hands[humanSeat];
+    final jokers = _round.jokersFor(humanSeat);
+    final route = player.showKind;
+    if (_round.isOver ||
+        _round.currentSeat != humanSeat ||
+        !player.hasDrawn ||
+        jokers == null ||
+        route == null) {
+      return {};
+    }
+    bool isWinningHand(List<PlayingCard> cards) => switch (route) {
+      ShowKind.pureSets => canSplitIntoSets(cards, jokers),
+      ShowKind.doublees => containsDoubleeWithJokers(cards, jokers),
+    };
+
+    final winning = <int>{};
+    for (final candidate in hand) {
+      final rest = [
+        for (final handCard in hand)
+          if (handCard.id != candidate.id) handCard.card,
+      ];
+      if (isWinningHand(rest)) winning.add(candidate.id);
+    }
+    return winning;
   }
 
   /// Brings the on-screen hand in line with the engine's: cards still held
@@ -198,6 +330,21 @@ class TableController extends Notifier<TableState> {
       if (held.remove(handCard.card)) kept.add(handCard);
     }
     return [...kept, for (final card in held) HandCard(_nextCardId++, card)];
+  }
+
+  /// [hand] with the cards in [groups] moved to the front, group by group.
+  static List<HandCard> _groupedFirst(
+    List<HandCard> hand,
+    List<List<int>> groups,
+  ) {
+    final byId = {for (final c in hand) c.id: c};
+    final grouped = {for (final group in groups) ...group};
+    return [
+      for (final group in groups)
+        for (final id in group) byId[id]!,
+      for (final handCard in hand)
+        if (!grouped.contains(handCard.id)) handCard,
+    ];
   }
 
   TableView _snapshot() =>

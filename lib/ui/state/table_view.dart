@@ -1,4 +1,6 @@
 import '../../engine/card.dart';
+import '../../engine/joker.dart';
+import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
 
 /// One player's seat as everyone at the table can see it.
@@ -7,6 +9,8 @@ class SeatView {
     required this.seat,
     required this.name,
     required this.cardCount,
+    this.hasSeenJoker = false,
+    this.laidDown = const [],
   });
 
   final int seat;
@@ -14,11 +18,19 @@ class SeatView {
 
   /// Cards still held, not counting any laid down.
   final int cardCount;
+
+  /// Whether this player has shown their sets and seen the joker.
+  final bool hasSeenJoker;
+
+  /// Sets this player has laid face up: opening tunnellas, then the sets
+  /// shown to see the joker.
+  final List<List<PlayingCard>> laidDown;
 }
 
 /// An immutable snapshot of a [Round] as seen from [you]'s seat: what the
 /// table screen draws. It shows only what that player is allowed to see —
-/// their own cards, but just a count for everyone else's.
+/// their own cards, but just a count for everyone else's, and the joker only
+/// once they've seen it.
 class TableView {
   const TableView({
     required this.you,
@@ -29,6 +41,9 @@ class TableView {
     required this.currentSeat,
     required this.youHaveDrawn,
     required this.winner,
+    this.isJokerChosen = false,
+    this.yourJokers,
+    this.pureSetsStillNeeded = PlayerHand.pureSetsToShow,
   });
 
   /// Builds the view for [humanSeat]. [opponents] are listed in turn order
@@ -40,24 +55,33 @@ class TableView {
     required String Function(int seat) nameOf,
   }) {
     final playerCount = round.hands.length;
-    SeatView seatView(int seat) => SeatView(
-      seat: seat,
-      name: nameOf(seat),
-      cardCount: round.hands[seat].cards.length,
-    );
+    SeatView seatView(int seat) {
+      final hand = round.hands[seat];
+      return SeatView(
+        seat: seat,
+        name: nameOf(seat),
+        cardCount: hand.cards.length,
+        hasSeenJoker: hand.hasSeenJoker,
+        laidDown: [...hand.openingTunnellas, ...hand.shownSets],
+      );
+    }
 
+    final yours = round.hands[humanSeat];
     return TableView(
       you: seatView(humanSeat),
       opponents: [
         for (var i = 1; i < playerCount; i++)
           seatView((humanSeat + i) % playerCount),
       ],
-      hand: round.hands[humanSeat].cards,
+      hand: yours.cards,
       stockCount: round.stockCount,
       topDiscard: round.topDiscard,
       currentSeat: round.currentSeat,
-      youHaveDrawn: round.hands[humanSeat].hasDrawn,
+      youHaveDrawn: yours.hasDrawn,
       winner: round.winner == null ? null : seatView(round.winner!),
+      isJokerChosen: round.isJokerChosen,
+      yourJokers: round.jokersFor(humanSeat),
+      pureSetsStillNeeded: yours.pureSetsStillNeeded,
     );
   }
 
@@ -80,6 +104,18 @@ class TableView {
 
   /// Who won the round, or `null` while it's still being played.
   final SeatView? winner;
+
+  /// Whether anyone has picked the tiplu yet.
+  final bool isJokerChosen;
+
+  /// The jokers, once the human player has seen them; otherwise `null`.
+  final Jokers? yourJokers;
+
+  /// How many pure sets the human player still has to show, after counting
+  /// their opening tunnellas.
+  final int pureSetsStillNeeded;
+
+  bool get youHaveSeenJoker => you.hasSeenJoker;
 
   bool get isYourTurn => winner == null && currentSeat == you.seat;
 }

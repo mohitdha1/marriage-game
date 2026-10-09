@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../engine/joker.dart';
 import '../../engine/round.dart';
 import '../state/table_state.dart';
 import 'card_view.dart';
@@ -18,6 +19,8 @@ class HandFan extends StatelessWidget {
     required this.cards,
     required this.cardWidth,
     this.selected = const {},
+    this.groupOf,
+    this.jokers,
     this.onCardTap,
     this.onDraw,
   });
@@ -27,6 +30,13 @@ class HandFan extends StatelessWidget {
 
   /// Ids of the selected cards.
   final Set<int> selected;
+
+  /// Which grouped set a card belongs to, if any. Grouped cards get a
+  /// coloured strip, and a small gap separates each group from the next.
+  final int? Function(int cardId)? groupOf;
+
+  /// The jokers, once seen; wild cards are then marked with a badge.
+  final Jokers? jokers;
 
   final void Function(int cardId)? onCardTap;
 
@@ -42,6 +52,20 @@ class HandFan extends StatelessWidget {
 
   /// How far a selected card lifts, as a share of a card's height.
   static const _lift = 0.2;
+
+  /// Extra space between groups, as a share of a card's width.
+  static const _groupGap = 0.25;
+
+  /// Strip colours for grouped sets, reused if there are more groups.
+  static const groupColors = [
+    Color(0xFF1E88E5),
+    Color(0xFF43A047),
+    Color(0xFFFB8C00),
+    Color(0xFF8E24AA),
+    Color(0xFF00ACC1),
+    Color(0xFFE53935),
+    Color(0xFF6D4C41),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -75,17 +99,36 @@ class HandFan extends StatelessWidget {
                 cardHeight) /
             2;
 
-        final usableWidth = constraints.maxWidth - 2 * overhangX;
+        int? group(int i) => groupOf?.call(cards[i].id);
+        // A gap goes wherever one card and the next aren't in the same group,
+        // as long as at least one of them is grouped.
+        final gapBefore = [
+          for (var i = 0; i < n; i++)
+            i > 0 &&
+                group(i) != group(i - 1) &&
+                (group(i) != null || group(i - 1) != null),
+        ];
+        final gapCount = gapBefore.where((g) => g).length;
+        final gap = cardWidth * _groupGap;
+
+        final usableWidth =
+            constraints.maxWidth - 2 * overhangX - gap * gapCount;
         final spacing = n == 1
             ? 0.0
             : min(cardWidth * _maxSpacing, (usableWidth - cardWidth) / (n - 1));
+        final offsets = <double>[];
+        for (var i = 0; i < n; i++) {
+          offsets.add(
+            i == 0 ? 0 : offsets[i - 1] + spacing + (gapBefore[i] ? gap : 0),
+          );
+        }
         // Cards sit on a circle; its radius follows from the spacing and the
         // turn between neighbours.
         final radius = spacing / turn;
         final drops = [
           for (var i = 0; i < n; i++) radius * (1 - cos((i - middle) * turn)),
         ];
-        final fanWidth = spacing * (n - 1) + cardWidth;
+        final fanWidth = offsets.last + cardWidth;
         final left = (constraints.maxWidth - fanWidth) / 2;
         // Room above the cards for a selected card to lift into.
         final top = lift + overhangY;
@@ -98,7 +141,7 @@ class HandFan extends StatelessWidget {
               for (var i = 0; i < n; i++)
                 Positioned(
                   key: ValueKey(cards[i].id),
-                  left: left + spacing * i,
+                  left: left + offsets[i],
                   top:
                       top +
                       drops[i] -
@@ -109,6 +152,11 @@ class HandFan extends StatelessWidget {
                       handCard: cards[i],
                       width: cardWidth,
                       selected: selected.contains(cards[i].id),
+                      wild: jokers?.isWild(cards[i].card) ?? false,
+                      groupColor: switch (group(i)) {
+                        null => null,
+                        final g => groupColors[g % groupColors.length],
+                      },
                       onTap: onCardTap == null
                           ? null
                           : () => onCardTap!(cards[i].id),
@@ -129,17 +177,27 @@ class _HandCardView extends StatelessWidget {
     required this.handCard,
     required this.width,
     required this.selected,
+    required this.wild,
+    required this.groupColor,
     required this.onTap,
   });
 
   final HandCard handCard;
   final double width;
   final bool selected;
+  final bool wild;
+  final Color? groupColor;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final face = CardFace(handCard.card, width: width, highlighted: selected);
+    final face = CardFace(
+      handCard.card,
+      width: width,
+      highlighted: selected,
+      wild: wild,
+      groupColor: groupColor,
+    );
     return Draggable<HandCard>(
       data: handCard,
       feedback: Material(
