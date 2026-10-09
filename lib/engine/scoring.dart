@@ -146,7 +146,13 @@ class RoundScore {
     required this.maal,
     required this.net,
     List<int>? penalties,
-  }) : penalties = penalties ?? List.filled(net.length, 0);
+    List<int>? maalShares,
+    List<int>? winnerPayments,
+    List<bool>? sawJoker,
+  }) : penalties = penalties ?? List.filled(net.length, 0),
+       maalShares = maalShares ?? List.filled(net.length, 0),
+       winnerPayments = winnerPayments ?? List.filled(net.length, 0),
+       sawJoker = sawJoker ?? List.filled(net.length, false);
 
   /// Seat index of the player who won the round.
   final int winner;
@@ -161,6 +167,27 @@ class RoundScore {
   /// Joker-discard penalty points each player paid the winner, by seat;
   /// already included in [net].
   final List<int> penalties;
+
+  /// Each player's zero-sum share of the maal: their own maal × the number
+  /// of players, minus everyone's maal combined. Part of [net].
+  final List<int> maalShares;
+
+  /// What each player paid the winner (negative) for losing the round, and
+  /// what the winner collected (positive), by seat. Part of [net].
+  final List<int> winnerPayments;
+
+  /// Whether each player had seen the joker when the round ended.
+  final List<bool> sawJoker;
+
+  /// [penalties] as transfers: negative for each player who paid, and the
+  /// total collected (positive) for the winner.
+  List<int> get penaltyTransfers {
+    final collected = penalties.fold(0, (sum, p) => sum + p);
+    return [
+      for (var seat = 0; seat < penalties.length; seat++)
+        seat == winner ? collected : -penalties[seat],
+    ];
+  }
 }
 
 /// Settles a round won by the player at seat [winner].
@@ -201,10 +228,14 @@ RoundScore scoreRound({
 
   final maal = [for (final hand in hands) scoreMaal(hand, jokers)];
   final totalMaal = maal.fold(0, (sum, m) => sum + m.total);
-  final net = [for (final m in maal) m.total * hands.length - totalMaal];
+  final maalShares = [
+    for (final m in maal) m.total * hands.length - totalMaal,
+  ];
+  final net = [...maalShares];
 
   final dubleeWin = hands[winner].showKind == ShowKind.doublees;
   final penalties = List.filled(hands.length, 0);
+  final winnerPayments = List.filled(hands.length, 0);
   for (var seat = 0; seat < hands.length; seat++) {
     if (seat == winner) continue;
     var payment = hands[seat].hasSeenJoker
@@ -213,6 +244,8 @@ RoundScore scoreRound({
     if (dubleeWin) payment += ScoringTable.dubleeWinBonus;
     net[seat] -= payment;
     net[winner] += payment;
+    winnerPayments[seat] -= payment;
+    winnerPayments[winner] += payment;
 
     final penalty =
         (jokerDiscards?[seat] ?? 0) * ScoringTable.jokerDiscardPenalty;
@@ -226,6 +259,9 @@ RoundScore scoreRound({
     maal: maal,
     net: net,
     penalties: penalties,
+    maalShares: maalShares,
+    winnerPayments: winnerPayments,
+    sawJoker: [for (final hand in hands) hand.hasSeenJoker],
   );
 }
 

@@ -373,6 +373,52 @@ void main() {
       );
     });
 
+    test('itemises each player\'s maal share and winner payment', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(held: [jhiplu, tiplu, poplu]), // maal 10, winner
+          seenHand(held: [tiplu]), // maal 3
+          unseenHand(held: [alter]), // unseen: maal 0
+        ],
+        winner: 0,
+        jokers: jokers,
+        jokerDiscards: [0, 1, 0],
+      );
+
+      expect(result.maalShares, [17, -4, -13]);
+      expect(result.winnerPayments, [13, -3, -10]);
+      expect(result.penaltyTransfers, [15, -15, 0]);
+      expect(result.sawJoker, [true, true, false]);
+      for (var seat = 0; seat < 3; seat++) {
+        expect(
+          result.net[seat],
+          result.maalShares[seat] +
+              result.winnerPayments[seat] +
+              result.penaltyTransfers[seat],
+          reason: 'seat $seat: the items add up to the round total',
+        );
+      }
+    });
+
+    test('shares, payments and penalty transfers each sum to zero', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(held: [alter, alter]),
+          seenHand(held: [tiplu, jhiplu]),
+          unseenHand(),
+          seenHand(opening: [tunnellaOf(poplu)], shown: [spadesRun, clubsRun]),
+        ],
+        winner: 1,
+        jokers: jokers,
+        jokerDiscards: [2, 0, 0, 1],
+      );
+
+      int sum(List<int> values) => values.fold(0, (a, b) => a + b);
+      expect(sum(result.maalShares), 0);
+      expect(sum(result.winnerPayments), 0);
+      expect(sum(result.penaltyTransfers), 0);
+    });
+
     test('the winner must have seen the joker', () {
       expect(
         () => scoreRound(
