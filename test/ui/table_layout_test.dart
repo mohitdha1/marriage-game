@@ -56,6 +56,10 @@ void main() {
       // buttons down the right-hand side.
       ..padding = const FakeViewPadding(top: 28, right: 48);
     addTearDown(tester.view.reset);
+    // Jokers pulse forever, so a settled screen needs motion turned off.
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 
     final rest = [...Rank.values.map((r) => c(Suit.diamonds, r))];
     await tester.pumpWidget(

@@ -48,6 +48,10 @@ Future<void> pumpTable(
     ..physicalSize = const Size(844, 390)
     ..devicePixelRatio = 1;
   addTearDown(tester.view.reset);
+  // Jokers pulse forever, so a settled screen needs motion turned off.
+  tester.platformDispatcher.accessibilityFeaturesTestValue =
+      const FakeAccessibilityFeatures(disableAnimations: true);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 
   await tester.pumpWidget(
     ProviderScope(
@@ -419,12 +423,12 @@ void main() {
       expect(badge('hand-helper'), '5 sets · 1 unmatched');
       expect(badge('maal-badge'), 'Maal 2');
 
-      // The joker stays in the corner, and wild cards in hand get a badge.
+      // The joker stays in the corner, and wild cards in hand glow.
       expect(find.byKey(const Key('joker-chip')), findsOneWidget);
       expect(
         find.descendant(
           of: find.byType(HandFan),
-          matching: find.byKey(const Key('joker-badge')),
+          matching: find.byType(JokerGlow),
         ),
         findsNWidgets(2), // 7♣ and 8♥
       );

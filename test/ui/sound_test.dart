@@ -63,6 +63,10 @@ Future<RecordingSoundEffects> pumpTable(
     ..physicalSize = const Size(844, 390)
     ..devicePixelRatio = 1;
   addTearDown(tester.view.reset);
+  // Jokers pulse forever, so a settled screen needs motion turned off.
+  tester.platformDispatcher.accessibilityFeaturesTestValue =
+      const FakeAccessibilityFeatures(disableAnimations: true);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 
   final sounds = RecordingSoundEffects();
   await tester.pumpWidget(
