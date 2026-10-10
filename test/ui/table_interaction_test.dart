@@ -245,18 +245,185 @@ void main() {
     expect(stateOf(tester).view.youHaveDrawn, isFalse, reason: 'not a draw');
   });
 
-  testWidgets('a quick drag on a hand card does nothing; it needs a long '
-      'press', (tester) async {
-    await pumpTable(tester);
-    final before = stateOf(tester).hand;
+  group('Discarding by gesture', () {
+    /// The card that was drawn: the last one in the hand.
+    PlayingCard drawn(WidgetTester tester) => stateOf(tester).hand.last.card;
 
-    await dragBetween(
+    Future<void> drawFromStock(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('stock')));
+      await tester.pump();
+    }
+
+    bool inHand(WidgetTester tester, PlayingCard card) =>
+        stateOf(tester).hand.any((c) => c.card == card);
+
+    testWidgets('drag a card straight up onto the pile, no long press needed', (
       tester,
-      lastHandCard(tester),
-      find.byKey(const Key('discard-pile')),
-    );
+    ) async {
+      await pumpTable(tester);
+      await drawFromStock(tester);
+      final card = drawn(tester);
 
-    expect(stateOf(tester).hand, before);
+      await dragBetween(
+        tester,
+        lastHandCard(tester),
+        find.byKey(const Key('discard-pile')),
+      );
+
+      expect(inHand(tester, card), isFalse);
+      expect(stateOf(tester).view.isYourTurn, isTrue, reason: 'bot played');
+    });
+
+    testWidgets('flick a card upwards to discard it', (tester) async {
+      await pumpTable(tester);
+      await drawFromStock(tester);
+      final card = drawn(tester);
+
+      await tester.fling(lastHandCard(tester), const Offset(0, -120), 1500);
+      await tester.pumpAndSettle();
+
+      expect(inHand(tester, card), isFalse);
+    });
+
+    testWidgets('a slow drag up that misses the pile keeps the card', (
+      tester,
+    ) async {
+      await pumpTable(tester);
+      await drawFromStock(tester);
+      final before = stateOf(tester).hand;
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(lastHandCard(tester)),
+      );
+      for (var i = 0; i < 6; i++) {
+        await gesture.moveBy(const Offset(0, -10));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(stateOf(tester).hand, before);
+    });
+
+    testWidgets('a quick drag sideways does nothing: moving a card needs a '
+        'long press', (tester) async {
+      await pumpTable(tester);
+      await drawFromStock(tester);
+      final before = stateOf(tester).hand;
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(lastHandCard(tester)),
+      );
+      await gesture.moveBy(const Offset(-60, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(-60, 0));
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(stateOf(tester).hand, before);
+    });
+
+    testWidgets('before drawing, a flick is refused with the reason and the '
+        'card stays', (tester) async {
+      await pumpTable(tester);
+      final before = stateOf(tester).hand;
+
+      await tester.fling(lastHandCard(tester), const Offset(0, -120), 1500);
+      await tester.pumpAndSettle();
+
+      expect(stateOf(tester).hand, before);
+      expect(find.byType(SnackBar), findsOneWidget);
+    });
+
+    testWidgets('on a bot\'s turn, a drag onto the pile is refused', (
+      tester,
+    ) async {
+      await pumpTable(tester, thinkingTime: const Duration(seconds: 1));
+      await drawFromStock(tester);
+      await tester.tap(lastHandCard(tester));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('discard-pile')));
+      await tester.pump();
+      final bot = stateOf(tester).view.opponents.single;
+      final before = stateOf(tester).hand;
+
+      await dragBetween(
+        tester,
+        lastHandCard(tester),
+        find.byKey(const Key('discard-pile')),
+      );
+
+      expect(stateOf(tester).hand, before);
+      expect(find.text('Wait for ${bot.name} to play.'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+    });
+
+    group('with motion', () {
+      final flyingCard = find.byKey(const Key('flying-card'));
+
+      testWidgets('a refused card glides back from where it was let go', (
+        tester,
+      ) async {
+        await pumpTable(tester, reduceMotion: false);
+        await tester.pumpAndSettle(); // the deal
+        final id = stateOf(tester).hand.last.id;
+
+        await tester.fling(lastHandCard(tester), const Offset(0, -120), 1500);
+        await tester.pump();
+        await tester.pump();
+
+        expect(flyingCard, findsOneWidget);
+        // Its place stays empty until it's back.
+        expect(
+          find.descendant(
+            of: find.byKey(ValueKey(id)),
+            matching: find.byType(CardFace),
+          ),
+          findsNothing,
+        );
+
+        await tester.pumpAndSettle();
+        expect(flyingCard, findsNothing);
+        expect(
+          find.descendant(
+            of: find.byKey(ValueKey(id)),
+            matching: find.byType(CardFace),
+          ),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('a flicked card flies on to the pile from where it was let '
+          'go', (tester) async {
+        await pumpTable(
+          tester,
+          reduceMotion: false,
+          thinkingTime: const Duration(seconds: 1),
+        );
+        await tester.pumpAndSettle(); // the deal
+        await drawFromStock(tester);
+        await tester.pumpAndSettle();
+        final handCentre = tester.getCenter(find.byType(HandFan));
+        const flick = Offset(0, -120);
+        final letGoAt = tester.getCenter(lastHandCard(tester)) + flick;
+
+        await tester.fling(lastHandCard(tester), flick, 1500);
+        await tester.pump();
+        await tester.pump();
+
+        expect(stateOf(tester).view.topDiscard, queenOfDiamonds);
+        final start = tester.getCenter(flyingCard);
+        expect(
+          (start - letGoAt).distance,
+          lessThan((start - handCentre).distance),
+          reason: 'the flight starts where the card was let go',
+        );
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pumpAndSettle();
+      });
+    });
   });
 
   testWidgets('Sort orders the hand ♠ ♥ ♣ ♦, then by rank', (tester) async {

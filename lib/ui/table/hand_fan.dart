@@ -10,9 +10,11 @@ import 'card_view.dart';
 /// The human player's cards, overlapped and fanned along a gentle arc so a
 /// full 21–22 card hand fits across a landscape screen.
 ///
-/// Tapping a card selects it (it lifts and gets a bright border); a card can
-/// also be dragged onto the discard pile. Dropping the stock or the discard
-/// pile onto the fan draws from it.
+/// Tapping a card selects it (it lifts and gets a bright border). Dragging a
+/// card straight up and letting go over the discard pile, or flicking it
+/// upwards, discards it. Long-pressing a card picks it up to move it within
+/// the hand (or onto the pile). Dropping the stock or the discard pile onto
+/// the fan draws from it.
 class HandFan extends StatelessWidget {
   const HandFan({
     super.key,
@@ -24,6 +26,8 @@ class HandFan extends StatelessWidget {
     this.onCardTap,
     this.onDraw,
     this.onReorder,
+    this.onFlick,
+    this.onDropMissed,
     this.hiddenIds = const {},
     this.cardKey,
   });
@@ -49,6 +53,18 @@ class HandFan extends StatelessWidget {
   /// Called when a card is long-pressed and dropped back on the fan, with
   /// the position it was dropped at.
   final void Function(int cardId, int newIndex)? onReorder;
+
+  /// Called when a card is flicked upwards, with the centre of the card
+  /// where it was let go, in global coordinates.
+  final void Function(int cardId, Offset releasedAt)? onFlick;
+
+  /// Called when a dragged card is let go somewhere that doesn't take it,
+  /// with the centre of the card where it was let go.
+  final void Function(int cardId, Offset releasedAt)? onDropMissed;
+
+  /// How fast, in logical pixels a second, an upward release must be to
+  /// count as a flick.
+  static const flickSpeed = 700.0;
 
   /// Ids of cards that keep their place in the fan but aren't drawn yet,
   /// such as a card still flying in from a pile.
@@ -188,6 +204,12 @@ class HandFan extends StatelessWidget {
                       onTap: onCardTap == null
                           ? null
                           : () => onCardTap!(cards[i].id),
+                      onReleased: (at, {required flicked}) {
+                        final id = cards[i].id;
+                        flicked
+                            ? onFlick?.call(id, at)
+                            : onDropMissed?.call(id, at);
+                      },
                     ),
                   ),
                 ),
@@ -210,8 +232,18 @@ class HandFan extends StatelessWidget {
   }
 }
 
-/// One card in the hand: tap to select; long-press and drag to move it
-/// within the hand or onto the discard pile.
+/// A hand card being dragged straight up to be discarded, as opposed to a
+/// [HandCard] picked up with a long press to be moved. The discard pile
+/// takes both; the hand only takes a [HandCard], so a card dragged up and
+/// let go over the hand isn't mistaken for a move.
+class QuickDiscard {
+  const QuickDiscard(this.card);
+
+  final HandCard card;
+}
+
+/// One card in the hand: tap to select; drag up or flick to discard;
+/// long-press and drag to move it within the hand or onto the discard pile.
 class _HandCardView extends StatelessWidget {
   const _HandCardView({
     super.key,
@@ -221,6 +253,7 @@ class _HandCardView extends StatelessWidget {
     required this.wild,
     required this.groupColor,
     required this.onTap,
+    required this.onReleased,
     this.hidden = false,
   });
 
@@ -230,6 +263,10 @@ class _HandCardView extends StatelessWidget {
   final bool wild;
   final Color? groupColor;
   final VoidCallback? onTap;
+
+  /// Called when a drag ends without anything taking the card, with the
+  /// card's centre where it was let go and whether it was flicked upwards.
+  final void Function(Offset at, {required bool flicked}) onReleased;
 
   /// Keeps the card's space but draws nothing there.
   final bool hidden;
@@ -246,15 +283,40 @@ class _HandCardView extends StatelessWidget {
       wild: wild,
       groupColor: groupColor,
     );
-    return LongPressDraggable<HandCard>(
-      data: handCard,
-      delay: const Duration(milliseconds: 250),
-      feedback: Material(
-        color: Colors.transparent,
-        child: CardFace(handCard.card, width: width, highlighted: true),
+    final lifted = Material(
+      color: Colors.transparent,
+      child: CardFace(handCard.card, width: width, highlighted: true),
+    );
+    final dimmed = Opacity(opacity: 0.3, child: face);
+    final centre = Offset(width / 2, width / cardAspectRatio / 2);
+
+    void ended(DraggableDetails details, {required bool canFlick}) {
+      if (details.wasAccepted) return;
+      final upward = -details.velocity.pixelsPerSecond.dy;
+      onReleased(
+        details.offset + centre,
+        flicked: canFlick && upward >= HandFan.flickSpeed,
+      );
+    }
+
+    // A drag that starts straight up discards; holding still first (the
+    // long press) picks the card up to move it instead. Sideways drags
+    // without the long press do nothing, so moving a finger along the hand
+    // never throws a card away.
+    return Draggable<QuickDiscard>(
+      data: QuickDiscard(handCard),
+      affinity: Axis.vertical,
+      feedback: lifted,
+      childWhenDragging: dimmed,
+      onDragEnd: (details) => ended(details, canFlick: true),
+      child: LongPressDraggable<HandCard>(
+        data: handCard,
+        delay: const Duration(milliseconds: 250),
+        feedback: lifted,
+        childWhenDragging: dimmed,
+        onDragEnd: (details) => ended(details, canFlick: false),
+        child: GestureDetector(onTap: onTap, child: face),
       ),
-      childWhenDragging: Opacity(opacity: 0.3, child: face),
-      child: GestureDetector(onTap: onTap, child: face),
     );
   }
 }

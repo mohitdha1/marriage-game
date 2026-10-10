@@ -4,6 +4,7 @@ import '../../engine/card.dart';
 import '../../engine/round.dart';
 import '../state/table_state.dart';
 import 'card_view.dart';
+import 'hand_fan.dart';
 
 /// The middle of the table: the face-down stock and the face-up discard
 /// pile, side by side.
@@ -31,8 +32,9 @@ class TableCenter extends StatelessWidget {
   final VoidCallback? onStockTap;
   final VoidCallback? onDiscardPileTap;
 
-  /// Called with the id of a hand card dropped on the discard pile.
-  final void Function(int cardId)? onCardDropped;
+  /// Called with the id of a hand card dropped on the discard pile, and the
+  /// card's centre where it was let go, in global coordinates.
+  final void Function(int cardId, Offset droppedAt)? onCardDropped;
 
   /// Keys marking where the stock and discard pile are, for animations.
   final GlobalKey? stockKey;
@@ -62,9 +64,24 @@ class TableCenter extends StatelessWidget {
           ),
         ),
         SizedBox(width: cardWidth * 0.6),
-        DragTarget<HandCard>(
-          onAcceptWithDetails: (details) =>
-              onCardDropped?.call(details.data.id),
+        // Takes a card dragged straight up as well as one picked up with a
+        // long press.
+        DragTarget<Object>(
+          onWillAcceptWithDetails: (details) =>
+              details.data is HandCard || details.data is QuickDiscard,
+          onAcceptWithDetails: (details) {
+            final card = switch (details.data) {
+              final HandCard card => card,
+              QuickDiscard(:final card) => card,
+              _ => null,
+            };
+            if (card == null) return;
+            final centre = Offset(
+              cardWidth / 2,
+              cardWidth / cardAspectRatio / 2,
+            );
+            onCardDropped?.call(card.id, details.offset + centre);
+          },
           builder: (context, candidates, rejected) {
             final face = discard == null
                 ? CardSlot(width: cardWidth)

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -71,6 +72,43 @@ class _TableScreenState extends ConsumerState<TableScreen> {
   GlobalKey _handCardKey(int id) =>
       _handCardKeys.putIfAbsent(id, GlobalKey.new);
 
+  /// Where the player let go of the card they're discarding by a drag or a
+  /// flick, so its flight to the pile starts from there.
+  Offset? _releasedAt;
+
+  /// Discards [cardId], let go at [at] by a drag onto the pile or a flick.
+  /// If a discard isn't allowed now, the controller says why and the card
+  /// glides back to its place in the hand.
+  void _discardReleased(int cardId, Offset at) {
+    _releasedAt = at;
+    unawaited(ref.read(tableProvider.notifier).discard(cardId));
+    _releasedAt = null;
+    if (ref.read(tableProvider).hand.any((c) => c.id == cardId)) {
+      _snapBack(cardId, at);
+    }
+  }
+
+  /// Glides [cardId] from [from] back to its place in the hand, after a
+  /// drag that didn't end in a move.
+  void _snapBack(int cardId, Offset from) {
+    final layer = _flights.currentState;
+    final card = ref
+        .read(tableProvider)
+        .hand
+        .where((c) => c.id == cardId)
+        .firstOrNull;
+    if (_reduceMotion || layer == null || card == null) return;
+    setState(() => _arriving.add(cardId));
+    layer.fly(
+      fromPoint: from,
+      to: _handCardKey(cardId),
+      face: card.card,
+      onLanded: () {
+        if (mounted) setState(() => _arriving.remove(cardId));
+      },
+    );
+  }
+
   var _firstDealShown = false;
 
   @override
@@ -141,6 +179,8 @@ class _TableScreenState extends ConsumerState<TableScreen> {
     }
     final fresh = next.view.events.skip(previous.view.events.length).toList();
     if (fresh.isEmpty) return;
+    final releasedAt = _releasedAt;
+    _releasedAt = null;
 
     // Hide what hasn't arrived yet in this very frame, then launch the
     // flights once the new layout is in place.
@@ -193,8 +233,10 @@ class _TableScreenState extends ConsumerState<TableScreen> {
             delay += cardFlightTime;
           case DiscardedCard(:final seat, :final card) ||
               WonRound(:final seat, :final card):
+            final yours = seat == humanSeat;
             layer.fly(
-              from: seat == humanSeat ? _anchors.hand : _anchors.seat(seat),
+              from: yours ? _anchors.hand : _anchors.seat(seat),
+              fromPoint: yours ? releasedAt : null,
               to: _anchors.discardPile,
               face: card,
               delay: delay,
@@ -341,7 +383,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                             cardWidth: cardWidth,
                             onStockTap: () => controller.draw(DrawSource.stock),
                             onDiscardPileTap: controller.tapDiscardPile,
-                            onCardDropped: controller.discard,
+                            onCardDropped: _discardReleased,
                           ),
                           const SizedBox(height: 6),
                           ConstrainedBox(
@@ -408,6 +450,8 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                         },
                         onDraw: controller.draw,
                         onReorder: controller.moveCard,
+                        onFlick: _discardReleased,
+                        onDropMissed: _snapBack,
                       ),
                     ),
                     // Badges over the hand's lower corners; taps go through

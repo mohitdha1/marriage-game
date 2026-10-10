@@ -39,18 +39,19 @@ class CardFlightLayerState extends State<CardFlightLayer>
 
   /// Flies a card from the widget at [from] to the widget at [to], starting
   /// after [delay]. Shows [face] face up, or a card back when it's `null`.
-  /// [to] can be replaced by [toRect], a spot on the table in global
-  /// coordinates. Calls [onLanded] when the card arrives (straight away if
-  /// either place can't be found).
+  /// [from] can be replaced by [fromPoint] and [to] by [toRect]: spots on
+  /// the table in global coordinates. Calls [onLanded] when the card arrives
+  /// (straight away if either place can't be found).
   void fly({
-    required GlobalKey from,
+    GlobalKey? from,
+    Offset? fromPoint,
     GlobalKey? to,
     Rect? toRect,
     PlayingCard? face,
     Duration delay = Duration.zero,
     VoidCallback? onLanded,
   }) {
-    final start = _centreOf(from);
+    final start = fromPoint ?? (from == null ? null : _centreOf(from));
     final end = toRect?.center ?? (to == null ? null : _centreOf(to));
     final box = context.findRenderObject() as RenderBox?;
     if (start == null || end == null || box == null || !box.hasSize) {
