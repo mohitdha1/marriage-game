@@ -558,6 +558,7 @@ void main() {
       tester,
     ) async {
       await pumpTable(tester, reduceMotion: false);
+      await tester.pumpAndSettle(); // the deal
 
       await tester.tap(find.byKey(const Key('stock')));
       await tester.pump(); // the move
@@ -593,6 +594,7 @@ void main() {
         reduceMotion: false,
         thinkingTime: const Duration(seconds: 1),
       );
+      await tester.pumpAndSettle(); // the deal
       await tester.tap(find.byKey(const Key('stock')));
       await tester.pumpAndSettle();
 

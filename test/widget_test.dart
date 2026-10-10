@@ -85,12 +85,10 @@ void main() {
     }
   });
 
-  testWidgets('the hand fan shows the human player\'s 21 cards, in order', (
+  testWidgets('the 21 cards are dealt into the hand fan, in order', (
     tester,
   ) async {
-    await pumpTable(tester);
-
-    final faces = tester
+    List<Object> faces() => tester
         .widgetList<CardFace>(
           find.descendant(
             of: find.byType(HandFan),
@@ -100,8 +98,19 @@ void main() {
         .map((face) => face.card)
         .toList();
 
-    expect(faces, hasLength(21));
-    expect(faces, currentState(tester).hand.map((c) => c.card));
+    await pumpTable(tester);
+    // Cards appear in the hand as they're dealt.
+    expect(faces(), isEmpty);
+    await tester.pump(); // the cards take off
+    await tester.pump(const Duration(milliseconds: 900));
+    await tester.pump();
+    expect(faces().length, inExclusiveRange(0, 21));
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(find.byKey(const Key('flying-card')), findsNothing);
+    expect(faces(), hasLength(21));
+    expect(faces(), currentState(tester).hand.map((c) => c.card));
   });
 
   testWidgets('the centre shows the stock size and the top discard', (

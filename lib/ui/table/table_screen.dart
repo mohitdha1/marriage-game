@@ -67,6 +67,59 @@ class _TableScreenState extends ConsumerState<TableScreen> {
   GlobalKey _handCardKey(int id) =>
       _handCardKeys.putIfAbsent(id, GlobalKey.new);
 
+  var _firstDealShown = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The first round was dealt before the screen opened.
+    if (_firstDealShown) return;
+    _firstDealShown = true;
+    if (!_reduceMotion) _deal(ref.read(tableProvider));
+  }
+
+  /// Deals [state]'s hands from the stock: a card at a time to each player
+  /// in turn, round the table, with the player's own cards appearing in
+  /// their hand as they land.
+  void _deal(TableState state) {
+    final hand = state.hand.map((c) => c.id).toList();
+    _arriving.addAll(hand);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final layer = _flights.currentState;
+      if (!mounted || layer == null) {
+        if (mounted) setState(() => _arriving.removeAll(hand));
+        return;
+      }
+      final seats = state.view.opponents.map((o) => o.seat).toList();
+      final dealt = hand.length * (seats.length + 1);
+      // A full deal takes about the same time however many play.
+      final gap = Duration(microseconds: _dealTime.inMicroseconds ~/ dealt);
+      var delay = Duration.zero;
+      for (final id in hand) {
+        for (final seat in seats) {
+          layer.fly(
+            from: _anchors.stock,
+            to: _anchors.seat(seat),
+            delay: delay,
+          );
+          delay += gap;
+        }
+        layer.fly(
+          from: _anchors.stock,
+          to: _handCardKey(id),
+          delay: delay,
+          onLanded: () {
+            if (mounted) setState(() => _arriving.remove(id));
+          },
+        );
+        delay += gap;
+      }
+    });
+  }
+
+  /// How long dealing a round takes, not counting the last card's flight.
+  static const _dealTime = Duration(milliseconds: 1500);
+
   /// Animates the moves in [next] that weren't in [previous]: each draw and
   /// discard glides from where it came from to where it went, one after
   /// another.
@@ -77,6 +130,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
       setState(() {
         _arriving.clear();
         _discardsFlying = 0;
+        _deal(next);
       });
       return;
     }
