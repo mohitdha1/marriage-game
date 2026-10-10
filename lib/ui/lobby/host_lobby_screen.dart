@@ -289,6 +289,14 @@ class _Seats extends StatelessWidget {
           const SizedBox(height: 8),
           SegmentedButton<BotDifficulty>(
             showSelectedIcon: false,
+            // Readable on the dark panel: white, and the chosen level in
+            // the theme's highlight colour.
+            style: SegmentedButton.styleFrom(
+              foregroundColor: Colors.white,
+              selectedForegroundColor: const Color(0xFF1A1A1A),
+              selectedBackgroundColor: TableTheme.of(context).accent,
+              side: const BorderSide(color: Color(0x99FFFFFF)),
+            ),
             segments: const [
               ButtonSegment(value: BotDifficulty.easy, label: Text('Easy')),
               ButtonSegment(value: BotDifficulty.medium, label: Text('Medium')),
