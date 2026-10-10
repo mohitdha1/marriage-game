@@ -14,26 +14,45 @@ import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
 import '../../engine/scoring.dart';
 import '../../engine/win_check.dart';
+import '../../net/connection.dart';
+import '../../net/wire.dart';
 import '../home/coins.dart';
 import 'table_notifier.dart';
 import 'table_state.dart';
 import 'table_view.dart';
 
-/// Who plays a match: one person against bots, or several [people] passing
-/// this device round the table.
+/// Who plays a match: one person against bots, several [people] passing
+/// this device round the table, or a game hosted here for [remote] players
+/// on other devices.
 @immutable
 class MatchSetup {
   /// One person against [playerCount] − 1 bots at [difficulty].
   const MatchSetup({
     this.playerCount = 5,
     this.difficulty = BotDifficulty.medium,
-  }) : people = const [];
+  }) : people = const [],
+       remote = const {};
 
   /// [people], named in seat order, taking turns on this device; no bots.
   MatchSetup.passAndPlay(List<String> people)
     : playerCount = people.length,
       difficulty = BotDifficulty.medium,
-      people = List.unmodifiable(people);
+      people = List.unmodifiable(people),
+      remote = const {};
+
+  /// A game hosted on this device: its player at seat 0, [remote] players
+  /// at their seats on other devices, and bots at [difficulty] in any other
+  /// seat of [playerCount].
+  MatchSetup.hosted({
+    required String hostName,
+    required this.playerCount,
+    required Map<int, RemotePlayer> remote,
+    this.difficulty = BotDifficulty.medium,
+  }) : people = [hostName],
+       remote = Map.unmodifiable(remote);
+
+  /// Players on other devices, by seat.
+  final Map<int, RemotePlayer> remote;
 
   /// How many play, people and bots together.
   final int playerCount;
@@ -41,10 +60,20 @@ class MatchSetup {
   /// How well the bots play, when there are bots.
   final BotDifficulty difficulty;
 
-  /// The people sharing this device, by seat; empty against bots.
+  /// The people at this device, named by seat: everyone sharing it in pass
+  /// and play, or just the host in a hosted game. Empty against bots, where
+  /// the one person is "You".
   final List<String> people;
 
-  bool get isPassAndPlay => people.isNotEmpty;
+  bool get isPassAndPlay => people.isNotEmpty && remote.isEmpty;
+}
+
+/// A player on another device, and the link to it.
+class RemotePlayer {
+  const RemotePlayer({required this.name, required this.connection});
+
+  final String name;
+  final Connection connection;
 }
 
 /// Quick Play's setup: a full table of five against Medium bots.
@@ -120,10 +149,14 @@ class TableController extends TableNotifier {
   late Round _round;
   late Map<int, BotPlayer> _bots;
 
-  /// The seats people play, and their names (empty against bots, where the
-  /// one person is "You").
+  /// The seats people play at this device, and their names (empty against
+  /// bots, where the one person is "You").
   late Set<int> _people;
   late List<String> _peopleNames;
+
+  /// Whether people pass this device between turns, so the table is
+  /// covered while it changes hands.
+  late bool _passAndPlay;
 
   /// Whose view the table shows: the person playing now, or the last one to
   /// play while bots take their turns.
@@ -131,6 +164,11 @@ class TableController extends TableNotifier {
 
   /// Everyone else's private table, kept while it isn't their view.
   final _desks = <int, _Desk>{};
+
+  /// Players on other devices, by seat, and those of them still to choose
+  /// their opening tunnellas this round.
+  late Map<int, RemotePlayer> _remote;
+  final _remoteChoosing = <int>{};
   late Duration Function() _thinkingTime;
   late MatchScore _match;
   Future<void>? _botsPlaying;
@@ -152,14 +190,22 @@ class TableController extends TableNotifier {
     final setup = ref.read(matchSetupProvider);
     final seats = [for (var seat = 0; seat < _round.hands.length; seat++) seat];
     _peopleNames = setup.people;
+    _passAndPlay = setup.isPassAndPlay;
     _people = setup.isPassAndPlay ? seats.toSet() : {humanSeat};
+    _remote = setup.remote;
+    for (final MapEntry(key: seat, value: player) in _remote.entries) {
+      final listening = player.connection.messages.listen(
+        (message) => _onRemote(seat, message),
+      );
+      ref.onDispose(listening.cancel);
+    }
 
     // The same bots play every round of the match.
     final random = ref.watch(randomProvider);
     final difficulty = ref.read(botDifficultyProvider);
     final botSeats = [
       for (final seat in seats)
-        if (!_people.contains(seat)) seat,
+        if (!_people.contains(seat) && !_remote.containsKey(seat)) seat,
     ];
     final personalities = BotPersonality.pick(botSeats.length, random);
     _bots = {
@@ -171,6 +217,8 @@ class TableController extends TableNotifier {
         ),
     };
 
+    // Players on other devices see the first deal once it's in place.
+    Future.microtask(_sendUpdates);
     return _setUpRound();
   }
 
@@ -183,6 +231,7 @@ class TableController extends TableNotifier {
     _roundNumber++;
     _round = _newRound(_firstSeat);
     state = _setUpRound();
+    _sendUpdates();
   }
 
   /// Makes the opening shows for the newly dealt [_round] and returns its
@@ -212,13 +261,23 @@ class TableController extends TableNotifier {
         _round.showOpeningTunnellas(seat, tunnellas);
       }
     }
+    // Players on other devices choose on their own screens.
+    _remoteChoosing.clear();
+    for (final seat in _remote.keys) {
+      final tunnellas = findTunnellas(_round.hands[seat].cards);
+      if (tunnellas.length > PlayerHand.maxOpeningTunnellas) {
+        _remoteChoosing.add(seat);
+      } else {
+        _round.showOpeningTunnellas(seat, tunnellas);
+      }
+    }
     // The view opens on the first person who has to choose, or else on the
     // first person to play.
     _viewer = choosing.isNotEmpty
         ? choosing.first
         : _inTurnOrder(_people).first;
     final desk = _desks.remove(_viewer) ?? _Desk();
-    if (choosing.isEmpty) {
+    if (choosing.isEmpty && _remoteChoosing.isEmpty) {
       // If a bot goes first, start it once this first state is in place.
       Future.microtask(_advance);
     }
@@ -236,7 +295,7 @@ class TableController extends TableNotifier {
       handProgress: _handProgress(),
       // Among friends, the round opens covered until whoever goes first has
       // the device.
-      passingTo: _peopleNames.isNotEmpty ? _viewer : null,
+      passingTo: _passAndPlay ? _viewer : null,
     );
   }
 
@@ -251,7 +310,7 @@ class TableController extends TableNotifier {
     ).where((seat) => _desks[seat]?.openingChoice != null);
     if (stillChoosing.isNotEmpty) {
       _switchTo(stillChoosing.first);
-    } else {
+    } else if (_remoteChoosing.isEmpty) {
       unawaited(_advance());
     }
   }
@@ -309,30 +368,115 @@ class TableController extends TableNotifier {
   /// takes out of the hand, so the right copy goes when there are
   /// duplicates. Returns whether the engine accepted the move.
   bool _act(void Function() move, {Set<int> removing = const {}}) {
-    String? notice;
-    try {
-      move();
-    } on ArgumentError catch (e) {
-      notice = _explain(e);
-    } on StateError catch (e) {
-      notice = e.message;
-    }
+    var notice = _tryMove(move);
     final accepted = notice == null;
-    final winner = _round.winner;
-    if (accepted && winner != null) {
-      notice = _nameOf(winner) == 'You'
-          ? 'You won the round!'
-          : '${_nameOf(winner)} won the round.';
-    }
+    if (accepted) notice = _winNotice();
     _publish(notice: notice, removed: accepted ? removing : const {});
     return accepted;
+  }
+
+  /// Runs [move] against the engine, returning the engine's reason if it
+  /// refuses, or `null` if it accepts.
+  String? _tryMove(void Function() move) {
+    try {
+      move();
+      return null;
+    } on ArgumentError catch (e) {
+      return _explain(e);
+    } on StateError catch (e) {
+      return e.message;
+    }
+  }
+
+  /// Who won, once the round is over.
+  String? _winNotice() => switch (_round.winner) {
+    null => null,
+    // Among friends sharing a device, it's by name: everyone is watching.
+    final winner when winner == _viewer && !_passAndPlay =>
+      'You won the round!',
+    final winner => '${_nameOf(winner)} won the round.',
+  };
+
+  /// Applies [message] from the player on another device at [seat]: a move
+  /// on their turn, or their opening choice before play starts. A move the
+  /// engine refuses goes back to them with the reason.
+  void _onRemote(int seat, WireMessage message) {
+    if (message is! MoveMessage) return;
+    final player = _remote[seat]!;
+    void refuse(String reason) => player.connection.send(Refused(reason));
+
+    if (message case MoveOpenTunnellas(:final tunnellas)) {
+      if (!_remoteChoosing.contains(seat)) return refuse('You have opened.');
+      final refusal = _tryMove(
+        () => _round.showOpeningTunnellas(seat, tunnellas),
+      );
+      if (refusal != null) return refuse(refusal);
+      _remoteChoosing.remove(seat);
+      _publish();
+      final localChoosing = _people.any(
+        (s) =>
+            (s == _viewer ? state.openingChoice : _desks[s]?.openingChoice) !=
+            null,
+      );
+      if (_remoteChoosing.isEmpty && !localChoosing) unawaited(_advance());
+      return;
+    }
+
+    if (_round.isOver) return refuse('The round is over.');
+    if (_round.currentSeat != seat) {
+      return refuse('Wait for ${_nameOf(_round.currentSeat)} to play.');
+    }
+    final refusal = _tryMove(() {
+      switch (message) {
+        case MoveDraw(:final source):
+          _round.draw(source);
+        case MoveDiscard(:final card):
+          _round.discard(card);
+        case MoveShow(:final kind, :final sets, :final tipluPosition):
+          switch (kind) {
+            case ShowKind.doublees:
+              _round.showDoublees(sets, tipluPosition: tipluPosition);
+            case ShowKind.pureSets:
+              _round.showPureSets(sets, tipluPosition: tipluPosition);
+          }
+        case MoveWin(:final card):
+          _round.declareWin(card);
+        case MoveOpenTunnellas():
+          break;
+      }
+    });
+    if (refusal != null) return refuse(refusal);
+    _publish(notice: _winNotice());
+    if (message is MoveDiscard) unawaited(_advance());
+  }
+
+  /// Sends every player on another device what they may now see.
+  void _sendUpdates() {
+    for (final MapEntry(key: seat, value: player) in _remote.entries) {
+      player.connection.send(
+        SeatUpdate(
+          view: _viewFor(seat),
+          handProgress: handProgress(
+            _round.hands[seat],
+            _round.jokersFor(seat),
+          ),
+          winningCards: _winningCardsFor(seat),
+          roundNumber: _roundNumber,
+          seatNames: [for (var s = 0; s < _round.hands.length; s++) _nameOf(s)],
+          roundScores: _match.rounds,
+          totals: _match.totals,
+          jokerPenalty: jokerPenaltyEnabled,
+          choosingOpening: _remoteChoosing.contains(seat),
+        ),
+      );
+    }
   }
 
   /// Plays any bots' turns, then turns the table to the person who plays
   /// next.
   Future<void> _advance() async {
     // With no bot to wait for, the table turns straight away.
-    if (!_people.contains(_round.currentSeat)) await _playBots();
+    if (_bots.containsKey(_round.currentSeat)) await _playBots();
     if (!ref.mounted || _round.isOver) return;
     final next = _round.currentSeat;
     if (_people.contains(next) && next != _viewer) _switchTo(next);
@@ -378,7 +522,7 @@ class TableController extends TableNotifier {
       _botsPlaying ??= _runBots().whenComplete(() => _botsPlaying = null);
 
   Future<void> _runBots() async {
-    while (!_round.isOver && !_people.contains(_round.currentSeat)) {
+    while (!_round.isOver && _bots.containsKey(_round.currentSeat)) {
       await Future<void>.delayed(_thinkingTime());
       if (!ref.mounted) return;
       final seat = _round.currentSeat;
@@ -392,9 +536,9 @@ class TableController extends TableNotifier {
     if (_round.isOver && !_roundRecorded) {
       final score = _round.score();
       _match.addRound(score);
-      // Coins are the device owner's, won against bots; a game passed
-      // round among friends doesn't touch them.
-      if (_peopleNames.isEmpty) {
+      // Coins are the device owner's, won against bots; a game among
+      // friends, on one device or several, doesn't touch them.
+      if (!_passAndPlay && _remote.isEmpty) {
         ref.read(coinsProvider.notifier).addRoundResult(score.net[humanSeat]);
       }
       _roundRecorded = true;
@@ -419,36 +563,46 @@ class TableController extends TableNotifier {
       handProgress: _handProgress(),
       notice: notice,
     );
+    _sendUpdates();
   }
 
   /// Ids of the cards in [hand] that would leave a winning hand if
   /// discarded now. Empty unless it's the viewer's turn, they've drawn and
   /// they've seen the joker.
   Set<int> _winningDiscards(List<HandCard> hand) {
-    final player = _round.hands[_viewer];
-    final jokers = _round.jokersFor(_viewer);
+    final winning = _winningCardsFor(_viewer);
+    return {
+      for (final handCard in hand)
+        if (winning.contains(handCard.card)) handCard.id,
+    };
+  }
+
+  /// The cards [seat] holds that would leave a winning hand if discarded
+  /// now. Empty unless it's their turn, they've drawn and they've seen the
+  /// joker.
+  List<PlayingCard> _winningCardsFor(int seat) {
+    final player = _round.hands[seat];
+    final jokers = _round.jokersFor(seat);
     final route = player.showKind;
     if (_round.isOver ||
-        _round.currentSeat != _viewer ||
+        _round.currentSeat != seat ||
         !player.hasDrawn ||
         jokers == null ||
         route == null) {
-      return {};
+      return [];
     }
     bool isWinningHand(List<PlayingCard> cards) => switch (route) {
       ShowKind.pureSets => canSplitIntoSets(cards, jokers),
       ShowKind.doublees => containsDoubleeWithJokers(cards, jokers),
     };
 
-    final winning = <int>{};
-    for (final candidate in hand) {
-      final rest = [
-        for (final handCard in hand)
-          if (handCard.id != candidate.id) handCard.card,
-      ];
-      if (isWinningHand(rest)) winning.add(candidate.id);
-    }
-    return winning;
+    final held = player.cards;
+    return [
+      for (final (i, candidate) in held.indexed)
+        if (!held.take(i).contains(candidate) &&
+            isWinningHand([...held.take(i), ...held.skip(i + 1)]))
+          candidate,
+    ];
   }
 
   /// [shown] brought in line with the cards the viewer holds.
@@ -458,17 +612,20 @@ class TableController extends TableNotifier {
   HandProgress _handProgress() =>
       handProgress(_round.hands[_viewer], _round.jokersFor(_viewer));
 
-  TableView _snapshot() => TableView.fromRound(
+  TableView _snapshot() => _viewFor(_viewer);
+
+  TableView _viewFor(int seat) => TableView.fromRound(
     _round,
-    humanSeat: _viewer,
+    humanSeat: seat,
     nameOf: _nameOf,
     avatarOf: (seat) => _bots[seat]?.personality.avatarColor,
   );
 
-  String _nameOf(int seat) => switch (_bots[seat]) {
-    final bot? => bot.personality.name,
-    null when _peopleNames.isEmpty => 'You',
-    null => _peopleNames[seat],
+  String _nameOf(int seat) => switch ((_bots[seat], _remote[seat])) {
+    (final bot?, _) => bot.personality.name,
+    (_, final remote?) => remote.name,
+    _ when _peopleNames.isEmpty => 'You',
+    _ => _peopleNames[seat],
   };
 }
 

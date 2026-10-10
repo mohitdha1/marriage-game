@@ -45,7 +45,15 @@ class _ScoreboardScreenState extends ConsumerState<ScoreboardScreen> {
         foregroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         actions: [
-          if (roundOver)
+          if (roundOver && !ref.read(tableProvider.notifier).dealsRounds)
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Center(
+                key: Key('waiting-for-host'),
+                child: Text('The host deals the next round'),
+              ),
+            ),
+          if (roundOver && ref.read(tableProvider.notifier).dealsRounds)
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: FilledButton(

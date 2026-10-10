@@ -44,6 +44,10 @@ abstract class TableNotifier extends Notifier<TableState> {
   /// Deals the next round once the current one is over.
   void startNextRound();
 
+  /// Whether this device deals the rounds. A device that has joined a game
+  /// hosted elsewhere waits for the host to deal.
+  bool get dealsRounds => true;
+
   /// Completes once any bots that are playing have finished their turns.
   Future<void> get botsSettled;
 

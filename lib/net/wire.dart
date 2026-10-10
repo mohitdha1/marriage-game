@@ -120,6 +120,7 @@ class SeatUpdate extends WireMessage {
     required this.roundScores,
     required this.totals,
     required this.jokerPenalty,
+    this.choosingOpening = false,
   });
 
   factory SeatUpdate.fromJson(Json json) => SeatUpdate(
@@ -134,6 +135,7 @@ class SeatUpdate extends WireMessage {
     ],
     totals: _ints(json['totals']),
     jokerPenalty: json['jokerPenalty']! as bool,
+    choosingOpening: json['choosingOpening']! as bool,
   );
 
   final TableView view;
@@ -150,6 +152,10 @@ class SeatUpdate extends WireMessage {
   /// Whether throwing away a joker after seeing it costs a penalty.
   final bool jokerPenalty;
 
+  /// Whether the player was dealt more than 3 tunnellas and has to choose
+  /// which to open with before play can start.
+  final bool choosingOpening;
+
   @override
   Json toJson() => {
     'type': 'update',
@@ -161,6 +167,7 @@ class SeatUpdate extends WireMessage {
     'scores': [for (final score in roundScores) _roundScoreToJson(score)],
     'totals': totals,
     'jokerPenalty': jokerPenalty,
+    'choosingOpening': choosingOpening,
   };
 }
 
