@@ -21,6 +21,8 @@ class TableCenter extends StatelessWidget {
     this.onStockTap,
     this.onDiscardPileTap,
     this.onCardDropped,
+    this.stockKey,
+    this.discardKey,
   });
 
   final int stockCount;
@@ -31,6 +33,10 @@ class TableCenter extends StatelessWidget {
 
   /// Called with the id of a hand card dropped on the discard pile.
   final void Function(int cardId)? onCardDropped;
+
+  /// Keys marking where the stock and discard pile are, for animations.
+  final GlobalKey? stockKey;
+  final GlobalKey? discardKey;
 
   @override
   Widget build(BuildContext context) {
@@ -43,14 +49,17 @@ class TableCenter extends StatelessWidget {
           label: 'Stock · $stockCount',
           labelKey: const Key('stock-count'),
           onTap: onStockTap,
-          child: stockCount == 0
-              ? CardSlot(width: cardWidth)
-              : Draggable<DrawSource>(
-                  data: DrawSource.stock,
-                  feedback: CardBack(width: cardWidth),
-                  childWhenDragging: _StackedBacks(width: cardWidth),
-                  child: _StackedBacks(width: cardWidth),
-                ),
+          child: KeyedSubtree(
+            key: stockKey,
+            child: stockCount == 0
+                ? CardSlot(width: cardWidth)
+                : Draggable<DrawSource>(
+                    data: DrawSource.stock,
+                    feedback: CardBack(width: cardWidth),
+                    childWhenDragging: _StackedBacks(width: cardWidth),
+                    child: _StackedBacks(width: cardWidth),
+                  ),
+          ),
         ),
         SizedBox(width: cardWidth * 0.6),
         DragTarget<HandCard>(
@@ -68,17 +77,20 @@ class TableCenter extends StatelessWidget {
               key: const Key('discard-pile'),
               label: 'Discard',
               onTap: onDiscardPileTap,
-              child: discard == null
-                  ? face
-                  : Draggable<DrawSource>(
-                      data: DrawSource.discardPile,
-                      feedback: Material(
-                        color: Colors.transparent,
-                        child: CardFace(discard, width: cardWidth),
+              child: KeyedSubtree(
+                key: discardKey,
+                child: discard == null
+                    ? face
+                    : Draggable<DrawSource>(
+                        data: DrawSource.discardPile,
+                        feedback: Material(
+                          color: Colors.transparent,
+                          child: CardFace(discard, width: cardWidth),
+                        ),
+                        childWhenDragging: CardSlot(width: cardWidth),
+                        child: face,
                       ),
-                      childWhenDragging: CardSlot(width: cardWidth),
-                      child: face,
-                    ),
+              ),
             );
           },
         ),

@@ -44,6 +44,7 @@ Future<void> pumpTable(
   List<PlayingCard>? yourHand,
   int firstSeat = 0,
   Duration thinkingTime = Duration.zero,
+  bool reduceMotion = true,
 }) async {
   tester.view
     ..physicalSize = const Size(844, 390)
@@ -51,7 +52,7 @@ Future<void> pumpTable(
   addTearDown(tester.view.reset);
   // Jokers pulse forever, so a settled screen needs motion turned off.
   tester.platformDispatcher.accessibilityFeaturesTestValue =
-      const FakeAccessibilityFeatures(disableAnimations: true);
+      FakeAccessibilityFeatures(disableAnimations: reduceMotion);
   addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 
   await tester.pumpWidget(
@@ -537,6 +538,99 @@ void main() {
     expect(status(tester), 'Your turn: draw a card.');
     // The bot's discard now shows beside its avatar.
     expect(find.byKey(Key('last-discard-${bot.seat}')), findsOneWidget);
+  });
+
+  group('card flights', () {
+    final flyingCard = find.byKey(const Key('flying-card'));
+
+    /// The card shown on the discard pile, or `null` when it looks empty.
+    PlayingCard? pileTop(WidgetTester tester) {
+      final faces = find.descendant(
+        of: find.byKey(const Key('discard-pile')),
+        matching: find.byType(CardFace),
+      );
+      return faces.evaluate().isEmpty
+          ? null
+          : tester.widget<CardFace>(faces.first).card;
+    }
+
+    testWidgets('a drawn card flies in, and shows in the hand once it lands', (
+      tester,
+    ) async {
+      await pumpTable(tester, reduceMotion: false);
+
+      await tester.tap(find.byKey(const Key('stock')));
+      await tester.pump(); // the move
+      await tester.pump(); // the flight takes off
+      final drawn = stateOf(tester).hand.last;
+      expect(drawn.card, queenOfDiamonds);
+      expect(flyingCard, findsOneWidget);
+      // Its place in the hand is kept empty until it arrives.
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey(drawn.id)),
+          matching: find.byType(CardFace),
+        ),
+        findsNothing,
+      );
+
+      await tester.pumpAndSettle();
+      expect(flyingCard, findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey(drawn.id)),
+          matching: find.byType(CardFace),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the pile shows its old top card until a discard lands', (
+      tester,
+    ) async {
+      await pumpTable(
+        tester,
+        reduceMotion: false,
+        thinkingTime: const Duration(seconds: 1),
+      );
+      await tester.tap(find.byKey(const Key('stock')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(lastHandCard(tester));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('discard-pile')));
+      await tester.pump();
+      await tester.pump();
+      expect(stateOf(tester).view.topDiscard, queenOfDiamonds);
+      expect(flyingCard, findsOneWidget);
+      expect(pileTop(tester), kingOfClubs);
+
+      await tester.pumpAndSettle();
+      expect(flyingCard, findsNothing);
+      expect(pileTop(tester), queenOfDiamonds);
+
+      // Let the bot finish its turn.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('nothing flies when the device asks for less motion', (
+      tester,
+    ) async {
+      await pumpTable(tester);
+
+      await tester.tap(find.byKey(const Key('stock')));
+      await tester.pump();
+      await tester.pump();
+      expect(flyingCard, findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey(stateOf(tester).hand.last.id)),
+          matching: find.byType(CardFace),
+        ),
+        findsOneWidget,
+      );
+    });
   });
 
   testWidgets('the hand helper can be turned off in settings', (tester) async {

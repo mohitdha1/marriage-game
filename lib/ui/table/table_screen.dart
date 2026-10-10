@@ -7,12 +7,14 @@ import '../../engine/card.dart';
 import '../../engine/hand_arrangement.dart';
 import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
+import '../../engine/table_event.dart';
 import '../scoreboard/scoreboard_screen.dart';
 import '../settings/settings.dart';
 import '../sound/sound_effects.dart';
 import '../state/table_controller.dart';
 import '../state/table_state.dart';
 import '../state/table_view.dart';
+import 'card_flights.dart';
 import 'card_view.dart';
 import 'hand_fan.dart';
 import 'joker_reveal.dart';
@@ -31,15 +33,131 @@ import 'tiplu_picker.dart';
 /// Under the piles, a status line says what to do next, and buttons appear
 /// when they're useful: Group and Show to show sets and see the joker, Win to
 /// finish the round. Moves the engine refuses pop up with its reason.
-class TableScreen extends ConsumerWidget {
+///
+/// Cards glide between the piles, the hand and the seats as moves are made
+/// (see [CardFlightLayer]), unless the device asks for reduced motion.
+class TableScreen extends ConsumerStatefulWidget {
   const TableScreen({super.key});
 
+  @override
+  ConsumerState<TableScreen> createState() => _TableScreenState();
+}
+
+class _TableScreenState extends ConsumerState<TableScreen> {
   /// Room kept clear on either side of the status line, for the seats and,
   /// lower down, the laid-down sets and action buttons.
   static const _sideClearance = 200.0;
 
+  final _anchors = TableAnchors();
+  final _flights = GlobalKey<CardFlightLayerState>();
+  final _handCardKeys = <int, GlobalKey>{};
+
+  /// Hand cards still in the air: drawn, but not landed yet.
+  final _arriving = <int>{};
+
+  /// Discards still in the air. Until they've all landed, the discard pile
+  /// shows [_pileShowing] (nothing when `null`): what was on it before, then
+  /// each discard as it lands.
+  var _discardsFlying = 0;
+  PlayingCard? _pileShowing;
+
+  bool get _reduceMotion =>
+      MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+  GlobalKey _handCardKey(int id) =>
+      _handCardKeys.putIfAbsent(id, GlobalKey.new);
+
+  /// Animates the moves in [next] that weren't in [previous]: each draw and
+  /// discard glides from where it came from to where it went, one after
+  /// another.
+  void _animateMoves(TableState? previous, TableState next) {
+    if (previous == null || _reduceMotion) return;
+    if (previous.roundNumber != next.roundNumber) {
+      _handCardKeys.clear();
+      setState(() {
+        _arriving.clear();
+        _discardsFlying = 0;
+      });
+      return;
+    }
+    final fresh = next.view.events.skip(previous.view.events.length).toList();
+    if (fresh.isEmpty) return;
+
+    // Hide what hasn't arrived yet in this very frame, then launch the
+    // flights once the new layout is in place.
+    final newest = next.hand.isEmpty ? null : next.hand.last;
+    final humanDraws = fresh.any((e) => e is DrewCard && e.seat == humanSeat);
+    final discards = fresh
+        .where((e) => e is DiscardedCard || e is WonRound)
+        .length;
+    final pileTaken = fresh.any(
+      (e) => e is DrewCard && e.source == DrawSource.discardPile,
+    );
+    setState(() {
+      if (humanDraws && newest != null) _arriving.add(newest.id);
+      if (discards > 0) {
+        if (_discardsFlying == 0) {
+          _pileShowing = pileTaken ? null : previous.view.topDiscard;
+        }
+        _discardsFlying += discards;
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final layer = _flights.currentState;
+      if (!mounted || layer == null) return;
+      var delay = Duration.zero;
+      for (final event in fresh) {
+        switch (event) {
+          case DrewCard(:final seat, :final source, :final card):
+            final from = source == DrawSource.stock
+                ? _anchors.stock
+                : _anchors.discardPile;
+            if (seat == humanSeat && newest != null) {
+              layer.fly(
+                from: from,
+                to: _handCardKey(newest.id),
+                face: newest.card,
+                delay: delay,
+                onLanded: () {
+                  if (mounted) setState(() => _arriving.remove(newest.id));
+                },
+              );
+            } else {
+              layer.fly(
+                from: from,
+                to: _anchors.seat(seat),
+                face: card,
+                delay: delay,
+              );
+            }
+            delay += cardFlightTime;
+          case DiscardedCard(:final seat, :final card) ||
+              WonRound(:final seat, :final card):
+            layer.fly(
+              from: seat == humanSeat ? _anchors.hand : _anchors.seat(seat),
+              to: _anchors.discardPile,
+              face: card,
+              delay: delay,
+              onLanded: () {
+                if (!mounted) return;
+                setState(() {
+                  if (_discardsFlying > 0) _discardsFlying--;
+                  _pileShowing = card;
+                });
+              },
+            );
+            delay += cardFlightTime;
+          case OpenedTunnellas() || ShowedSets() || StockReshuffled():
+            break;
+        }
+      }
+    });
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    ref.listen(tableProvider, _animateMoves);
     final state = ref.watch(tableProvider);
     final table = state.view;
     final controller = ref.read(tableProvider.notifier);
@@ -97,11 +215,14 @@ class TableScreen extends ConsumerWidget {
                     for (var i = 0; i < table.opponents.length; i++)
                       Align(
                         alignment: seats[i],
-                        child: OpponentSeat(
-                          seat: table.opponents[i],
-                          isCurrentTurn:
-                              table.winner == null &&
-                              table.currentSeat == table.opponents[i].seat,
+                        child: KeyedSubtree(
+                          key: _anchors.seat(table.opponents[i].seat),
+                          child: OpponentSeat(
+                            seat: table.opponents[i],
+                            isCurrentTurn:
+                                table.winner == null &&
+                                table.currentSeat == table.opponents[i].seat,
+                          ),
                         ),
                       ),
                     Align(
@@ -156,7 +277,11 @@ class TableScreen extends ConsumerWidget {
                         children: [
                           TableCenter(
                             stockCount: table.stockCount,
-                            topDiscard: table.topDiscard,
+                            topDiscard: _discardsFlying > 0
+                                ? _pileShowing
+                                : table.topDiscard,
+                            stockKey: _anchors.stock,
+                            discardKey: _anchors.discardPile,
                             cardWidth: cardWidth,
                             onStockTap: () => controller.draw(DrawSource.stock),
                             onDiscardPileTap: controller.tapDiscardPile,
@@ -213,6 +338,9 @@ class TableScreen extends ConsumerWidget {
                     Align(
                       alignment: Alignment.bottomCenter,
                       child: HandFan(
+                        key: _anchors.hand,
+                        hiddenIds: _arriving,
+                        cardKey: _handCardKey,
                         cards: state.hand,
                         selected: state.selected,
                         groupOf: state.groupOf,
@@ -245,6 +373,12 @@ class TableScreen extends ConsumerWidget {
                           text: handHelperText(progress),
                         ),
                       ),
+                    Positioned.fill(
+                      child: CardFlightLayer(
+                        key: _flights,
+                        cardWidth: cardWidth,
+                      ),
+                    ),
                     if (choice != null)
                       _Overlay(
                         child: OpeningPicker(

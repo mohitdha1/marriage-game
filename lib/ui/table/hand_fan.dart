@@ -24,6 +24,8 @@ class HandFan extends StatelessWidget {
     this.onCardTap,
     this.onDraw,
     this.onReorder,
+    this.hiddenIds = const {},
+    this.cardKey,
   });
 
   final List<HandCard> cards;
@@ -47,6 +49,14 @@ class HandFan extends StatelessWidget {
   /// Called when a card is long-pressed and dropped back on the fan, with
   /// the position it was dropped at.
   final void Function(int cardId, int newIndex)? onReorder;
+
+  /// Ids of cards that keep their place in the fan but aren't drawn yet,
+  /// such as a card still flying in from a pile.
+  final Set<int> hiddenIds;
+
+  /// A key for each card's widget, so other parts of the table can find
+  /// where a card sits.
+  final GlobalKey Function(int cardId)? cardKey;
 
   /// Largest gap between neighbouring cards, as a share of a card's width,
   /// so small hands still overlap a little.
@@ -165,6 +175,8 @@ class HandFan extends StatelessWidget {
                   child: Transform.rotate(
                     angle: (i - middle) * turn,
                     child: _HandCardView(
+                      key: cardKey?.call(cards[i].id),
+                      hidden: hiddenIds.contains(cards[i].id),
                       handCard: cards[i],
                       width: cardWidth,
                       selected: selected.contains(cards[i].id),
@@ -202,12 +214,14 @@ class HandFan extends StatelessWidget {
 /// within the hand or onto the discard pile.
 class _HandCardView extends StatelessWidget {
   const _HandCardView({
+    super.key,
     required this.handCard,
     required this.width,
     required this.selected,
     required this.wild,
     required this.groupColor,
     required this.onTap,
+    this.hidden = false,
   });
 
   final HandCard handCard;
@@ -217,8 +231,14 @@ class _HandCardView extends StatelessWidget {
   final Color? groupColor;
   final VoidCallback? onTap;
 
+  /// Keeps the card's space but draws nothing there.
+  final bool hidden;
+
   @override
   Widget build(BuildContext context) {
+    if (hidden) {
+      return SizedBox(width: width, height: width / cardAspectRatio);
+    }
     final face = CardFace(
       handCard.card,
       width: width,
