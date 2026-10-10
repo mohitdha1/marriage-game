@@ -15,6 +15,8 @@ import 'package:marriage_game/ui/table/opponent_seat.dart';
 import 'package:marriage_game/ui/table/table_center.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
 
+import 'real_fonts.dart';
+
 const c = PlayingCard.new;
 
 List<PlayingCard> run(Suit suit, List<Rank> ranks) => [
@@ -30,6 +32,10 @@ const screens = {
 };
 
 void main() {
+  // Measure with Android's real font, not the test font, so text takes up
+  // as much room as it does on a phone.
+  setUpAll(loadRealFonts);
+
   final runs = [
     run(Suit.hearts, [Rank.three, Rank.four, Rank.five]),
     run(Suit.spades, [Rank.two, Rank.three, Rank.four]),
@@ -45,7 +51,10 @@ void main() {
   ) async {
     tester.view
       ..physicalSize = size
-      ..devicePixelRatio = 1;
+      ..devicePixelRatio = 1
+      // A landscape Android phone: status bar along the top, navigation
+      // buttons down the right-hand side.
+      ..padding = const FakeViewPadding(top: 28, right: 48);
     addTearDown(tester.view.reset);
 
     final rest = [...Rank.values.map((r) => c(Suit.diamonds, r))];

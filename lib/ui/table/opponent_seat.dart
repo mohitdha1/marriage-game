@@ -28,7 +28,7 @@ class OpponentSeat extends StatelessWidget {
     return AnimatedContainer(
       key: Key('seat-${seat.seat}'),
       duration: const Duration(milliseconds: 250),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: const Color(0x55000000),
         borderRadius: BorderRadius.circular(16),

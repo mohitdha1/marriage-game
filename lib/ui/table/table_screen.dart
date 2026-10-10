@@ -74,7 +74,7 @@ class TableScreen extends ConsumerWidget {
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final cardWidth = (constraints.maxHeight * 0.17).clamp(
+              final cardWidth = (constraints.maxHeight * 0.16).clamp(
                 40.0,
                 100.0,
               );
@@ -122,7 +122,7 @@ class TableScreen extends ConsumerWidget {
                       child: _JokerChip(table: table),
                     ),
                     Align(
-                      alignment: const Alignment(0, -0.3),
+                      alignment: const Alignment(0, -0.25),
                       child: Column(
                         key: const Key('table-centre'),
                         mainAxisSize: MainAxisSize.min,
