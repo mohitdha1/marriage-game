@@ -8,6 +8,7 @@ import 'package:marriage_game/engine/card.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/net/connection.dart';
+import 'package:marriage_game/net/remote_session.dart';
 import 'package:marriage_game/net/wire.dart';
 import 'package:marriage_game/ui/home/coins.dart';
 import 'package:marriage_game/ui/state/remote_table_controller.dart';
