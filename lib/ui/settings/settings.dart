@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../bots/bot_player.dart';
 import '../theme/table_theme.dart';
 import 'preferences.dart';
 
@@ -12,7 +13,13 @@ class Settings {
     this.playerName = defaultName,
     this.avatarColor = 0xFF90CAF9, // the first of [avatarColors]
     this.tableTheme = TableThemeId.classic,
+    this.playerCount = 5,
+    this.botDifficulty = BotDifficulty.medium,
   });
+
+  /// The fewest and most players at a table, the human player included.
+  static const minPlayers = 2;
+  static const maxPlayers = 5;
 
   static const defaultName = 'Player';
 
@@ -44,6 +51,12 @@ class Settings {
   /// The look of the table and the cards' backs.
   final TableThemeId tableTheme;
 
+  /// How many play in a game against bots, the human player included.
+  final int playerCount;
+
+  /// How well the bots play.
+  final BotDifficulty botDifficulty;
+
   Settings copyWith({
     bool? sound,
     bool? vibration,
@@ -51,6 +64,8 @@ class Settings {
     String? playerName,
     int? avatarColor,
     TableThemeId? tableTheme,
+    int? playerCount,
+    BotDifficulty? botDifficulty,
   }) => Settings(
     sound: sound ?? this.sound,
     vibration: vibration ?? this.vibration,
@@ -58,6 +73,8 @@ class Settings {
     playerName: playerName ?? this.playerName,
     avatarColor: avatarColor ?? this.avatarColor,
     tableTheme: tableTheme ?? this.tableTheme,
+    playerCount: playerCount ?? this.playerCount,
+    botDifficulty: botDifficulty ?? this.botDifficulty,
   );
 }
 
@@ -73,6 +90,8 @@ class SettingsController extends Notifier<Settings> {
   static const _playerName = 'profile.name';
   static const _avatarColor = 'profile.avatarColor';
   static const _tableTheme = 'settings.tableTheme';
+  static const _playerCount = 'lobby.playerCount';
+  static const _botDifficulty = 'lobby.botDifficulty';
 
   PreferencesStore get _store => ref.read(preferencesProvider);
 
@@ -91,6 +110,13 @@ class SettingsController extends Notifier<Settings> {
       tableTheme:
           TableThemeId.values.asNameMap()[store.getString(_tableTheme)] ??
           defaults.tableTheme,
+      playerCount: (store.getInt(_playerCount) ?? defaults.playerCount).clamp(
+        Settings.minPlayers,
+        Settings.maxPlayers,
+      ),
+      botDifficulty:
+          BotDifficulty.values.asNameMap()[store.getString(_botDifficulty)] ??
+          defaults.botDifficulty,
     );
   }
 
@@ -125,5 +151,18 @@ class SettingsController extends Notifier<Settings> {
   void setTableTheme(TableThemeId theme) {
     state = state.copyWith(tableTheme: theme);
     _store.setString(_tableTheme, theme.name);
+  }
+
+  /// Sets how many play against bots, kept between [Settings.minPlayers]
+  /// and [Settings.maxPlayers].
+  void setPlayerCount(int count) {
+    final kept = count.clamp(Settings.minPlayers, Settings.maxPlayers);
+    state = state.copyWith(playerCount: kept);
+    _store.setInt(_playerCount, kept);
+  }
+
+  void setBotDifficulty(BotDifficulty difficulty) {
+    state = state.copyWith(botDifficulty: difficulty);
+    _store.setString(_botDifficulty, difficulty.name);
   }
 }

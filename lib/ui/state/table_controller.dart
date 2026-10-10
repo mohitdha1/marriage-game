@@ -13,12 +13,17 @@ import '../../engine/round.dart';
 import '../../engine/scoring.dart';
 import '../../engine/win_check.dart';
 import '../home/coins.dart';
+import '../settings/settings.dart';
 import 'table_state.dart';
 import 'table_view.dart';
 
-/// Settings for the current game. Overridden in tests and, later, by the
-/// lobby's custom-game options.
-final gameConfigProvider = Provider<GameConfig>((ref) => GameConfig());
+/// Settings for the current game: as many players as chosen before the
+/// game. Tests override it.
+final gameConfigProvider = Provider<GameConfig>(
+  (ref) => GameConfig(
+    playerCount: ref.watch(settingsProvider.select((s) => s.playerCount)),
+  ),
+);
 
 /// The random source for shuffling and bot choices. Tests override it with a
 /// seeded [Random] so games are repeatable.
@@ -32,10 +37,9 @@ final roundFactoryProvider = Provider<Round Function(int firstSeat)>((ref) {
       Round.deal(config: config, random: random, firstSeat: firstSeat);
 });
 
-/// How well the bots play. Medium for Quick Play; the lobby will let players
-/// choose.
+/// How well the bots play, as chosen before the game.
 final botDifficultyProvider = Provider<BotDifficulty>(
-  (ref) => BotDifficulty.medium,
+  (ref) => ref.watch(settingsProvider.select((s) => s.botDifficulty)),
 );
 
 /// How long a bot "thinks" before each move: a slightly different pause
@@ -76,7 +80,9 @@ class TableController extends Notifier<TableState> {
 
   @override
   TableState build() {
-    _newRound = ref.watch(roundFactoryProvider);
+    // Read once: a match keeps the setup it started with, even if the
+    // choices for the next game change meanwhile.
+    _newRound = ref.read(roundFactoryProvider);
     _thinkingTime = ref.watch(botThinkingTimeProvider);
     _firstSeat = 0;
     _roundNumber = 1;
@@ -85,7 +91,7 @@ class TableController extends Notifier<TableState> {
 
     // The same bots play every round of the match.
     final random = ref.watch(randomProvider);
-    final difficulty = ref.watch(botDifficultyProvider);
+    final difficulty = ref.read(botDifficultyProvider);
     final botSeats = [
       for (var seat = 0; seat < _round.hands.length; seat++)
         if (seat != humanSeat) seat,

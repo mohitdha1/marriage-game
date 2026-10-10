@@ -3,9 +3,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/main.dart';
+import 'package:marriage_game/bots/bot_player.dart';
+import 'package:marriage_game/ui/home/game_setup.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/settings/how_to_play_screen.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
@@ -27,11 +28,13 @@ Future<ProviderContainer> pumpHome(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        preferencesProvider.overrideWithValue(InMemoryPreferences(saved)),
+        // A small table unless a test says otherwise.
+        preferencesProvider.overrideWithValue(
+          InMemoryPreferences({'lobby.playerCount': 3, ...?saved}),
+        ),
         randomProvider.overrideWithValue(Random(0)),
         botThinkingTimeProvider.overrideWithValue(() => Duration.zero),
         soundEffectsProvider.overrideWithValue(const SilentSoundEffects()),
-        gameConfigProvider.overrideWithValue(GameConfig(playerCount: 3)),
       ],
       child: const MarriageApp(),
     ),
@@ -54,10 +57,10 @@ void main() {
     expect(find.byKey(const Key('settings-button')), findsOneWidget);
   });
 
-  testWidgets('Single Player opens a fresh table every time', (tester) async {
+  testWidgets('Quick Play opens a fresh table every time', (tester) async {
     final container = await pumpHome(tester);
 
-    await tester.tap(find.byKey(const Key('single-player')));
+    await tester.tap(find.byKey(const Key('quick-play')));
     await tester.pumpAndSettle();
     expect(find.byType(TableScreen), findsOneWidget);
 
@@ -72,7 +75,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(HomeScreen), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('single-player')));
+    await tester.tap(find.byKey(const Key('quick-play')));
     await tester.pumpAndSettle();
     expect(container.read(tableProvider).view.youHaveDrawn, isFalse);
   });
@@ -81,7 +84,7 @@ void main() {
     tester,
   ) async {
     await pumpHome(tester);
-    await tester.tap(find.byKey(const Key('single-player')));
+    await tester.tap(find.byKey(const Key('quick-play')));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('back-button')));
@@ -91,6 +94,103 @@ void main() {
     await tester.tap(find.text('Stay'));
     await tester.pumpAndSettle();
     expect(find.byType(TableScreen), findsOneWidget);
+  });
+
+  group('Game setup', () {
+    testWidgets('Quick Play shows the setup it will use', (tester) async {
+      await pumpHome(
+        tester,
+        saved: {'lobby.playerCount': 4, 'lobby.botDifficulty': 'hard'},
+      );
+
+      expect(find.text('3 bots · Hard'), findsOneWidget);
+    });
+
+    testWidgets('Single Player asks for the players and bots, then plays '
+        'with them', (tester) async {
+      final container = await pumpHome(tester);
+
+      await tester.tap(find.byKey(const Key('single-player')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('game-setup')), findsOneWidget);
+      expect(find.byType(TableScreen), findsNothing);
+
+      await tester.tap(find.byKey(const Key('players-5')));
+      await tester.tap(find.text('Easy'));
+      await tester.pumpAndSettle();
+      expect(find.text('Relaxed bots that sometimes slip up.'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('setup-play')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TableScreen), findsOneWidget);
+      final table = container.read(tableProvider);
+      expect(table.view.opponents, hasLength(4));
+      expect(container.read(botDifficultyProvider), BotDifficulty.easy);
+    });
+
+    testWidgets('Cancel stays home, but keeps the choices for Quick Play', (
+      tester,
+    ) async {
+      final container = await pumpHome(tester);
+
+      await tester.tap(find.byKey(const Key('single-player')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('players-2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TableScreen), findsNothing);
+      expect(container.read(settingsProvider).playerCount, 2);
+      expect(find.text('1 bot · Medium'), findsOneWidget);
+    });
+
+    testWidgets('a match keeps its setup when the next game\'s changes', (
+      tester,
+    ) async {
+      final container = await pumpHome(tester);
+      await tester.tap(find.byKey(const Key('quick-play')));
+      await tester.pumpAndSettle();
+      final opponents = container.read(tableProvider).view.opponents.length;
+
+      container.read(settingsProvider.notifier).setPlayerCount(5);
+      await tester.pump();
+
+      expect(
+        container.read(tableProvider).view.opponents,
+        hasLength(opponents),
+      );
+    });
+
+    testWidgets('the setup fits a small phone', (tester) async {
+      await pumpHome(tester);
+      tester.view.physicalSize = const Size(667, 375);
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('single-player')));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('setup-play')).hitTestable(), findsOneWidget);
+      expect(find.text('Hard').hitTestable(), findsOneWidget);
+    });
+
+    test('the setup sums up as bots and level', () {
+      expect(describeSetup(const Settings(playerCount: 2)), '1 bot · Medium');
+      expect(
+        describeSetup(
+          const Settings(playerCount: 5, botDifficulty: BotDifficulty.hard),
+        ),
+        '4 bots · Hard',
+      );
+    });
+
+    test('every level has a description', () {
+      for (final level in BotDifficulty.values) {
+        expect(describeDifficulty(level), isNotEmpty);
+      }
+    });
   });
 
   testWidgets('Hotspot / Local says it is coming soon', (tester) async {

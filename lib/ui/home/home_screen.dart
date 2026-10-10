@@ -12,7 +12,9 @@ import '../table/suit_icon.dart';
 import '../table/table_screen.dart';
 import '../theme/table_felt.dart';
 import 'coins.dart';
+import 'game_setup.dart';
 import 'player_avatar.dart';
+
 /// The table for a game against bots, with its sounds and vibration, asking
 /// before the back gesture leaves a round in progress.
 /// back gesture leaves a round in progress.
@@ -21,7 +23,8 @@ const singlePlayerTable = TableSounds(
 );
 
 /// The first screen: the player's avatar, name and coins along the top, a
-/// settings gear, and a large tile for each way to play.
+/// settings gear, a large tile for each way to play, and a Quick Play button
+/// that starts a game against bots straight away.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -61,45 +64,65 @@ class HomeScreen extends ConsumerWidget {
                     ),
                     Expanded(
                       child: Center(
-                        child: Wrap(
-                          spacing: 24,
-                          runSpacing: 16,
-                          alignment: WrapAlignment.center,
-                          children: [
-                            _ModeTile(
-                              key: const Key('single-player'),
-                              title: 'Single Player',
-                              subtitle: 'Play against computer players',
-                              icon: Icons.smart_toy_outlined,
-                              colors: const [
-                                Color(0xFFFFB300),
-                                Color(0xFFF57C00),
-                              ],
-                              onTap: () => _startSinglePlayer(context, ref),
-                            ),
-                            _ModeTile(
-                              key: const Key('hotspot'),
-                              title: 'Hotspot / Local',
-                              subtitle: 'Friends on the same Wi-Fi or hotspot',
-                              icon: Icons.wifi_tethering,
-                              colors: const [
-                                Color(0xFF7E57C2),
-                                Color(0xFF3949AB),
-                              ],
-                              comingSoon: true,
-                              onTap: () => ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Playing with friends on the same '
-                                      'Wi-Fi or hotspot is coming soon.',
-                                    ),
-                                    behavior: SnackBarBehavior.floating,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Wrap(
+                                spacing: 24,
+                                runSpacing: 16,
+                                alignment: WrapAlignment.center,
+                                children: [
+                                  _ModeTile(
+                                    key: const Key('single-player'),
+                                    title: 'Single Player',
+                                    subtitle: 'Choose the players and bots',
+                                    icon: Icons.smart_toy_outlined,
+                                    colors: const [
+                                      Color(0xFFFFB300),
+                                      Color(0xFFF57C00),
+                                    ],
+                                    onTap: () async {
+                                      if (await showGameSetup(context) &&
+                                          context.mounted) {
+                                        _startSinglePlayer(context, ref);
+                                      }
+                                    },
                                   ),
-                                ),
-                            ),
-                          ],
+                                  _ModeTile(
+                                    key: const Key('hotspot'),
+                                    title: 'Hotspot / Local',
+                                    subtitle:
+                                        'Friends on the same Wi-Fi or hotspot',
+                                    icon: Icons.wifi_tethering,
+                                    colors: const [
+                                      Color(0xFF7E57C2),
+                                      Color(0xFF3949AB),
+                                    ],
+                                    comingSoon: true,
+                                    onTap: () => ScaffoldMessenger.of(context)
+                                      ..hideCurrentSnackBar()
+                                      ..showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Playing with friends on the same '
+                                            'Wi-Fi or hotspot is coming soon.',
+                                          ),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              _QuickPlayButton(
+                                setup: describeSetup(settings),
+                                onPressed: () =>
+                                    _startSinglePlayer(context, ref),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -119,6 +142,51 @@ class HomeScreen extends ConsumerWidget {
     Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => singlePlayerTable));
+  }
+}
+
+/// The big button that starts a game against bots with the last setup
+/// chosen, named underneath.
+class _QuickPlayButton extends StatelessWidget {
+  const _QuickPlayButton({required this.setup, required this.onPressed});
+
+  final String setup;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton(
+      key: const Key('quick-play'),
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: const Color(0xFFFFC400),
+        foregroundColor: const Color(0xFF3E2723),
+        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 10),
+        shape: const StadiumBorder(),
+        elevation: 4,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.play_arrow_rounded, size: 28),
+              SizedBox(width: 4),
+              Text(
+                'Quick Play',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          Text(
+            setup,
+            key: const Key('quick-play-setup'),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
   }
 }
 
