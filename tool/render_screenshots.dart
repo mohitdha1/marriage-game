@@ -28,6 +28,7 @@ import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
 
 import '../test/ui/real_fonts.dart';
+import 'package:marriage_game/ui/state/table_notifier.dart';
 
 const folder = 'docs/store/screenshots';
 
@@ -104,7 +105,7 @@ Future<void> play(WidgetTester tester, Duration time) async {
   }
 }
 
-TableController controllerOf(WidgetTester tester) => ProviderScope.containerOf(
+TableNotifier controllerOf(WidgetTester tester) => ProviderScope.containerOf(
   tester.element(find.byType(TableScreen)),
 ).read(tableProvider.notifier);
 

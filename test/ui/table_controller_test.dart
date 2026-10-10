@@ -9,6 +9,7 @@ import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/ui/home/coins.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
+import 'package:marriage_game/ui/state/table_notifier.dart';
 import 'package:marriage_game/ui/state/table_state.dart';
 
 const c = PlayingCard.new;
@@ -86,7 +87,7 @@ ProviderContainer tableWith({
 
 extension on ProviderContainer {
   TableState get table => read(tableProvider);
-  TableController get controller => read(tableProvider.notifier);
+  TableNotifier get controller => read(tableProvider.notifier);
 
   /// Selects the hand cards equal to [cards] (one copy each) and groups
   /// them.
@@ -229,7 +230,7 @@ void main() {
       for (var i = 1; i < sorted.length; i++) {
         final a = sorted[i - 1].card;
         final b = sorted[i].card;
-        final order = TableController.sortedSuits;
+        final order = TableNotifier.sortedSuits;
         expect(
           order.indexOf(a.suit) < order.indexOf(b.suit) ||
               (a.suit == b.suit && a.rank.order <= b.rank.order),

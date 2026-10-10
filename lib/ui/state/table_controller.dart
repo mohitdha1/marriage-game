@@ -15,6 +15,7 @@ import '../../engine/round.dart';
 import '../../engine/scoring.dart';
 import '../../engine/win_check.dart';
 import '../home/coins.dart';
+import 'table_notifier.dart';
 import 'table_state.dart';
 import 'table_view.dart';
 
@@ -96,7 +97,7 @@ final botThinkingTimeProvider = Provider<Duration Function()>((ref) {
 const humanSeat = 0;
 
 /// The table as the person whose view it is sees it.
-final tableProvider = NotifierProvider<TableController, TableState>(
+final tableProvider = NotifierProvider<TableNotifier, TableState>(
   TableController.new,
 );
 
@@ -114,7 +115,7 @@ final tableProvider = NotifierProvider<TableController, TableState>(
 /// The table shows one person's view at a time: their hand, groups and
 /// selection. Each person's are kept on their own [_Desk] while someone
 /// else's turn is showing.
-class TableController extends Notifier<TableState> {
+class TableController extends TableNotifier {
   late Round Function(int firstSeat) _newRound;
   late Round _round;
   late Map<int, BotPlayer> _bots;
@@ -133,7 +134,6 @@ class TableController extends Notifier<TableState> {
   late Duration Function() _thinkingTime;
   late MatchScore _match;
   Future<void>? _botsPlaying;
-  var _nextCardId = 0;
   var _firstSeat = 0;
   var _roundNumber = 1;
   var _roundRecorded = false;
@@ -176,6 +176,7 @@ class TableController extends Notifier<TableState> {
 
   /// Deals the next round once the current one is over. The first player
   /// moves one seat round the table, and match totals carry on.
+  @override
   void startNextRound() {
     if (!_round.isOver) return;
     _firstSeat = (_firstSeat + 1) % _round.hands.length;
@@ -188,7 +189,7 @@ class TableController extends Notifier<TableState> {
   /// first state.
   TableState _setUpRound() {
     _botsPlaying = null;
-    _nextCardId = 0;
+    resetCardIds();
     _roundRecorded = false;
     _desks.clear();
 
@@ -224,7 +225,7 @@ class TableController extends Notifier<TableState> {
 
     return TableState(
       view: _snapshot(),
-      hand: _reconcile(desk.hand),
+      hand: _heldFrom(desk.hand),
       openingChoice: desk.openingChoice,
       roundNumber: _roundNumber,
       seatNames: [
@@ -239,79 +240,9 @@ class TableController extends Notifier<TableState> {
     );
   }
 
-  /// Uncovers the table once the person it was passed to has the device.
-  void takeOver() {
-    if (state.passingTo == null) return;
-    state = state.copyWith(passingTo: () => null);
-  }
-
-  /// Selects [cardId] if it isn't selected, or deselects it if it is.
-  void toggleSelected(int cardId) {
-    final selected = {...state.selected};
-    if (!selected.remove(cardId)) selected.add(cardId);
-    state = state.copyWith(selected: selected);
-  }
-
-  /// Moves the card with [cardId] to [newIndex] in the hand, where it stays
-  /// until it's moved again or the hand is sorted.
-  void moveCard(int cardId, int newIndex) {
-    final hand = [...state.hand];
-    final from = hand.indexWhere((c) => c.id == cardId);
-    if (from < 0) return;
-    final card = hand.removeAt(from);
-    hand.insert(newIndex.clamp(0, hand.length), card);
-    state = state.copyWith(hand: hand);
-  }
-
-  /// The order Sort puts suits in: alternating black and red, so
-  /// neighbouring suits are easy to tell apart.
-  static const sortedSuits = [
-    Suit.spades,
-    Suit.hearts,
-    Suit.clubs,
-    Suit.diamonds,
-  ];
-
-  /// Sorts the hand by suit (♠ ♥ ♣ ♦), then by rank within each suit.
-  /// Grouped sets stay together at the front, in the order they were made.
-  void sortHand() {
-    final byId = {for (final handCard in state.hand) handCard.id: handCard};
-    final groupedCards = [
-      for (final group in state.groups)
-        for (final id in group) byId[id]!,
-    ];
-    final loose = [
-      for (final handCard in state.hand)
-        if (!groupedCards.contains(handCard)) handCard,
-    ]..sort(_bySuitThenRank);
-    state = state.copyWith(hand: [...groupedCards, ...loose]);
-  }
-
-  static int _bySuitThenRank(HandCard a, HandCard b) {
-    final bySuit = sortedSuits
-        .indexOf(a.card.suit)
-        .compareTo(sortedSuits.indexOf(b.card.suit));
-    return bySuit != 0
-        ? bySuit
-        : a.card.rank.order.compareTo(b.card.rank.order);
-  }
-
-  /// Makes the opening show with the tunnellas at [picks] (indexes into
-  /// [TableState.openingChoice]).
-  void chooseOpeningTunnellas(List<int> picks) {
-    final choice = state.openingChoice;
-    if (choice == null) return;
-    if (picks.length != PlayerHand.maxOpeningTunnellas ||
-        picks.toSet().length != picks.length ||
-        picks.any((i) => i < 0 || i >= choice.length)) {
-      _publish(notice: 'Choose 3 different tunnellas.');
-      return;
-    }
-    final shown = _act(
-      () => _round.showOpeningTunnellas(_viewer, [
-        for (final i in picks) choice[i],
-      ]),
-    );
+  @override
+  void submitOpening(List<List<PlayingCard>> tunnellas) {
+    final shown = _act(() => _round.showOpeningTunnellas(_viewer, tunnellas));
     if (!shown) return;
     state = state.copyWith(openingChoice: () => null);
     // Anyone else who has to choose goes next; then play begins.
@@ -325,124 +256,43 @@ class TableController extends Notifier<TableState> {
     }
   }
 
-  /// Draws from [source] to start the human player's turn.
+  @override
   void draw(DrawSource source) {
-    if (!_checkYourTurn()) return;
+    if (!checkYourTurn()) return;
     _act(() => _round.draw(source));
   }
 
-  /// Discards the card with [cardId] to end the human player's turn; the
-  /// bots then play until it's the human player's turn again. The returned
-  /// future completes once they have.
+  /// Discards the card with [cardId] to end the turn; any bots then play
+  /// until it's a person's turn again. The returned future completes once
+  /// they have.
+  @override
   Future<void> discard(int cardId) async {
-    final card = _cardWithId(cardId);
-    if (card == null || !_checkYourTurn()) return;
+    final card = cardWithId(cardId);
+    if (card == null || !checkYourTurn()) return;
     if (_act(() => _round.discard(card), removing: {cardId})) {
       await _advance();
     }
   }
 
-  /// Whether discarding the card with [cardId] now would cost the person
-  /// playing the joker-discard penalty: it's their turn to discard, the
-  /// penalty is in play, they've seen the joker, and the card is wild.
-  bool discardCostsPenalty(int cardId) {
-    final view = state.view;
-    final jokers = view.yourJokers;
-    final card = _cardWithId(cardId);
-    return _round.config.jokerDiscardPenaltyEnabled &&
-        view.isYourTurn &&
-        view.youHaveDrawn &&
-        view.youHaveSeenJoker &&
-        jokers != null &&
-        card != null &&
-        jokers.isWild(card);
-  }
-
-  /// Completes once any bots that are playing have finished their turns.
+  @override
   Future<void> get botsSettled => _botsPlaying ?? Future.value();
 
-  /// Groups the selected cards into a set to show. Grouped cards move
-  /// together to the left of the hand, in the order the groups were made.
-  void groupSelected() {
-    if (state.selected.length < 2) {
-      _publish(notice: 'Select 2 or more cards to group.');
-      return;
-    }
-    final newGroup = [
-      for (final handCard in state.hand)
-        if (state.selected.contains(handCard.id)) handCard.id,
-    ];
-    final groups = [
-      for (final group in state.groups)
-        [
-          for (final id in group)
-            if (!state.selected.contains(id)) id,
-        ],
-      newGroup,
-    ].where((group) => group.isNotEmpty).toList();
-    state = state.copyWith(
-      groups: groups,
-      hand: _groupedFirst(state.hand, groups),
-      selected: {},
-    );
-  }
+  @override
+  bool get jokerPenaltyEnabled => _round.config.jokerDiscardPenaltyEnabled;
 
-  /// Breaks up every group.
-  void clearGroups() => state = state.copyWith(groups: []);
-
-  /// Shows the grouped sets to see the joker. If nobody has picked the tiplu
-  /// yet, the player picks it first ([pickTiplu]), then the sets are shown.
-  void showGroups() {
-    if (!_checkYourTurn()) return;
-    if (state.groups.isEmpty) {
-      _publish(notice: 'Group your sets first, then tap Show.');
-      return;
-    }
-    if (!state.view.isJokerChosen) {
-      state = state.copyWith(pickingTiplu: true);
-      return;
-    }
-    _showGroups(tipluPosition: null);
-  }
-
-  /// Picks the stock card at [position] (0 is the top) as the tiplu, and
-  /// shows the grouped sets.
-  void pickTiplu(int position) {
-    state = state.copyWith(pickingTiplu: false);
-    _showGroups(tipluPosition: position);
-  }
-
-  void cancelTipluPick() => state = state.copyWith(pickingTiplu: false);
-
-  /// Closes the joker reveal.
-  void dismissReveal() => state = state.copyWith(revealingJoker: false);
-
-  /// Finishes the round by discarding the selected card, if that leaves a
-  /// winning hand.
-  void declareWin() {
-    if (!_checkYourTurn()) return;
-    final selected = state.singleSelected;
-    if (selected == null) {
-      _publish(notice: 'Select the card to discard, then tap Win.');
-      return;
-    }
-    _act(() => _round.declareWin(selected.card), removing: {selected.id});
-  }
-
-  void _showGroups({required int? tipluPosition}) {
-    final sets = [
-      for (final group in state.groups)
-        [for (final id in group) _cardWithId(id)!],
-    ];
-    final ids = {for (final group in state.groups) ...group};
-    final isDoublees =
-        sets.length == PlayerHand.doubleesToShow &&
-        sets.every((set) => set.length == 2);
+  @override
+  void submitShow({
+    required ShowKind kind,
+    required List<List<PlayingCard>> sets,
+    required Set<int> ids,
+    required int? tipluPosition,
+  }) {
     final shown = _act(() {
-      if (isDoublees) {
-        _round.showDoublees(sets, tipluPosition: tipluPosition);
-      } else {
-        _round.showPureSets(sets, tipluPosition: tipluPosition);
+      switch (kind) {
+        case ShowKind.doublees:
+          _round.showDoublees(sets, tipluPosition: tipluPosition);
+        case ShowKind.pureSets:
+          _round.showPureSets(sets, tipluPosition: tipluPosition);
       }
     }, removing: ids);
     if (shown) {
@@ -450,44 +300,9 @@ class TableController extends Notifier<TableState> {
     }
   }
 
-  /// Tapping the discard pile takes its top card at the start of a turn, or
-  /// discards the selected card once the player has drawn.
-  Future<void> tapDiscardPile() async {
-    if (!_checkYourTurn()) return;
-    if (!state.view.youHaveDrawn) {
-      draw(DrawSource.discardPile);
-      return;
-    }
-    final selected = state.singleSelected;
-    if (selected == null) {
-      _publish(notice: 'Select one card, then tap the discard pile.');
-      return;
-    }
-    await discard(selected.id);
-  }
-
-  /// Whether the human player may move now; if not, says why.
-  bool _checkYourTurn() {
-    if (state.passingTo case final seat?) {
-      _publish(notice: 'Pass the device to ${_nameOf(seat)} first.');
-      return false;
-    }
-    if (state.view.isYourTurn) return true;
-    final winner = state.view.winner;
-    _publish(
-      notice: winner != null
-          ? 'The round is over.'
-          : 'Wait for ${_nameOf(_round.currentSeat)} to play.',
-    );
-    return false;
-  }
-
-  PlayingCard? _cardWithId(int id) {
-    for (final handCard in state.hand) {
-      if (handCard.id == id) return handCard.card;
-    }
-    return null;
-  }
+  @override
+  void submitWin(HandCard winning) =>
+      _act(() => _round.declareWin(winning.card), removing: {winning.id});
 
   /// Runs [move] against the engine, turning a refused move into a notice,
   /// then publishes the new state. [removing] names the hand cards the move
@@ -585,7 +400,7 @@ class TableController extends Notifier<TableState> {
       _roundRecorded = true;
     }
 
-    final hand = _reconcile([
+    final hand = _heldFrom([
       for (final handCard in state.hand)
         if (!removed.contains(handCard.id)) handCard,
     ]);
@@ -636,32 +451,9 @@ class TableController extends Notifier<TableState> {
     return winning;
   }
 
-  /// Brings the on-screen hand in line with the engine's: cards still held
-  /// keep their place and id, cards that have left are dropped, and new
-  /// cards are added at the right-hand end.
-  List<HandCard> _reconcile(List<HandCard> shown) {
-    final held = [..._round.hands[_viewer].cards];
-    final kept = <HandCard>[];
-    for (final handCard in shown) {
-      if (held.remove(handCard.card)) kept.add(handCard);
-    }
-    return [...kept, for (final card in held) HandCard(_nextCardId++, card)];
-  }
-
-  /// [hand] with the cards in [groups] moved to the front, group by group.
-  static List<HandCard> _groupedFirst(
-    List<HandCard> hand,
-    List<List<int>> groups,
-  ) {
-    final byId = {for (final c in hand) c.id: c};
-    final grouped = {for (final group in groups) ...group};
-    return [
-      for (final group in groups)
-        for (final id in group) byId[id]!,
-      for (final handCard in hand)
-        if (!grouped.contains(handCard.id)) handCard,
-    ];
-  }
+  /// [shown] brought in line with the cards the viewer holds.
+  List<HandCard> _heldFrom(List<HandCard> shown) =>
+      reconcile(_round.hands[_viewer].cards, shown);
 
   HandProgress _handProgress() =>
       handProgress(_round.hands[_viewer], _round.jokersFor(_viewer));

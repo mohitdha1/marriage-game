@@ -15,6 +15,7 @@ import '../scoreboard/scoreboard_screen.dart';
 import '../settings/settings.dart';
 import '../sound/sound_effects.dart';
 import '../state/table_controller.dart';
+import '../state/table_notifier.dart';
 import '../state/table_state.dart';
 import '../state/table_view.dart';
 import '../theme/table_felt.dart';
@@ -761,7 +762,7 @@ class _ActionBar extends StatelessWidget {
   const _ActionBar({required this.state, required this.controller});
 
   final TableState state;
-  final TableController controller;
+  final TableNotifier controller;
 
   @override
   Widget build(BuildContext context) {

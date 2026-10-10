@@ -12,6 +12,7 @@ import 'package:marriage_game/ui/haptics/haptics.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
+import 'package:marriage_game/ui/state/table_notifier.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
 
 const c = PlayingCard.new;
@@ -91,7 +92,7 @@ Future<RecordingHaptics> pumpTable(WidgetTester tester) async {
   return haptics;
 }
 
-TableController controllerOf(WidgetTester tester) => ProviderScope.containerOf(
+TableNotifier controllerOf(WidgetTester tester) => ProviderScope.containerOf(
   tester.element(find.byType(TableScreen)),
 ).read(tableProvider.notifier);
 

@@ -12,6 +12,7 @@ import 'package:marriage_game/ui/scoreboard/scoreboard_screen.dart';
 import 'package:marriage_game/ui/settings/settings.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
+import 'package:marriage_game/ui/state/table_notifier.dart';
 import 'package:marriage_game/ui/state/table_state.dart';
 import 'package:marriage_game/ui/table/card_view.dart';
 import 'package:marriage_game/ui/table/hand_fan.dart';
@@ -512,7 +513,7 @@ void main() {
       twoOfDiamonds,
     ];
 
-    TableController controllerOf(WidgetTester tester) =>
+    TableNotifier controllerOf(WidgetTester tester) =>
         ProviderScope.containerOf(
           tester.element(find.byType(TableScreen)),
         ).read(tableProvider.notifier);
