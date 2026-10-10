@@ -403,18 +403,11 @@ class TableController extends Notifier<TableState> {
       if (!ref.mounted) return;
       final seat = _round.currentSeat;
       final turn = _bots[seat]!.takeTurn(_round);
-      _publish(
-        notice: turn.won ? '${_nameOf(seat)} won the round.' : null,
-        botMoves: {...state.botMoves, seat: describeBotTurn(turn)},
-      );
+      _publish(notice: turn.won ? '${_nameOf(seat)} won the round.' : null);
     }
   }
 
-  void _publish({
-    String? notice,
-    Set<int> removed = const {},
-    Map<int, String>? botMoves,
-  }) {
+  void _publish({String? notice, Set<int> removed = const {}}) {
     // Score a finished round once, however it ended.
     if (_round.isOver && !_roundRecorded) {
       _match.addRound(_round.score());
@@ -435,7 +428,6 @@ class TableController extends Notifier<TableState> {
       selected: state.selected.where(ids.contains).toSet(),
       groups: groups,
       winningDiscards: _winningDiscards(hand),
-      botMoves: botMoves,
       roundScores: List.unmodifiable(_match.rounds),
       totals: List.unmodifiable(_match.totals),
       handProgress: _handProgress(),
@@ -512,17 +504,6 @@ class TableController extends Notifier<TableState> {
 
   String _nameOf(int seat) =>
       seat == humanSeat ? 'You' : _bots[seat]!.personality.name;
-}
-
-/// A bot's turn in a few words, for its seat: "Took 7♣, threw 9♦".
-String describeBotTurn(BotTurn turn) {
-  final parts = [
-    turn.drewFrom == DrawSource.discardPile ? 'took ${turn.drawn}' : 'drew',
-    if (turn.shown.isNotEmpty) 'showed',
-    if (turn.won) 'won!' else 'threw ${turn.discarded}',
-  ];
-  final text = parts.join(', ');
-  return text[0].toUpperCase() + text.substring(1);
 }
 
 /// The engine's reason for refusing a move, naming the card when there is

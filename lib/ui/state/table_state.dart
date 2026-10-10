@@ -37,7 +37,6 @@ class TableState {
     this.pickingTiplu = false,
     this.revealingJoker = false,
     this.winningDiscards = const {},
-    this.botMoves = const {},
     this.roundNumber = 1,
     this.seatNames = const [],
     this.roundScores = const [],
@@ -74,9 +73,6 @@ class TableState {
 
   /// Ids of the cards that, if discarded now, would leave a winning hand.
   final Set<int> winningDiscards;
-
-  /// Each bot's latest move in a few words, by seat, shown at its seat.
-  final Map<int, String> botMoves;
 
   /// Which round of the match this is, counting from 1.
   final int roundNumber;
@@ -122,7 +118,6 @@ class TableState {
     bool? pickingTiplu,
     bool? revealingJoker,
     Set<int>? winningDiscards,
-    Map<int, String>? botMoves,
     List<RoundScore>? roundScores,
     List<int>? totals,
     HandProgress? handProgress,
@@ -136,7 +131,6 @@ class TableState {
     pickingTiplu: pickingTiplu ?? this.pickingTiplu,
     revealingJoker: revealingJoker ?? this.revealingJoker,
     winningDiscards: winningDiscards ?? this.winningDiscards,
-    botMoves: botMoves ?? this.botMoves,
     roundNumber: roundNumber,
     seatNames: seatNames,
     roundScores: roundScores ?? this.roundScores,

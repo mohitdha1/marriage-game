@@ -100,7 +100,6 @@ class TableScreen extends ConsumerWidget {
                           isCurrentTurn:
                               table.winner == null &&
                               table.currentSeat == table.opponents[i].seat,
-                          lastMove: state.botMoves[table.opponents[i].seat],
                         ),
                       ),
                     Align(

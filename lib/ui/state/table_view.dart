@@ -13,6 +13,7 @@ class SeatView {
     this.hasSeenJoker = false,
     this.laidDown = const [],
     this.avatarColor,
+    this.lastDiscard,
   });
 
   final int seat;
@@ -30,6 +31,9 @@ class SeatView {
 
   /// The avatar's background colour as 0xAARRGGBB, if this player has one.
   final int? avatarColor;
+
+  /// The card this player discarded most recently this round, if any.
+  final PlayingCard? lastDiscard;
 }
 
 /// An immutable snapshot of a [Round] as seen from [you]'s seat: what the
@@ -71,6 +75,7 @@ class TableView {
         hasSeenJoker: hand.hasSeenJoker,
         laidDown: [...hand.openingTunnellas, ...hand.shownSets],
         avatarColor: avatarOf?.call(seat),
+        lastDiscard: _lastDiscardBy(seat, round.events),
       );
     }
 
@@ -130,4 +135,18 @@ class TableView {
   bool get youHaveSeenJoker => you.hasSeenJoker;
 
   bool get isYourTurn => winner == null && currentSeat == you.seat;
+}
+
+/// The card [seat] discarded most recently in [events], if any.
+PlayingCard? _lastDiscardBy(int seat, List<TableEvent> events) {
+  for (final event in events.reversed) {
+    if (event.seat != seat) continue;
+    switch (event) {
+      case DiscardedCard(:final card) || WonRound(:final card):
+        return card;
+      case _:
+        continue;
+    }
+  }
+  return null;
 }

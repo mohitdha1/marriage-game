@@ -500,7 +500,7 @@ void main() {
     });
   });
 
-  testWidgets('a bot visibly thinks, then its move appears at its seat', (
+  testWidgets('a bot visibly thinks, then its discard appears at its seat', (
     tester,
   ) async {
     await pumpTable(tester, thinkingTime: const Duration(seconds: 1));
@@ -529,7 +529,8 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
     expect(status(tester), 'Your turn: draw a card.');
-    expect(find.byKey(Key('last-move-${bot.seat}')), findsOneWidget);
+    // The bot's discard now shows beside its avatar.
+    expect(find.byKey(Key('last-discard-${bot.seat}')), findsOneWidget);
   });
 
   testWidgets('the hand helper can be turned off in settings', (tester) async {

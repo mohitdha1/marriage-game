@@ -104,14 +104,18 @@ void main() {
       ..pickTiplu(0)
       ..dismissReveal()
       ..draw(DrawSource.stock);
-    // Let every bot take a turn, so each seat shows its last move too.
+    // Let every bot take a turn, so each seat shows its last discard too.
     unawaited(controller.discard(container.read(tableProvider).hand.last.id));
     await tester.pumpAndSettle();
     controller
       ..draw(DrawSource.stock)
       ..toggleSelected(container.read(tableProvider).hand.last.id);
     await tester.pump();
-    expect(container.read(tableProvider).botMoves, hasLength(playerCount - 1));
+    expect(
+      container.read(tableProvider).view.opponents.map((s) => s.lastDiscard),
+      everyElement(isNotNull),
+      reason: 'every seat shows its last discard',
+    );
   }
 
   for (final MapEntry(key: name, value: size) in screens.entries) {

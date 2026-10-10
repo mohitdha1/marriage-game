@@ -100,6 +100,27 @@ void main() {
       expect(next.isYourTurn, isFalse);
     });
 
+    test('each seat shows its most recent discard', () {
+      final round = fourPlayerRound()
+        ..showOpeningTunnellas(0, [])
+        ..showOpeningTunnellas(1, [])
+        ..showOpeningTunnellas(2, [])
+        ..showOpeningTunnellas(3, []);
+      final before = TableView.fromRound(round, humanSeat: 0, nameOf: nameOf);
+      expect(before.you.lastDiscard, isNull);
+
+      round
+        ..draw(DrawSource.stock)
+        ..discard(c(Suit.clubs, Rank.two))
+        ..draw(DrawSource.discardPile)
+        ..discard(c(Suit.clubs, Rank.three));
+      final after = TableView.fromRound(round, humanSeat: 0, nameOf: nameOf);
+
+      expect(after.you.lastDiscard, c(Suit.clubs, Rank.two));
+      expect(after.opponents.first.lastDiscard, c(Suit.clubs, Rank.three));
+      expect(after.opponents[1].lastDiscard, isNull);
+    });
+
     test('an empty discard pile shows as null', () {
       final round = Round.fromCards(
         config: GameConfig(playerCount: 2),

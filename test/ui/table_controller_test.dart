@@ -655,13 +655,14 @@ void main() {
       expect(container.table.view.youHaveDrawn, isTrue);
     });
 
-    test('each bot\'s latest move is shown at its seat', () async {
+    test('each bot\'s latest discard is shown at its seat', () async {
       final container = tableWith()..controller.draw(DrawSource.stock);
 
       await container.controller.discard(container.idOf(twoOfDiamonds));
 
-      final seat = container.table.view.opponents.single.seat;
-      expect(container.table.botMoves[seat], startsWith('Drew, threw '));
+      final bot = container.table.view.opponents.single;
+      expect(bot.lastDiscard, isNotNull);
+      expect(container.table.view.you.lastDiscard, twoOfDiamonds);
     });
 
     test('once the round is over, moves are refused', () async {
@@ -718,36 +719,6 @@ void main() {
         await container.controller.discard(container.table.hand.last.id);
       }
       expect(container.table.view.opponents, hasLength(2));
-    });
-  });
-
-  group('describeBotTurn', () {
-    test('describes a draw, a show and a discard', () {
-      expect(
-        describeBotTurn(
-          BotTurn(
-            drewFrom: DrawSource.discardPile,
-            drawn: c(Suit.clubs, Rank.seven),
-            shown: [heartsRun],
-            discarded: c(Suit.diamonds, Rank.nine),
-          ),
-        ),
-        'Took 7♣, showed, threw 9♦',
-      );
-    });
-
-    test('describes a win', () {
-      expect(
-        describeBotTurn(
-          BotTurn(
-            drewFrom: DrawSource.stock,
-            drawn: c(Suit.clubs, Rank.seven),
-            discarded: c(Suit.diamonds, Rank.nine),
-            won: true,
-          ),
-        ),
-        'Drew, won!',
-      );
     });
   });
 
@@ -827,7 +798,10 @@ void main() {
       expect(table.view.winner, isNull);
       expect(table.hand, hasLength(yourCards.take(9).length + 7));
       expect(table.groups, isEmpty);
-      expect(table.botMoves, isEmpty);
+      expect(
+        table.view.opponents.map((s) => s.lastDiscard),
+        everyElement(isNull),
+      );
       expect(table.roundScores, hasLength(1));
       expect(table.totals, totals);
       expect(table.seatNames, names);
