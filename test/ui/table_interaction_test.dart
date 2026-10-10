@@ -251,7 +251,7 @@ void main() {
     expect(stateOf(tester).hand, before);
   });
 
-  testWidgets('Sort orders the hand by suit, then rank', (tester) async {
+  testWidgets('Sort orders the hand ♠ ♥ ♣ ♦, then by rank', (tester) async {
     await pumpTable(tester);
 
     await tester.tap(find.byKey(const Key('sort-button')));
@@ -266,14 +266,15 @@ void main() {
         )
         .map((face) => face.card)
         .toList();
+    // ♠ ♥ ♣ ♦: black and red alternate.
     expect(shown, [
-      c(Suit.clubs, Rank.seven),
-      c(Suit.diamonds, Rank.two),
-      c(Suit.diamonds, Rank.king),
+      c(Suit.spades, Rank.king),
       c(Suit.hearts, Rank.three),
       c(Suit.hearts, Rank.four),
       c(Suit.hearts, Rank.five),
-      c(Suit.spades, Rank.king),
+      c(Suit.clubs, Rank.seven),
+      c(Suit.diamonds, Rank.two),
+      c(Suit.diamonds, Rank.king),
     ]);
   });
 

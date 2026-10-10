@@ -166,16 +166,37 @@ class TableController extends Notifier<TableState> {
     state = state.copyWith(hand: hand);
   }
 
-  /// Sorts the hand by suit, then rank.
+  /// The order Sort puts suits in: alternating black and red, so
+  /// neighbouring suits are easy to tell apart.
+  static const sortedSuits = [
+    Suit.spades,
+    Suit.hearts,
+    Suit.clubs,
+    Suit.diamonds,
+  ];
+
+  /// Sorts the hand by suit (♠ ♥ ♣ ♦), then by rank within each suit.
+  /// Grouped sets stay together at the front, in the order they were made.
   void sortHand() {
-    final sorted = [...state.hand]
-      ..sort((a, b) {
-        final bySuit = a.card.suit.index.compareTo(b.card.suit.index);
-        return bySuit != 0
-            ? bySuit
-            : a.card.rank.order.compareTo(b.card.rank.order);
-      });
-    state = state.copyWith(hand: sorted);
+    final byId = {for (final handCard in state.hand) handCard.id: handCard};
+    final groupedCards = [
+      for (final group in state.groups)
+        for (final id in group) byId[id]!,
+    ];
+    final loose = [
+      for (final handCard in state.hand)
+        if (!groupedCards.contains(handCard)) handCard,
+    ]..sort(_bySuitThenRank);
+    state = state.copyWith(hand: [...groupedCards, ...loose]);
+  }
+
+  static int _bySuitThenRank(HandCard a, HandCard b) {
+    final bySuit = sortedSuits
+        .indexOf(a.card.suit)
+        .compareTo(sortedSuits.indexOf(b.card.suit));
+    return bySuit != 0
+        ? bySuit
+        : a.card.rank.order.compareTo(b.card.rank.order);
   }
 
   /// Makes the opening show with the tunnellas at [picks] (indexes into

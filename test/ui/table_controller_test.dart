@@ -211,30 +211,42 @@ void main() {
       expect(container.table.hand.last.id, first);
     });
 
-    test(
-      'Sort orders the hand by suit, then rank, keeping each card\'s id',
-      () {
-        final container = tableWith();
-        final idsBefore = {for (final c in container.table.hand) c.id: c.card};
+    test('Sort orders the hand by suit (♠ ♥ ♣ ♦), then rank, keeping ids', () {
+      final container = tableWith();
+      final idsBefore = {for (final c in container.table.hand) c.id: c.card};
 
-        container.controller.sortHand();
+      container.controller.sortHand();
 
-        final sorted = container.table.hand;
-        for (var i = 1; i < sorted.length; i++) {
-          final a = sorted[i - 1].card;
-          final b = sorted[i].card;
-          expect(
-            a.suit.index < b.suit.index ||
-                (a.suit == b.suit && a.rank.order <= b.rank.order),
-            isTrue,
-            reason: '$a should come before $b',
-          );
-        }
-        for (final handCard in sorted) {
-          expect(idsBefore[handCard.id], handCard.card);
-        }
-      },
-    );
+      final sorted = container.table.hand;
+      for (var i = 1; i < sorted.length; i++) {
+        final a = sorted[i - 1].card;
+        final b = sorted[i].card;
+        final order = TableController.sortedSuits;
+        expect(
+          order.indexOf(a.suit) < order.indexOf(b.suit) ||
+              (a.suit == b.suit && a.rank.order <= b.rank.order),
+          isTrue,
+          reason: '$a should come before $b',
+        );
+      }
+      for (final handCard in sorted) {
+        expect(idsBefore[handCard.id], handCard.card);
+      }
+    });
+
+    test('Sort keeps grouped sets together at the front', () {
+      final container = tableWith()
+        ..group(clubsRun)
+        ..group(heartsRun);
+
+      container.controller.sortHand();
+
+      final cards = container.table.hand.map((c) => c.card).toList();
+      expect(cards.take(6), [...clubsRun, ...heartsRun]);
+      expect(container.table.groups, hasLength(2));
+      // The rest is sorted ♠ first.
+      expect(cards[6].suit, Suit.spades);
+    });
   });
 
   group('Drawing', () {
