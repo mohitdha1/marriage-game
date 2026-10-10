@@ -12,64 +12,6 @@ List<PlayingCard> run(Suit suit, List<Rank> ranks) => [
 void main() {
   // Tiplu 7♥: every 7 plus 6♥ and 8♥ is wild.
   final jokers = Jokers(c(Suit.hearts, Rank.seven));
-  final heartsRun = run(Suit.hearts, [Rank.two, Rank.three, Rank.four]);
-  final clubsRun = run(Suit.clubs, [Rank.nine, Rank.ten, Rank.jack]);
-
-  group('findPureSets and allPureSetChoices', () {
-    test('finds separate pure sets', () {
-      final sets = findPureSets([
-        ...heartsRun,
-        c(Suit.spades, Rank.king),
-        ...clubsRun,
-      ], 2)!;
-
-      expect(sets, unorderedEquals([heartsRun, clubsRun]));
-    });
-
-    test('never uses a card twice', () {
-      final cards = run(Suit.clubs, [
-        Rank.three,
-        Rank.four,
-        Rank.five,
-        Rank.six,
-      ]);
-
-      expect(findPureSets(cards, 2), isNull);
-      // 3-4-5 and 4-5-6 are both possible single choices.
-      expect(allPureSetChoices(cards, 1), hasLength(2));
-    });
-
-    test('counts tunnellas and ace-low runs', () {
-      final kings = [for (var i = 0; i < 3; i++) c(Suit.spades, Rank.king)];
-      final aceLow = run(Suit.diamonds, [Rank.ace, Rank.two, Rank.three]);
-
-      expect(
-        findPureSets([...kings, ...aceLow], 2),
-        unorderedEquals([kings, aceLow]),
-      );
-    });
-  });
-
-  group('findDoublees', () {
-    test('finds pairs of identical cards', () {
-      final pairs = findDoublees([
-        c(Suit.clubs, Rank.two),
-        c(Suit.clubs, Rank.two),
-        c(Suit.hearts, Rank.two),
-        c(Suit.spades, Rank.nine),
-        c(Suit.spades, Rank.nine),
-      ], 2);
-
-      expect(pairs, [
-        [c(Suit.clubs, Rank.two), c(Suit.clubs, Rank.two)],
-        [c(Suit.spades, Rank.nine), c(Suit.spades, Rank.nine)],
-      ]);
-    });
-
-    test('returns null when there are too few pairs', () {
-      expect(findDoublees(heartsRun, 1), isNull);
-    });
-  });
 
   group('usefulness', () {
     final card = c(Suit.clubs, Rank.five);
@@ -122,52 +64,6 @@ void main() {
       expect(rankGap(Rank.ace, Rank.king), 1);
       expect(rankGap(Rank.ace, Rank.two), 1);
       expect(rankGap(Rank.two, Rank.four), 2);
-    });
-  });
-
-  group('maxCoverage', () {
-    test('before the joker, only pure sets count', () {
-      final cards = [
-        ...heartsRun,
-        c(Suit.spades, Rank.king),
-        c(Suit.diamonds, Rank.king),
-        c(Suit.clubs, Rank.seven), // would be wild, but the joker is unseen
-      ];
-
-      expect(maxCoverage(cards, null), 3);
-    });
-
-    test('after the joker, trials and joker-filled sets count too', () {
-      final cards = [
-        ...heartsRun,
-        c(Suit.spades, Rank.king),
-        c(Suit.diamonds, Rank.king),
-        c(Suit.clubs, Rank.seven),
-      ];
-
-      expect(maxCoverage(cards, jokers), 6);
-    });
-
-    test('a hand with nothing in sets covers 0', () {
-      expect(
-        maxCoverage([
-          c(Suit.spades, Rank.two),
-          c(Suit.hearts, Rank.nine),
-          c(Suit.clubs, Rank.king),
-        ], jokers),
-        0,
-      );
-    });
-
-    test('picks the best way to split overlapping sets', () {
-      // 3♣ 4♣ 5♣ 6♣ 6♦ 6♠: the run 3-4-5 plus the trial of 6s covers all 6.
-      final cards = [
-        ...run(Suit.clubs, [Rank.three, Rank.four, Rank.five, Rank.six]),
-        c(Suit.diamonds, Rank.six),
-        c(Suit.spades, Rank.six),
-      ];
-
-      expect(maxCoverage(cards, Jokers(c(Suit.hearts, Rank.king))), 6);
     });
   });
 }

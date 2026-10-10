@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../engine/card.dart';
+import '../engine/hand_arrangement.dart';
 import '../engine/joker.dart';
 import '../engine/melds.dart';
 import '../engine/player_hand.dart';

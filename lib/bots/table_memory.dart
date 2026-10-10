@@ -1,4 +1,5 @@
 import '../engine/card.dart';
+import '../engine/hand_arrangement.dart';
 import '../engine/round.dart';
 import '../engine/table_event.dart';
 import 'hand_analysis.dart';
