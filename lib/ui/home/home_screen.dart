@@ -155,7 +155,8 @@ class _QuickPlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton(
+    // The same soft drop shadow as the mode tiles above it.
+    final button = FilledButton(
       key: const Key('quick-play'),
       onPressed: onPressed,
       style: FilledButton.styleFrom(
@@ -163,7 +164,6 @@ class _QuickPlayButton extends StatelessWidget {
         foregroundColor: const Color(0xFF3E2723),
         padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 10),
         shape: const StadiumBorder(),
-        elevation: 4,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -186,6 +186,19 @@ class _QuickPlayButton extends StatelessWidget {
           ),
         ],
       ),
+    );
+    return DecoratedBox(
+      decoration: const ShapeDecoration(
+        shape: StadiumBorder(),
+        shadows: [
+          BoxShadow(
+            color: Color(0x55000000),
+            blurRadius: 12,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: button,
     );
   }
 }
