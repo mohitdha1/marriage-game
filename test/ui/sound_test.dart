@@ -12,6 +12,7 @@ import 'package:marriage_game/engine/player_hand.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/engine/table_event.dart';
 import 'package:marriage_game/main.dart';
+import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/sound/table_sounds.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
@@ -96,7 +97,7 @@ Future<RecordingSoundEffects> pumpTable(
           ),
         ),
       ],
-      child: const MarriageApp(),
+      child: const MarriageApp(home: singlePlayerTable),
     ),
   );
   await tester.pump();

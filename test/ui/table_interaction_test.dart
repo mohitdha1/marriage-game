@@ -7,6 +7,7 @@ import 'package:marriage_game/engine/card.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/main.dart';
+import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/scoreboard/scoreboard_screen.dart';
 import 'package:marriage_game/ui/settings/settings.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
@@ -82,7 +83,7 @@ Future<void> pumpTable(
           ),
         ),
       ],
-      child: const MarriageApp(),
+      child: const MarriageApp(home: singlePlayerTable),
     ),
   );
 }

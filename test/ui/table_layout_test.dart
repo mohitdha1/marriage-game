@@ -8,6 +8,7 @@ import 'package:marriage_game/engine/card.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/main.dart';
+import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/table/hand_fan.dart';
@@ -90,7 +91,7 @@ void main() {
             ),
           ),
         ],
-        child: const MarriageApp(),
+        child: const MarriageApp(home: singlePlayerTable),
       ),
     );
 
@@ -147,8 +148,8 @@ void main() {
           'stock and discard pile': find.byType(TableCenter),
           'status line': find.byKey(const Key('status-line')),
           'action buttons': find.byKey(const Key('action-bar')),
-          'your laid-down sets': find.byKey(const Key('your-laid-down-sets')),
-          'sort and log buttons': find.byKey(const Key('top-left-buttons')),
+          'sort button and your sets': find.byKey(const Key('hand-tools')),
+          'back and log buttons': find.byKey(const Key('top-left-buttons')),
           'scores button and joker chip': find.byKey(
             const Key('top-right-items'),
           ),

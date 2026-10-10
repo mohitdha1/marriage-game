@@ -111,10 +111,10 @@ class TableScreen extends ConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           _TopButton(
-                            key: const Key('sort-button'),
-                            tooltip: 'Sort by suit, then rank',
-                            icon: Icons.sort,
-                            onPressed: controller.sortHand,
+                            key: const Key('back-button'),
+                            tooltip: 'Leave the table',
+                            icon: Icons.arrow_back,
+                            onPressed: () => _leave(context, table),
                           ),
                           _TopButton(
                             key: const Key('log-button'),
@@ -187,11 +187,25 @@ class TableScreen extends ConsumerWidget {
                     // Just above the hand, clear of the space a selected card
                     // lifts into: laid-down sets on the left, buttons on the
                     // right.
-                    if (table.you.laidDown.isNotEmpty)
-                      Align(
-                        alignment: const Alignment(-1, 0.05),
-                        child: _LaidDownSets(sets: table.you.laidDown),
+                    Align(
+                      alignment: const Alignment(-1, 0.05),
+                      child: Row(
+                        key: const Key('hand-tools'),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _TopButton(
+                            key: const Key('sort-button'),
+                            tooltip: 'Sort by suit, then rank',
+                            icon: Icons.sort,
+                            onPressed: controller.sortHand,
+                          ),
+                          if (table.you.laidDown.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            _LaidDownSets(sets: table.you.laidDown),
+                          ],
+                        ],
                       ),
+                    ),
                     Align(
                       alignment: const Alignment(1, 0.05),
                       child: _ActionBar(state: state, controller: controller),
@@ -262,6 +276,57 @@ class TableScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Makes the phone's back gesture ask before leaving a round that's still
+/// being played, just like the table's Back button.
+class LeaveGuard extends ConsumerWidget {
+  const LeaveGuard({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _leave(context, ref.read(tableProvider).view);
+      },
+      child: child,
+    );
+  }
+}
+
+/// Leaves the table for the home screen, checking first if a round is
+/// still being played.
+Future<void> _leave(BuildContext context, TableView table) async {
+  final navigator = Navigator.of(context);
+  if (!navigator.canPop()) return;
+  if (table.winner == null) {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const Key('leave-dialog'),
+        title: const Text('Leave the table?'),
+        content: const Text(
+          'This match will end. Coins from rounds you\'ve finished are kept.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Stay'),
+          ),
+          FilledButton(
+            key: const Key('leave-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Leave'),
+          ),
+        ],
+      ),
+    );
+    if (leave != true) return;
+  }
+  navigator.pop();
 }
 
 /// How long the table stays on screen after a round ends before the

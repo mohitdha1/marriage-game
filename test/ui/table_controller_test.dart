@@ -7,6 +7,7 @@ import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/bots/bot_personality.dart';
 import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/engine/round.dart';
+import 'package:marriage_game/ui/home/coins.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_state.dart';
 
@@ -758,6 +759,15 @@ void main() {
       expect(table.totals, table.roundScores.single.net);
       expect(table.seatNames.first, 'You');
       expect(table.seatNames[1], table.view.opponents.single.name);
+    });
+
+    test('your result each round moves your coins', () {
+      final container = wonByYou();
+
+      expect(
+        container.read(coinsProvider),
+        CoinsController.startingBalance + container.table.totals[0],
+      );
     });
 
     test('a round won by a bot is scored too', () async {

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/main.dart';
+import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_state.dart';
@@ -46,7 +47,7 @@ Future<void> pumpTable(
           GameConfig(playerCount: playerCount),
         ),
       ],
-      child: const MarriageApp(),
+      child: const MarriageApp(home: singlePlayerTable),
     ),
   );
 }

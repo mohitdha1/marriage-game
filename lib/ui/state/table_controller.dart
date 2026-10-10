@@ -12,6 +12,7 @@ import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
 import '../../engine/scoring.dart';
 import '../../engine/win_check.dart';
+import '../home/coins.dart';
 import 'table_state.dart';
 import 'table_view.dart';
 
@@ -410,7 +411,9 @@ class TableController extends Notifier<TableState> {
   void _publish({String? notice, Set<int> removed = const {}}) {
     // Score a finished round once, however it ended.
     if (_round.isOver && !_roundRecorded) {
-      _match.addRound(_round.score());
+      final score = _round.score();
+      _match.addRound(score);
+      ref.read(coinsProvider.notifier).addRoundResult(score.net[humanSeat]);
       _roundRecorded = true;
     }
 

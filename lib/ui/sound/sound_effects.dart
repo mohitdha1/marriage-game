@@ -4,6 +4,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../settings/settings.dart';
+
 /// The game's sound effects, each with its file in `assets/sounds/`.
 enum Sfx {
   shuffle('shuffle.wav'),
@@ -34,6 +36,23 @@ class SilentSoundEffects implements SoundEffects {
 
   @override
   Future<void> dispose() async {}
+}
+
+/// Passes sounds on to [inner] only while [isOn] says sound is switched on,
+/// so the Settings toggle silences the game straight away.
+class GatedSoundEffects implements SoundEffects {
+  GatedSoundEffects(this.inner, {required this.isOn});
+
+  final SoundEffects inner;
+  final bool Function() isOn;
+
+  @override
+  void play(Sfx sound) {
+    if (isOn()) inner.play(sound);
+  }
+
+  @override
+  Future<void> dispose() => inner.dispose();
 }
 
 /// How the game's sounds share the device's audio with other apps.
@@ -86,7 +105,10 @@ class AudioPlayerSoundEffects implements SoundEffects {
 
 /// The app's sound effects. Tests override this with [SilentSoundEffects].
 final soundEffectsProvider = Provider<SoundEffects>((ref) {
-  final sounds = AudioPlayerSoundEffects();
+  final sounds = GatedSoundEffects(
+    AudioPlayerSoundEffects(),
+    isOn: () => ref.read(settingsProvider).sound,
+  );
   ref.onDispose(sounds.dispose);
   return sounds;
 });

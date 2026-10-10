@@ -1,0 +1,390 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../engine/card.dart';
+import '../settings/profile_dialog.dart';
+import '../settings/settings.dart';
+import '../settings/settings_popover.dart';
+import '../sound/table_sounds.dart';
+import '../state/table_controller.dart';
+import '../table/suit_icon.dart';
+import '../table/table_screen.dart';
+import 'coins.dart';
+import 'player_avatar.dart';
+
+/// The table for a game against bots, with its sounds, asking before the
+/// back gesture leaves a round in progress.
+const singlePlayerTable = TableSounds(child: LeaveGuard(child: TableScreen()));
+
+/// The first screen: the player's avatar, name and coins along the top, a
+/// settings gear, and a large tile for each way to play.
+class HomeScreen extends ConsumerWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final coins = ref.watch(coinsProvider);
+
+    return Scaffold(
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF0B4F4A), Color(0xFF1B5E20), Color(0xFF0D3B12)],
+          ),
+        ),
+        child: Stack(
+          children: [
+            const Positioned.fill(child: _SuitBackdrop()),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _PlayerBadge(
+                          name: settings.playerName,
+                          color: Color(settings.avatarColor),
+                          onTap: () => showProfileDialog(context),
+                        ),
+                        const Spacer(),
+                        _CoinPill(coins: coins),
+                        const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          key: const Key('settings-button'),
+                          tooltip: 'Settings',
+                          onPressed: () => showSettingsPopover(context),
+                          icon: const Icon(Icons.settings),
+                        ),
+                      ],
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Wrap(
+                          spacing: 24,
+                          runSpacing: 16,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            _ModeTile(
+                              key: const Key('single-player'),
+                              title: 'Single Player',
+                              subtitle: 'Play against computer players',
+                              icon: Icons.smart_toy_outlined,
+                              colors: const [
+                                Color(0xFFFFB300),
+                                Color(0xFFF57C00),
+                              ],
+                              onTap: () => _startSinglePlayer(context, ref),
+                            ),
+                            _ModeTile(
+                              key: const Key('hotspot'),
+                              title: 'Hotspot / Local',
+                              subtitle: 'Friends on the same Wi-Fi or hotspot',
+                              icon: Icons.wifi_tethering,
+                              colors: const [
+                                Color(0xFF7E57C2),
+                                Color(0xFF3949AB),
+                              ],
+                              comingSoon: true,
+                              onTap: () => ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Playing with friends on the same '
+                                      'Wi-Fi or hotspot is coming soon.',
+                                    ),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Opens a fresh match against bots.
+  void _startSinglePlayer(BuildContext context, WidgetRef ref) {
+    ref.invalidate(tableProvider);
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => singlePlayerTable));
+  }
+}
+
+/// The player's avatar and name. Tapping it opens their profile.
+class _PlayerBadge extends StatelessWidget {
+  const _PlayerBadge({
+    required this.name,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String name;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: const Key('player-badge'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PlayerAvatar(name: name, color: color, radius: 20),
+            const SizedBox(width: 8),
+            Text(
+              name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The coin balance in a pill, with a drawn coin.
+class _CoinPill extends StatelessWidget {
+  const _CoinPill({required this.coins});
+
+  final int coins;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('coin-balance'),
+      padding: const EdgeInsets.fromLTRB(6, 4, 12, 4),
+      decoration: BoxDecoration(
+        color: const Color(0x66000000),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CoinIcon(size: 22),
+          const SizedBox(width: 6),
+          Text(
+            formatCoins(coins),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// [coins] with thousands separated by commas: 12,345.
+String formatCoins(int coins) {
+  final digits = coins.abs().toString();
+  final grouped = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 == 0) grouped.write(',');
+    grouped.write(digits[i]);
+  }
+  return '${coins < 0 ? '-' : ''}$grouped';
+}
+
+/// A simple gold coin.
+class CoinIcon extends StatelessWidget {
+  const CoinIcon({super.key, required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const RadialGradient(
+          colors: [Color(0xFFFFE082), Color(0xFFFFB300)],
+        ),
+        border: Border.all(color: const Color(0xFFB8860B), width: size * 0.08),
+      ),
+      alignment: Alignment.center,
+      child: Container(
+        width: size * 0.45,
+        height: size * 0.45,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: const Color(0xFFB8860B),
+            width: size * 0.06,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A large, tappable tile for one way to play.
+class _ModeTile extends StatelessWidget {
+  const _ModeTile({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.colors,
+    required this.onTap,
+    this.comingSoon = false,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<Color> colors;
+  final VoidCallback onTap;
+
+  /// Shows the tile faded, with a "Coming soon" ribbon.
+  final bool comingSoon;
+
+  @override
+  Widget build(BuildContext context) {
+    final tile = Container(
+      width: 230,
+      constraints: const BoxConstraints(minHeight: 170),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: colors,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x55000000),
+            blurRadius: 12,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 56, color: Colors.white),
+          const SizedBox(height: 10),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xDDFFFFFF), fontSize: 12),
+          ),
+        ],
+      ),
+    );
+
+    return Semantics(
+      button: true,
+      label: comingSoon ? '$title, coming soon' : title,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Opacity(opacity: comingSoon ? 0.55 : 1, child: tile),
+            if (comingSoon)
+              Positioned(
+                top: 12,
+                right: -6,
+                child: Container(
+                  key: const Key('coming-soon'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFC400),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Coming soon',
+                    style: TextStyle(
+                      color: Color(0xFF3E2723),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Large, faint card suits scattered behind the home screen.
+class _SuitBackdrop extends StatelessWidget {
+  const _SuitBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    const faint = Color(0x14FFFFFF);
+    return const IgnorePointer(
+      child: Stack(
+        children: [
+          Positioned(
+            left: -30,
+            bottom: -40,
+            child: SuitIcon(Suit.spades, size: 220, color: faint),
+          ),
+          Positioned(
+            right: 40,
+            top: 60,
+            child: SuitIcon(Suit.hearts, size: 140, color: faint),
+          ),
+          Positioned(
+            right: -40,
+            bottom: -30,
+            child: SuitIcon(Suit.clubs, size: 200, color: faint),
+          ),
+          Positioned(
+            left: 180,
+            top: 40,
+            child: SuitIcon(Suit.diamonds, size: 90, color: faint),
+          ),
+        ],
+      ),
+    );
+  }
+}
