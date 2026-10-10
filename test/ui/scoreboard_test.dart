@@ -114,14 +114,22 @@ Future<FakeTableController> openScoreboard(
   return controller;
 }
 
-/// The text of every cell in the table with [key], row by row.
+/// The text of every cell in the table with [key], row by row. A marked
+/// name reads as the name with 🏆 (round winner) or ★ (match leader).
 List<List<String>> cellsOf(WidgetTester tester, String key) {
   final table = tester.widget<DataTable>(
     find.descendant(of: find.byKey(Key(key)), matching: find.byType(DataTable)),
   );
+  String textOf(Widget cell) => switch (cell) {
+    Text(:final data) => data!,
+    ScoreName(:final name, mark: ScoreMark.winner) => '$name 🏆',
+    ScoreName(:final name, mark: ScoreMark.leader) => '$name ★',
+    ScoreName(:final name) => name,
+    _ => throw ArgumentError('unexpected cell $cell'),
+  };
   return [
     for (final row in table.rows)
-      [for (final cell in row.cells) (cell.child as Text).data!],
+      [for (final cell in row.cells) textOf(cell.child)],
   ];
 }
 
@@ -192,6 +200,17 @@ void main() {
       ['Priya', '−26', '+13', '−13'],
       ['Jack', '−33', '−10', '−43'],
     ]);
+  });
+
+  testWidgets('the trophy and star are drawn, not typed as emoji', (
+    tester,
+  ) async {
+    await openScoreboard(tester, stateWith([round1, round2]));
+
+    expect(find.byIcon(Icons.emoji_events), findsOneWidget);
+    expect(find.byIcon(Icons.star), findsOneWidget);
+    expect(find.textContaining('🏆'), findsNothing);
+    expect(find.textContaining('★'), findsNothing);
   });
 
   testWidgets('Next round deals the next round and returns to the table', (
