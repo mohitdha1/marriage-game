@@ -17,6 +17,7 @@ import 'card_view.dart';
 import 'hand_fan.dart';
 import 'joker_reveal.dart';
 import 'opening_picker.dart';
+import 'move_log.dart';
 import 'opponent_seat.dart';
 import 'set_chips.dart';
 import 'suit_icon.dart';
@@ -109,24 +110,43 @@ class TableScreen extends ConsumerWidget {
                         key: const Key('top-left-buttons'),
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          IconButton.filledTonal(
+                          _TopButton(
                             key: const Key('sort-button'),
                             tooltip: 'Sort by suit, then rank',
+                            icon: Icons.sort,
                             onPressed: controller.sortHand,
-                            icon: const Icon(Icons.sort),
                           ),
-                          IconButton.filledTonal(
-                            key: const Key('scores-button'),
-                            tooltip: 'Scores',
-                            onPressed: () => _openScoreboard(context),
-                            icon: const Icon(Icons.leaderboard),
+                          _TopButton(
+                            key: const Key('log-button'),
+                            tooltip: 'Log of this round\'s moves',
+                            icon: Icons.history,
+                            onPressed: () => showModalBottomSheet<void>(
+                              context: context,
+                              builder: (_) => MoveLog(
+                                events: table.events,
+                                nameOf: (seat) => state.seatNames[seat],
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
                     Align(
                       alignment: Alignment.topRight,
-                      child: _JokerChip(table: table),
+                      child: Row(
+                        key: const Key('top-right-items'),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _TopButton(
+                            key: const Key('scores-button'),
+                            tooltip: 'Scores',
+                            icon: Icons.leaderboard,
+                            onPressed: () => _openScoreboard(context),
+                          ),
+                          const SizedBox(width: 6),
+                          _JokerChip(table: table),
+                        ],
+                      ),
                     ),
                     Align(
                       alignment: const Alignment(0, -0.25),
@@ -295,6 +315,30 @@ int? maalOf(HandProgress? progress) => switch (progress) {
   WinProgress(:final maal) || DubleeProgress(:final maal) => maal,
   ShowProgress() || null => null,
 };
+
+/// A compact round icon button for the top of the table.
+class _TopButton extends StatelessWidget {
+  const _TopButton({
+    super.key,
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton.filledTonal(
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      onPressed: onPressed,
+      icon: Icon(icon, size: 20),
+    );
+  }
+}
 
 /// A small read-only label over a corner of the hand.
 class _CornerBadge extends StatelessWidget {

@@ -144,8 +144,10 @@ void main() {
           'status line': find.byKey(const Key('status-line')),
           'action buttons': find.byKey(const Key('action-bar')),
           'your laid-down sets': find.byKey(const Key('your-laid-down-sets')),
-          'sort and scores buttons': find.byKey(const Key('top-left-buttons')),
-          'joker chip': find.byKey(const Key('joker-chip')),
+          'sort and log buttons': find.byKey(const Key('top-left-buttons')),
+          'scores button and joker chip': find.byKey(
+            const Key('top-right-items'),
+          ),
         };
         final seats = find.byType(OpponentSeat);
         expect(seats, findsNWidgets(players - 1));

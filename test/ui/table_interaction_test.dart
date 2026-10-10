@@ -15,6 +15,7 @@ import 'package:marriage_game/ui/state/table_state.dart';
 import 'package:marriage_game/ui/table/card_view.dart';
 import 'package:marriage_game/ui/table/hand_fan.dart';
 import 'package:marriage_game/ui/table/joker_reveal.dart';
+import 'package:marriage_game/ui/table/move_log.dart';
 import 'package:marriage_game/ui/table/opening_picker.dart';
 import 'package:marriage_game/ui/table/opponent_seat.dart';
 import 'package:marriage_game/ui/table/suit_icon.dart';
@@ -543,5 +544,20 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('hand-helper')), findsNothing);
+  });
+
+  testWidgets('the Log button opens this round\'s moves', (tester) async {
+    await pumpTable(tester);
+    await tester.tap(find.byKey(const Key('stock')));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('log-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MoveLog), findsOneWidget);
+    expect(
+      tester.widget<SuitText>(find.byType(SuitText).first).text,
+      'You drew from the stock',
+    );
   });
 }
