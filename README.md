@@ -16,10 +16,11 @@ The game is built in phases (see [`docs/roadmap.md`](docs/roadmap.md)):
 - **Phase 1, the rules engine, is complete.** A pure-Dart engine runs a full
   game, from the deal through turns, the joker-seen flow, winning and
   scoring, and you can play it in the terminal.
-- **Phase 2, the Flutter UI and bots, is in progress.** The landscape table
+- **Phase 2, the Flutter UI and bots, is complete.** The landscape table
   screen is playable against bots at three difficulty levels: draw, discard,
   group and show sets, see the joker, win, and follow the scores round by
-  round, with sound effects.
+  round. Known issue: sound effects aren't heard on some Android phones yet.
+- **Phase 3, polish, is in progress.**
 
 ### How the code is organised
 

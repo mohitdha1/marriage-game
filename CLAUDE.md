@@ -15,13 +15,13 @@ A Flutter portfolio project built while learning Dart/Flutter, aimed at junior S
 
 ## Project plan
 
-The full phased roadmap lives in `docs/roadmap.md` — read it for details on any phase. We are currently on **Phase 2**.
+The full phased roadmap lives in `docs/roadmap.md` — read it for details on any phase. We are currently on **Phase 3**.
 
 Phase order (don't skip ahead):
 0. Dart & Flutter foundations
 1. Game logic engine (pure Dart) — complete
-2. Single-player Flutter UI vs bots — current phase
-3. Polish (card art, themes, animation, sound) — MVP complete after this
+2. Single-player Flutter UI vs bots — complete (known issue: sound effects not heard on the developer's Samsung phone)
+3. Polish (card art, themes, animation, sound) — current phase; MVP complete after this
 4. Local multiplayer (pass-and-play, LAN/hotspot)
 5. Online multiplayer (separate later project, not part of MVP)
 6. Publish & iterate
