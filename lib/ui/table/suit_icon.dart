@@ -152,7 +152,11 @@ class _SuitPainter extends CustomPainter {
         ..cubicTo(0.38, 0.82, 0.08, 0.80, 0.04, 0.60)
         ..cubicTo(0.0, 0.42, 0.20, 0.30, 0.5, 0.02)
         ..close(),
-    Suit.clubs =>
+    // Three leaves and a stem, joined into one outline. Adding them to one
+    // path would leave a gap where the stem meets the leaves, because their
+    // outlines run in opposite directions and cancel out there.
+    Suit.clubs => Path.combine(
+      PathOperation.union,
       Path()
         ..addOval(
           Rect.fromCircle(center: const Offset(0.5, 0.27), radius: 0.22),
@@ -162,11 +166,13 @@ class _SuitPainter extends CustomPainter {
         )
         ..addOval(
           Rect.fromCircle(center: const Offset(0.74, 0.56), radius: 0.22),
-        )
-        ..moveTo(0.46, 0.5)
+        ),
+      Path()
+        ..moveTo(0.46, 0.38)
         ..cubicTo(0.45, 0.75, 0.40, 0.90, 0.30, 0.98)
         ..lineTo(0.70, 0.98)
-        ..cubicTo(0.60, 0.90, 0.55, 0.75, 0.54, 0.5)
+        ..cubicTo(0.60, 0.90, 0.55, 0.75, 0.54, 0.38)
         ..close(),
+    ),
   };
 }
