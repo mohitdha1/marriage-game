@@ -529,6 +529,109 @@ void main() {
       }
     }
 
+    group('Discarding a joker', () {
+      final sevenOfClubs = c(Suit.clubs, Rank.seven);
+      final dialog = find.byKey(const Key('joker-discard-dialog'));
+
+      /// Draws, shows the three runs and picks 7♥ as the tiplu, which makes
+      /// the 7♣ in hand a joker.
+      Future<void> seeTheJoker(WidgetTester tester) async {
+        await pumpTable(tester, yourHand: winnableHand);
+        final controller = controllerOf(tester)..draw(DrawSource.stock);
+        for (final run in [heartsRun, spadesRun, clubsRun]) {
+          select(tester, run);
+          controller.groupSelected();
+        }
+        controller
+          ..showGroups()
+          ..pickTiplu(1)
+          ..dismissReveal();
+        await tester.pump();
+      }
+
+      int idOf(WidgetTester tester, PlayingCard card) =>
+          stateOf(tester).hand.firstWhere((h) => h.card == card).id;
+
+      bool inHand(WidgetTester tester, PlayingCard card) =>
+          stateOf(tester).hand.any((h) => h.card == card);
+
+      testWidgets('tapping the pile with a joker selected asks first; Cancel '
+          'keeps it', (tester) async {
+        await seeTheJoker(tester);
+        select(tester, [sevenOfClubs]);
+        await tester.pump();
+
+        await tester.tap(find.byKey(const Key('discard-pile')));
+        await tester.pumpAndSettle();
+        expect(dialog, findsOneWidget);
+        expect(find.text('Discard a joker?'), findsOneWidget);
+        expect(find.textContaining('15-point penalty'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('joker-discard-cancel')));
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+        expect(inHand(tester, sevenOfClubs), isTrue);
+        expect(stateOf(tester).view.youHaveDrawn, isTrue, reason: 'no move');
+      });
+
+      testWidgets('flicking a joker asks first; Discard throws it away', (
+        tester,
+      ) async {
+        await seeTheJoker(tester);
+        // Moved to the end of the hand, where nothing covers it.
+        final controller = controllerOf(tester);
+        controller.moveCard(
+          idOf(tester, sevenOfClubs),
+          stateOf(tester).hand.length - 1,
+        );
+        await tester.pump();
+
+        await tester.fling(lastHandCard(tester), const Offset(0, -120), 1500);
+        await tester.pumpAndSettle();
+        expect(dialog, findsOneWidget);
+        expect(inHand(tester, sevenOfClubs), isTrue, reason: 'not yet');
+
+        await tester.tap(find.byKey(const Key('joker-discard-confirm')));
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+        expect(inHand(tester, sevenOfClubs), isFalse);
+      });
+
+      testWidgets('dragging a joker onto the pile asks too', (tester) async {
+        await seeTheJoker(tester);
+        controllerOf(
+          tester,
+        ).moveCard(idOf(tester, sevenOfClubs), stateOf(tester).hand.length - 1);
+        await tester.pump();
+
+        await dragBetween(
+          tester,
+          lastHandCard(tester),
+          find.byKey(const Key('discard-pile')),
+        );
+        expect(dialog, findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('joker-discard-cancel')));
+        await tester.pumpAndSettle();
+        expect(inHand(tester, sevenOfClubs), isTrue);
+      });
+
+      testWidgets('an ordinary card is discarded without asking', (
+        tester,
+      ) async {
+        await seeTheJoker(tester);
+        final king = c(Suit.spades, Rank.king);
+        select(tester, [king]);
+        await tester.pump();
+
+        await tester.tap(find.byKey(const Key('discard-pile')));
+        await tester.pumpAndSettle();
+
+        expect(dialog, findsNothing);
+        expect(inHand(tester, king), isFalse);
+      });
+    });
+
     testWidgets('draw, group, show, pick the tiplu, see it revealed, and win', (
       tester,
     ) async {

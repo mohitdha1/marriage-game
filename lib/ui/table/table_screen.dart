@@ -8,6 +8,7 @@ import '../../engine/card.dart';
 import '../../engine/hand_arrangement.dart';
 import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
+import '../../engine/scoring.dart';
 import '../../engine/table_event.dart';
 import '../scoreboard/scoreboard_screen.dart';
 import '../settings/settings.dart';
@@ -78,14 +79,60 @@ class _TableScreenState extends ConsumerState<TableScreen> {
 
   /// Discards [cardId], let go at [at] by a drag onto the pile or a flick.
   /// If a discard isn't allowed now, the controller says why and the card
-  /// glides back to its place in the hand.
-  void _discardReleased(int cardId, Offset at) {
+  /// glides back to its place in the hand; so it does if the card is a
+  /// joker and the player decides not to pay the penalty after all.
+  Future<void> _discardReleased(int cardId, Offset at) async {
+    if (!await _confirmDiscard(cardId)) {
+      _snapBack(cardId, at);
+      return;
+    }
+    if (!mounted) return;
     _releasedAt = at;
     unawaited(ref.read(tableProvider.notifier).discard(cardId));
     _releasedAt = null;
     if (ref.read(tableProvider).hand.any((c) => c.id == cardId)) {
       _snapBack(cardId, at);
     }
+  }
+
+  /// Taps on the discard pile: takes its card, or discards the selected
+  /// one, asking first if that would cost the joker penalty.
+  Future<void> _discardPileTapped() async {
+    final selected = ref.read(tableProvider).singleSelected;
+    if (selected != null && !await _confirmDiscard(selected.id)) return;
+    if (!mounted) return;
+    unawaited(ref.read(tableProvider.notifier).tapDiscardPile());
+  }
+
+  /// Whether to go ahead with discarding [cardId]: always, unless it would
+  /// cost the joker penalty and the player backs out when asked.
+  Future<bool> _confirmDiscard(int cardId) async {
+    final controller = ref.read(tableProvider.notifier);
+    if (!controller.discardCostsPenalty(cardId)) return true;
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const Key('joker-discard-dialog'),
+        title: const Text('Discard a joker?'),
+        content: const Text(
+          '${ScoringTable.jokerDiscardPenalty}-point penalty, paid to the '
+          'round\'s winner.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('joker-discard-cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const Key('joker-discard-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    return go ?? false;
   }
 
   /// Glides [cardId] from [from] back to its place in the hand, after a
@@ -382,7 +429,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                             discardKey: _anchors.discardPile,
                             cardWidth: cardWidth,
                             onStockTap: () => controller.draw(DrawSource.stock),
-                            onDiscardPileTap: controller.tapDiscardPile,
+                            onDiscardPileTap: _discardPileTapped,
                             onCardDropped: _discardReleased,
                           ),
                           const SizedBox(height: 6),

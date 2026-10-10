@@ -241,6 +241,22 @@ class TableController extends Notifier<TableState> {
     }
   }
 
+  /// Whether discarding the card with [cardId] now would cost the human
+  /// player the joker-discard penalty: it's their turn to discard, the
+  /// penalty is in play, they've seen the joker, and the card is wild.
+  bool discardCostsPenalty(int cardId) {
+    final view = state.view;
+    final jokers = view.yourJokers;
+    final card = _cardWithId(cardId);
+    return _round.config.jokerDiscardPenaltyEnabled &&
+        view.isYourTurn &&
+        view.youHaveDrawn &&
+        view.youHaveSeenJoker &&
+        jokers != null &&
+        card != null &&
+        jokers.isWild(card);
+  }
+
   /// Completes once any bots that are playing have finished their turns.
   Future<void> get botsSettled => _botsPlaying ?? Future.value();
 

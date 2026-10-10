@@ -49,6 +49,7 @@ ProviderContainer tableWith({
   List<PlayingCard>? discardPile,
   int? firstSeat,
   Duration thinkingTime = Duration.zero,
+  GameConfig? config,
 }) {
   final container = ProviderContainer(
     overrides: [
@@ -56,7 +57,7 @@ ProviderContainer tableWith({
       botThinkingTimeProvider.overrideWithValue(() => thinkingTime),
       roundFactoryProvider.overrideWithValue(
         (seat) => Round.fromCards(
-          config: GameConfig(playerCount: 2),
+          config: config ?? GameConfig(playerCount: 2),
           random: Random(0),
           hands: [yourHand ?? yourCards, botHand ?? idleBotCards],
           stock:
@@ -547,6 +548,82 @@ void main() {
 
       expect(container.table.view.youHaveSeenJoker, isTrue);
       expect(container.table.view.you.laidDown, pairs);
+    });
+  });
+
+  group('Joker discard penalty', () {
+    /// Draws Q♦, shows the three runs and picks 7♥ as the tiplu, which makes
+    /// the 7♣ still in hand a joker.
+    ProviderContainer seenTheJoker({GameConfig? config}) {
+      final container = tableWith(config: config)
+        ..controller.draw(DrawSource.stock)
+        ..group(heartsRun)
+        ..group(spadesRun)
+        ..group(clubsRun);
+      container.controller
+        ..showGroups()
+        ..pickTiplu(1)
+        ..dismissReveal();
+      return container;
+    }
+
+    final sevenOfClubs = c(Suit.clubs, Rank.seven);
+
+    test('discarding a joker after seeing it costs the penalty', () {
+      final container = seenTheJoker();
+
+      expect(
+        container.controller.discardCostsPenalty(container.idOf(sevenOfClubs)),
+        isTrue,
+      );
+    });
+
+    test('an ordinary card costs nothing', () {
+      final container = seenTheJoker();
+
+      expect(
+        container.controller.discardCostsPenalty(
+          container.idOf(c(Suit.spades, Rank.king)),
+        ),
+        isFalse,
+      );
+    });
+
+    test('nothing costs a penalty before the joker is seen', () {
+      final container = tableWith()..controller.draw(DrawSource.stock);
+
+      expect(
+        container.controller.discardCostsPenalty(container.idOf(sevenOfClubs)),
+        isFalse,
+      );
+    });
+
+    test('nothing costs a penalty when the house rule is off', () {
+      final container = seenTheJoker(
+        config: GameConfig(playerCount: 2, jokerDiscardPenaltyEnabled: false),
+      );
+
+      expect(
+        container.controller.discardCostsPenalty(container.idOf(sevenOfClubs)),
+        isFalse,
+      );
+    });
+
+    test('nothing costs a penalty outside the discard step', () async {
+      final container = seenTheJoker();
+      final joker = container.idOf(sevenOfClubs);
+      await container.controller.discard(
+        container.idOf(c(Suit.spades, Rank.king)),
+      );
+      // The bot has played; it's the start of the next turn, before drawing.
+      expect(container.table.view.isYourTurn, isTrue);
+      expect(container.table.view.youHaveDrawn, isFalse);
+
+      expect(container.controller.discardCostsPenalty(joker), isFalse);
+    });
+
+    test('an unknown card costs nothing', () {
+      expect(seenTheJoker().controller.discardCostsPenalty(-1), isFalse);
     });
   });
 
