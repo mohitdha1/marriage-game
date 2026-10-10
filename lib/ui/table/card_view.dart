@@ -1,14 +1,22 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../engine/card.dart';
 import '../theme/table_theme.dart';
+import 'card_face_art.dart';
 import 'suit_icon.dart';
 
 /// Width ÷ height of a standard playing card (2.5" × 3.5").
 const cardAspectRatio = 2.5 / 3.5;
 
-/// A face-up card: rank and suit in the corner, a large suit in the middle.
-/// Placeholder art until the Phase 3 card faces.
+/// A face-up card, laid out like a printed one: rank and suit in the top
+/// left corner and, upside down, the bottom right; the pips of a number
+/// card in their usual pattern; one large pip on an ace; and the court
+/// figure on a jack, queen or king.
+///
+/// The corner rank is large, because in an overlapping hand the top left
+/// corner is often all that shows of a card.
 class CardFace extends StatelessWidget {
   const CardFace(
     this.card, {
@@ -35,31 +43,21 @@ class CardFace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _isRed ? const Color(0xFFC62828) : const Color(0xFF212121);
+    final color = _isRed ? redSuitColor : const Color(0xFF1A1A1A);
+    final height = width / cardAspectRatio;
+    final index = _CornerIndex(card: card, width: width, color: color);
     final face = _CardShape(
       width: width,
-      color: Colors.white,
+      paper: true,
       highlighted: highlighted,
       child: Stack(
         children: [
+          _centre(width, height, color),
+          Positioned(left: width * 0.05, top: width * 0.05, child: index),
           Positioned(
-            left: width * 0.08,
-            top: width * 0.05,
-            child: Column(
-              children: [
-                Text(
-                  card.rank.label,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: width * 0.28,
-                    fontWeight: FontWeight.bold,
-                    height: 1,
-                  ),
-                ),
-                SizedBox(height: width * 0.03),
-                SuitIcon(card.suit, size: width * 0.2, color: color),
-              ],
-            ),
+            right: width * 0.05,
+            bottom: width * 0.05,
+            child: Transform.rotate(angle: pi, child: index),
           ),
           if (groupColor != null)
             Positioned(
@@ -69,12 +67,6 @@ class CardFace extends StatelessWidget {
               height: width * 0.07,
               child: ColoredBox(color: groupColor!),
             ),
-          Center(
-            child: Padding(
-              padding: EdgeInsets.only(top: width * 0.25),
-              child: SuitIcon(card.suit, size: width * 0.42, color: color),
-            ),
-          ),
         ],
       ),
     );
@@ -82,6 +74,88 @@ class CardFace extends StatelessWidget {
       label: wild ? '$card, joker' : card.toString(),
       excludeSemantics: true,
       child: wild ? JokerGlow(width: width, child: face) : face,
+    );
+  }
+
+  /// The middle of the card, between the corner indexes.
+  Widget _centre(double width, double height, Color color) {
+    if (card.rank == Rank.ace) {
+      return Center(
+        child: SuitIcon(card.suit, size: width * 0.5, color: color),
+      );
+    }
+    if (isCourt(card.rank)) {
+      return Center(
+        child: SizedBox(
+          key: const Key('court-art'),
+          // Narrow enough to leave the corner indexes clear.
+          width: width * 0.5,
+          child: Image.asset(
+            courtArtAsset(card),
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
+          ),
+        ),
+      );
+    }
+    return Positioned.fromRect(
+      rect: Rect.fromLTRB(
+        width * 0.36,
+        height * 0.2,
+        width * 0.64,
+        height * 0.8,
+      ),
+      child: CustomPaint(
+        key: const Key('pips'),
+        painter: PipPainter(
+          suit: card.suit,
+          pips: pipLayout(card.rank),
+          pipSize: width * 0.14,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+/// A card's rank above its suit, kept within the narrow strip beside the
+/// pips: a wide rank such as 10 shrinks to fit.
+class _CornerIndex extends StatelessWidget {
+  const _CornerIndex({
+    required this.card,
+    required this.width,
+    required this.color,
+  });
+
+  final PlayingCard card;
+  final double width;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width * 0.2,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              card.rank.label,
+              maxLines: 1,
+              style: TextStyle(
+                color: color,
+                fontSize: width * 0.28,
+                fontWeight: FontWeight.w800,
+                height: 1,
+                letterSpacing: -width * 0.02,
+              ),
+            ),
+          ),
+          SizedBox(height: width * 0.02),
+          SuitIcon(card.suit, size: width * 0.17, color: color),
+        ],
+      ),
     );
   }
 }
@@ -166,7 +240,7 @@ class CardBack extends StatelessWidget {
     final theme = TableTheme.of(context);
     return _CardShape(
       width: width,
-      color: theme.cardBackEdge,
+      edge: theme.cardBackEdge,
       child: Padding(
         padding: EdgeInsets.all(width * 0.08),
         child: DecoratedBox(
@@ -206,19 +280,30 @@ class CardSlot extends StatelessWidget {
   }
 }
 
-/// The rounded, shadowed rectangle every card is drawn on.
+/// The rounded, shadowed rectangle every card is drawn on: card stock with
+/// a faint sheen for a face ([paper]), or a solid [edge] colour for a back.
 class _CardShape extends StatelessWidget {
   const _CardShape({
     required this.width,
-    required this.color,
     required this.child,
+    this.paper = false,
+    this.edge = Colors.white,
     this.highlighted = false,
   });
 
   final double width;
-  final Color color;
   final Widget child;
+  final bool paper;
+  final Color edge;
   final bool highlighted;
+
+  /// Card stock: bright white where the light catches it, a touch warmer
+  /// towards the far corner.
+  static const _paper = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFFFFFFF), Color(0xFFFAF8F3), Color(0xFFF1EDE4)],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -226,16 +311,22 @@ class _CardShape extends StatelessWidget {
       width: width,
       height: width / cardAspectRatio,
       decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(width * 0.1),
+        color: paper ? null : edge,
+        gradient: paper ? _paper : null,
+        borderRadius: BorderRadius.circular(width * 0.08),
         border: highlighted
             ? Border.all(color: const Color(0xFFFFC107), width: 2.5)
-            : Border.all(color: const Color(0x33000000)),
+            : Border.all(color: const Color(0x38000000), width: 0.8),
         boxShadow: const [
           BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 1,
+            offset: Offset(0, 0.5),
+          ),
+          BoxShadow(
             color: Color(0x40000000),
-            blurRadius: 3,
-            offset: Offset(1, 2),
+            blurRadius: 5,
+            offset: Offset(1, 3),
           ),
         ],
       ),

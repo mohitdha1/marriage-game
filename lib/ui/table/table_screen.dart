@@ -15,6 +15,7 @@ import '../state/table_controller.dart';
 import '../state/table_state.dart';
 import '../state/table_view.dart';
 import '../theme/table_theme.dart';
+import 'card_face_art.dart';
 import 'card_flights.dart';
 import 'card_view.dart';
 import 'hand_fan.dart';
@@ -77,6 +78,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
     // The first round was dealt before the screen opened.
     if (_firstDealShown) return;
     _firstDealShown = true;
+    precacheCourtArt(context);
     if (!_reduceMotion) _deal(ref.read(tableProvider));
   }
 

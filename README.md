@@ -82,3 +82,15 @@ flutter test test/engine     # just the rules engine
 flutter test test/console    # just the console game
 flutter analyze              # static analysis
 ```
+
+## Credits
+
+- **Court card figures** (the jacks, queens and kings in
+  `assets/cards/court/`) come from
+  [Vector Playing Cards](https://github.com/notpeter/Vector-Playing-Cards),
+  originally drawn by [Byron Knoll](http://www.byronknoll.com/). They are
+  released into the public domain, or under the
+  [WTFPL](http://www.wtfpl.net/) where public domain isn't recognised, and
+  may be used in commercial software. The figure panels were cropped from
+  the SVGs and resized; everything else on the cards is drawn in Flutter.
+- **Sound effects** are synthesised by `tool/generate_sounds.dart`.
