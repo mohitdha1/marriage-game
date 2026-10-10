@@ -1,4 +1,4 @@
-package com.example.marriage_game
+package io.github.mohitdha1.marriage
 
 import io.flutter.embedding.android.FlutterActivity
 

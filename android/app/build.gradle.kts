@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.marriage_game"
+    namespace = "io.github.mohitdha1.marriage"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,8 +20,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.marriage_game"
+        // Permanent once on Google Play: based on the GitHub account.
+        applicationId = "io.github.mohitdha1.marriage"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
