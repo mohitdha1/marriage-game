@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../state/table_view.dart';
 import 'card_view.dart';
+import 'suit_icon.dart';
 
 /// An opponent at the table: avatar beside their name, how many cards they
 /// hold, and whether they've seen the joker. Laid out in a row to stay short,
@@ -94,7 +95,7 @@ class OpponentSeat extends StatelessWidget {
               if (lastMove != null)
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 140),
-                  child: Text(
+                  child: SuitText(
                     lastMove!,
                     key: Key('last-move-${seat.seat}'),
                     maxLines: 1,

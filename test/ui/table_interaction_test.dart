@@ -16,6 +16,7 @@ import 'package:marriage_game/ui/table/hand_fan.dart';
 import 'package:marriage_game/ui/table/joker_reveal.dart';
 import 'package:marriage_game/ui/table/opening_picker.dart';
 import 'package:marriage_game/ui/table/opponent_seat.dart';
+import 'package:marriage_game/ui/table/suit_icon.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
 import 'package:marriage_game/ui/table/tiplu_picker.dart';
 
@@ -332,7 +333,10 @@ void main() {
       // The reveal flips the tiplu over.
       expect(find.byType(JokerReveal), findsOneWidget);
       await tester.pumpAndSettle();
-      expect(find.text('The joker is 7♥'), findsOneWidget);
+      expect(
+        tester.widget<SuitText>(find.byKey(const Key('reveal-title'))).text,
+        'The joker is 7♥',
+      );
       await tester.tap(find.text('Got it'));
       await tester.pump();
       expect(find.byType(JokerReveal), findsNothing);

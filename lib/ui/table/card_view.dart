@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../engine/card.dart';
+import 'suit_icon.dart';
 
 /// Width ÷ height of a standard playing card (2.5" × 3.5").
 const cardAspectRatio = 2.5 / 3.5;
@@ -57,14 +58,8 @@ class CardFace extends StatelessWidget {
                       height: 1,
                     ),
                   ),
-                  Text(
-                    card.suit.symbol,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: width * 0.24,
-                      height: 1,
-                    ),
-                  ),
+                  SizedBox(height: width * 0.03),
+                  SuitIcon(card.suit, size: width * 0.2, color: color),
                 ],
               ),
             ),
@@ -101,10 +96,7 @@ class CardFace extends StatelessWidget {
             Center(
               child: Padding(
                 padding: EdgeInsets.only(top: width * 0.25),
-                child: Text(
-                  card.suit.symbol,
-                  style: TextStyle(color: color, fontSize: width * 0.5),
-                ),
+                child: SuitIcon(card.suit, size: width * 0.42, color: color),
               ),
             ),
           ],

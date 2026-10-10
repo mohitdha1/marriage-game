@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../engine/joker.dart';
 import 'card_view.dart';
+import 'suit_icon.dart';
 
 /// The moment the human player sees the joker: the tiplu flips face up, with
 /// a banner naming the cards that are now wild.
@@ -60,16 +61,18 @@ class _JokerRevealState extends State<JokerReveal>
               },
             ),
             const SizedBox(height: 12),
-            Text(
+            SuitText(
               'The joker is ${jokers.tiplu}',
               key: const Key('reveal-title'),
+              redColor: redSuitColor,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 4),
-            Text(
+            SuitText(
               'Jhiplu ${jokers.jhiplu} · Poplu ${jokers.poplu} · '
               'Alter ${jokers.alter} · every ${jokers.tiplu.rank.label} is '
               'wild',
+              redColor: redSuitColor,
             ),
             const SizedBox(height: 12),
             FilledButton(onPressed: widget.onDone, child: const Text('Got it')),

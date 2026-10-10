@@ -13,6 +13,7 @@ import 'hand_fan.dart';
 import 'joker_reveal.dart';
 import 'opening_picker.dart';
 import 'opponent_seat.dart';
+import 'suit_icon.dart';
 import 'table_center.dart';
 import 'tiplu_picker.dart';
 
@@ -56,7 +57,7 @@ class TableScreen extends ConsumerWidget {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: Text(notice),
+            content: SuitText(notice),
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
           ),
