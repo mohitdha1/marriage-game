@@ -149,6 +149,7 @@ class RoundScore {
     List<int>? maalShares,
     List<int>? winnerPayments,
     List<bool>? sawJoker,
+    this.wonWithDoublees = false,
   }) : penalties = penalties ?? List.filled(net.length, 0),
        maalShares = maalShares ?? List.filled(net.length, 0),
        winnerPayments = winnerPayments ?? List.filled(net.length, 0),
@@ -178,6 +179,10 @@ class RoundScore {
 
   /// Whether each player had seen the joker when the round ended.
   final List<bool> sawJoker;
+
+  /// Whether the winner showed doublees, which earns them
+  /// [ScoringTable.dubleeWinBonus] extra from every other player.
+  final bool wonWithDoublees;
 
   /// [penalties] as transfers: negative for each player who paid, and the
   /// total collected (positive) for the winner.
@@ -262,6 +267,7 @@ RoundScore scoreRound({
     maalShares: maalShares,
     winnerPayments: winnerPayments,
     sawJoker: [for (final hand in hands) hand.hasSeenJoker],
+    wonWithDoublees: dubleeWin,
   );
 }
 

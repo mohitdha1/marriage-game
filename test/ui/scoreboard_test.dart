@@ -164,6 +164,24 @@ void main() {
     ]);
   });
 
+  testWidgets('a doublee win says so, explaining the bigger payments', (
+    tester,
+  ) async {
+    // Jack wins with doublees: everyone pays the usual 3 or 10, plus 5.
+    final dubleeRound = RoundScore(
+      winner: 2,
+      maal: const [MaalBreakdown(), MaalBreakdown(), MaalBreakdown()],
+      maalShares: const [0, 0, 0],
+      winnerPayments: const [-8, -8, 16],
+      sawJoker: const [true, true, true],
+      wonWithDoublees: true,
+      net: const [-8, -8, 16],
+    );
+    await openScoreboard(tester, stateWith([dubleeRound]));
+
+    expect(find.text('Round 1: Jack won with doublees'), findsOneWidget);
+  });
+
   testWidgets('match totals show every round and mark the leader', (
     tester,
   ) async {

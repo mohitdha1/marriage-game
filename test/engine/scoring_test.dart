@@ -307,6 +307,7 @@ void main() {
 
       // No maal anywhere: seen pays 3 + 5, unseen pays 10 + 5.
       expect(result.net, [8 + 15, -8, -15]);
+      expect(result.wonWithDoublees, isTrue);
     });
 
     test('each joker discarded after seeing costs 15, paid to the winner', () {
@@ -389,6 +390,7 @@ void main() {
       expect(result.winnerPayments, [13, -3, -10]);
       expect(result.penaltyTransfers, [15, -15, 0]);
       expect(result.sawJoker, [true, true, false]);
+      expect(result.wonWithDoublees, isFalse);
       for (var seat = 0; seat < 3; seat++) {
         expect(
           result.net[seat],

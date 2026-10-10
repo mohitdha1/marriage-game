@@ -70,7 +70,8 @@ class _ScoreboardScreenState extends ConsumerState<ScoreboardScreen> {
                   const SizedBox(height: 8),
                   Text(
                     'Round ${shown + 1}: '
-                    '${state.seatNames[rounds[shown].winner]} won',
+                    '${state.seatNames[rounds[shown].winner]} won'
+                    '${rounds[shown].wonWithDoublees ? ' with doublees' : ''}',
                     key: const Key('round-title'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
