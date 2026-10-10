@@ -13,6 +13,7 @@ import 'package:marriage_game/ui/settings/settings.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
+import 'package:marriage_game/ui/theme/table_theme.dart';
 
 Future<ProviderContainer> pumpHome(
   WidgetTester tester, {
@@ -121,6 +122,49 @@ void main() {
     expect(settings.vibration, isFalse);
     expect(settings.handHelper, isFalse);
     expect(find.text('Sound off'), findsOneWidget);
+  });
+
+  testWidgets('the settings popover picks the table theme, and the screen '
+      'behind it changes straight away', (tester) async {
+    final container = await pumpHome(tester);
+    await tester.tap(find.byKey(const Key('settings-button')));
+    await tester.pumpAndSettle();
+
+    // Classic is chosen to start with.
+    expect(
+      tester.getSemantics(find.byKey(const Key('theme-classic'))),
+      isSemantics(
+        label: 'Classic table',
+        isButton: true,
+        hasSelectedState: true,
+        isSelected: true,
+        hasTapAction: true,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('theme-midnight')));
+    await tester.pumpAndSettle();
+
+    expect(container.read(settingsProvider).tableTheme, TableThemeId.midnight);
+    // The popover stays open, so the themes can be compared.
+    expect(find.byKey(const Key('settings-popover')), findsOneWidget);
+    final home = tester.element(find.byType(HomeScreen));
+    expect(TableTheme.of(home).felt, TableTheme.midnight.felt);
+  });
+
+  testWidgets('the settings popover fits a small phone', (tester) async {
+    await pumpHome(tester);
+    tester.view.physicalSize = const Size(667, 375);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('settings-button')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    // Scrolled to if needed, every theme can be tapped.
+    await tester.ensureVisible(find.byKey(const Key('theme-dashain')));
+    await tester.tap(find.byKey(const Key('theme-dashain')));
+    await tester.pump();
+    expect(find.byKey(const Key('theme-dashain')), findsOneWidget);
   });
 
   testWidgets('Profile changes the name and avatar colour', (tester) async {

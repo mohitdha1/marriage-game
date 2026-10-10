@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../table/card_view.dart';
+import '../theme/table_theme.dart';
 import 'how_to_play_screen.dart';
 import 'profile_dialog.dart';
 import 'settings.dart';
 
 /// Opens the settings as a popover under the top-right corner: tiles for
-/// sound, vibration and the hand helper that switch on and off, and tiles
-/// that open the profile and the rules.
+/// sound, vibration and the hand helper that switch on and off, tiles that
+/// open the profile and the rules, and a choice of table theme.
 Future<void> showSettingsPopover(BuildContext context) {
   return showGeneralDialog<void>(
     context: context,
@@ -38,58 +40,155 @@ class _SettingsPopover extends ConsumerWidget {
       key: const Key('settings-popover'),
       color: const Color(0xF2263238),
       borderRadius: BorderRadius.circular(18),
-      child: Padding(
+      // Scrolls if a short screen can't fit it all.
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(10),
         child: SizedBox(
           width: 330,
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SettingTile(
-                key: const Key('setting-sound'),
-                label: 'Sound',
-                icon: settings.sound ? Icons.volume_up : Icons.volume_off,
-                on: settings.sound,
-                onTap: () => controller.setSound(!settings.sound),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _SettingTile(
+                    key: const Key('setting-sound'),
+                    label: 'Sound',
+                    icon: settings.sound ? Icons.volume_up : Icons.volume_off,
+                    on: settings.sound,
+                    onTap: () => controller.setSound(!settings.sound),
+                  ),
+                  _SettingTile(
+                    key: const Key('setting-vibration'),
+                    label: 'Vibration',
+                    icon: settings.vibration
+                        ? Icons.vibration
+                        : Icons.phonelink_erase,
+                    on: settings.vibration,
+                    onTap: () => controller.setVibration(!settings.vibration),
+                  ),
+                  _SettingTile(
+                    key: const Key('setting-hand-helper'),
+                    label: 'Hand helper',
+                    icon: Icons.lightbulb_outline,
+                    on: settings.handHelper,
+                    onTap: () => controller.setHandHelper(!settings.handHelper),
+                  ),
+                  _SettingTile(
+                    key: const Key('setting-profile'),
+                    label: 'Profile',
+                    icon: Icons.person_outline,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      showProfileDialog(context);
+                    },
+                  ),
+                  _SettingTile(
+                    key: const Key('setting-how-to-play'),
+                    label: 'How to play',
+                    icon: Icons.menu_book_outlined,
+                    onTap: () {
+                      final navigator = Navigator.of(context)..pop();
+                      navigator.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const HowToPlayScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
-              _SettingTile(
-                key: const Key('setting-vibration'),
-                label: 'Vibration',
-                icon: settings.vibration
-                    ? Icons.vibration
-                    : Icons.phonelink_erase,
-                on: settings.vibration,
-                onTap: () => controller.setVibration(!settings.vibration),
+              const SizedBox(height: 12),
+              const Text(
+                'Table theme',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              _SettingTile(
-                key: const Key('setting-hand-helper'),
-                label: 'Hand helper',
-                icon: Icons.lightbulb_outline,
-                on: settings.handHelper,
-                onTap: () => controller.setHandHelper(!settings.handHelper),
-              ),
-              _SettingTile(
-                key: const Key('setting-profile'),
-                label: 'Profile',
-                icon: Icons.person_outline,
-                onTap: () {
-                  Navigator.of(context).pop();
-                  showProfileDialog(context);
-                },
-              ),
-              _SettingTile(
-                key: const Key('setting-how-to-play'),
-                label: 'How to play',
-                icon: Icons.menu_book_outlined,
-                onTap: () {
-                  final navigator = Navigator.of(context)..pop();
-                  navigator.push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const HowToPlayScreen(),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  for (final (i, theme) in TableThemeId.values.indexed) ...[
+                    if (i > 0) const SizedBox(width: 8),
+                    _ThemeSwatch(
+                      theme: theme,
+                      chosen: settings.tableTheme == theme,
+                      onTap: () => controller.setTableTheme(theme),
                     ),
-                  );
-                },
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small preview of a table theme: its felt with a card back on it, and
+/// its name. The chosen theme is outlined in its highlight colour.
+class _ThemeSwatch extends StatelessWidget {
+  const _ThemeSwatch({
+    required this.theme,
+    required this.chosen,
+    required this.onTap,
+  });
+
+  final TableThemeId theme;
+  final bool chosen;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = theme.theme;
+    return Semantics(
+      selected: chosen,
+      button: true,
+      label: '${theme.label} table',
+      onTap: onTap,
+      // One clear label, rather than the label plus the name shown inside.
+      excludeSemantics: true,
+      child: GestureDetector(
+        key: Key('theme-${theme.name}'),
+        onTap: onTap,
+        child: Container(
+          width: 98,
+          height: 56,
+          decoration: look.feltDecoration.copyWith(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: chosen ? look.accent : const Color(0x33FFFFFF),
+              width: chosen ? 2.5 : 1,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              // The card back in the theme's own colours, whichever theme
+              // is showing now.
+              Theme(
+                data: Theme.of(context).copyWith(extensions: [look]),
+                child: const CardBack(width: 22),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    theme.label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
