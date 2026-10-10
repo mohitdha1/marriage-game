@@ -29,7 +29,7 @@ class Settings {
   /// Whether the game plays sound effects.
   final bool sound;
 
-  /// Whether the game may vibrate. Saved now; haptics arrive in Phase 3.
+  /// Whether the game may vibrate: on the player's turn and when they win.
   final bool vibration;
 
   /// Whether the table shows the hand helper badge: progress toward showing

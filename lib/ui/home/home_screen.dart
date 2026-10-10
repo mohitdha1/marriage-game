@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/card.dart';
+import '../haptics/table_haptics.dart';
 import '../settings/profile_dialog.dart';
 import '../settings/settings.dart';
 import '../settings/settings_popover.dart';
@@ -12,10 +13,12 @@ import '../table/table_screen.dart';
 import '../theme/table_felt.dart';
 import 'coins.dart';
 import 'player_avatar.dart';
-
-/// The table for a game against bots, with its sounds, asking before the
+/// The table for a game against bots, with its sounds and vibration, asking
+/// before the back gesture leaves a round in progress.
 /// back gesture leaves a round in progress.
-const singlePlayerTable = TableSounds(child: LeaveGuard(child: TableScreen()));
+const singlePlayerTable = TableSounds(
+  child: TableHaptics(child: LeaveGuard(child: TableScreen())),
+);
 
 /// The first screen: the player's avatar, name and coins along the top, a
 /// settings gear, and a large tile for each way to play.
