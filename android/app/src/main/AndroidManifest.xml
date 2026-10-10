@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Games with friends over Wi-Fi or a hotspot talk across the local
+         network; nothing is sent to the internet. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="Marriage"
         android:name="${applicationName}"

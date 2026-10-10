@@ -26,7 +26,10 @@ class RemoteTableController extends TableNotifier {
   TableState build() {
     _host = ref.watch(remoteSessionProvider)!;
     _last = _host.latest!;
-    final listening = _host.messages.listen(_onMessage);
+    final listening = _host.messages.listen(
+      _onMessage,
+      onDone: () => postNotice('Lost the connection to the host.'),
+    );
     ref.onDispose(listening.cancel);
     return _stateFor(_last, previous: null);
   }

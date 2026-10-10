@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/card.dart';
 import '../haptics/table_haptics.dart';
+import '../lobby/host_lobby_screen.dart';
+import '../lobby/join_screen.dart';
+import '../lobby/play_with_friends.dart';
 import '../settings/profile_dialog.dart';
 import '../settings/settings.dart';
 import '../settings/settings_popover.dart';
@@ -104,24 +107,13 @@ class HomeScreen extends ConsumerWidget {
                                   _ModeTile(
                                     key: const Key('friends'),
                                     title: 'Play with Friends',
-                                    subtitle: 'Pass and play on this device',
+                                    subtitle: 'On this device, or over Wi-Fi',
                                     icon: Icons.groups_outlined,
                                     colors: const [
                                       Color(0xFF7E57C2),
                                       Color(0xFF3949AB),
                                     ],
-                                    onTap: () async {
-                                      final names = await showPassAndPlaySetup(
-                                        context,
-                                      );
-                                      if (names != null && context.mounted) {
-                                        _startMatch(
-                                          context,
-                                          ref,
-                                          MatchSetup.passAndPlay(names),
-                                        );
-                                      }
-                                    },
+                                    onTap: () => _playWithFriends(context, ref),
                                   ),
                                 ],
                               ),
@@ -145,6 +137,27 @@ class HomeScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Asks how to play with friends, then sets that up.
+  Future<void> _playWithFriends(BuildContext context, WidgetRef ref) async {
+    final mode = await showPlayWithFriends(context);
+    if (mode == null || !context.mounted) return;
+    switch (mode) {
+      case FriendsMode.passAndPlay:
+        final names = await showPassAndPlaySetup(context);
+        if (names != null && context.mounted) {
+          _startMatch(context, ref, MatchSetup.passAndPlay(names));
+        }
+      case FriendsMode.host:
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const HostLobbyScreen()),
+        );
+      case FriendsMode.join:
+        await Navigator.of(
+          context,
+        ).push(MaterialPageRoute<void>(builder: (_) => const JoinScreen()));
+    }
   }
 
   /// Opens a fresh match with [setup].

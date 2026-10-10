@@ -213,6 +213,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('friends')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('friends-passAndPlay')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('pass-and-play-setup')), findsOneWidget);
     expect(
       tester
@@ -246,6 +248,8 @@ void main() {
       await tester.pump();
 
       await tester.tap(find.byKey(const Key('friends')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('friends-passAndPlay')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('people-5')));
       await tester.pumpAndSettle();

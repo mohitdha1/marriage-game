@@ -18,6 +18,31 @@ class Guest {
   StreamSubscription<WireMessage>? _lobbyListening;
 }
 
+/// A game's lobby on the host's device: who has joined, the table's size,
+/// and handing the guests over when the game starts.
+abstract interface class Lobby {
+  /// The host's name.
+  String get hostName;
+
+  /// Everyone at the table so far, the host first.
+  List<String> get names;
+
+  /// The table's size, including the host.
+  int get seats;
+
+  /// The names at the table, each time someone joins or leaves.
+  Stream<List<String>> get changes;
+
+  /// Changes the table's size, if everyone who has joined still fits.
+  void resize(int seats);
+
+  /// Closes the lobby to newcomers and hands over the guests by seat.
+  Map<int, Guest> start();
+
+  /// Shuts the lobby and every link to it.
+  Future<void> close();
+}
+
 /// Hosts a game on this device for players on others on the same network:
 /// takes them into the lobby as they join, tells everyone who's there, and
 /// hands them over as the game starts.
@@ -25,7 +50,7 @@ class Guest {
 /// The host is seat 0; guests take the next seats in the order they join.
 /// Anyone joining once the table is full or the game has started is turned
 /// away, and someone who leaves the lobby frees their place.
-class GameHost {
+class GameHost implements Lobby {
   GameHost._(this._server, this.hostName, this._seats);
 
   /// Opens the lobby on [port] at [address] (every network the device is
@@ -46,6 +71,7 @@ class GameHost {
   }
 
   final HttpServer _server;
+  @override
   final String hostName;
   int _seats;
   final _guests = <Guest>[];
@@ -56,16 +82,16 @@ class GameHost {
   /// The port the lobby is open on.
   int get port => _server.port;
 
-  /// Everyone at the table so far, the host first.
+  @override
   List<String> get names => [hostName, for (final guest in _guests) guest.name];
 
-  /// The table's size, including the host.
+  @override
   int get seats => _seats;
 
-  /// The names at the table, each time someone joins or leaves.
+  @override
   Stream<List<String>> get changes => _changes.stream;
 
-  /// Changes the table's size, if everyone who has joined still fits.
+  @override
   void resize(int seats) {
     if (seats < _guests.length + 1) return;
     _seats = seats;
@@ -139,8 +165,7 @@ class GameHost {
     _changes.add(names);
   }
 
-  /// Closes the lobby and hands over the guests by seat, for the game to
-  /// begin. Nobody else can join from now on.
+  @override
   Map<int, Guest> start() {
     _started = true;
     for (final guest in _guests) {
@@ -149,7 +174,7 @@ class GameHost {
     return {for (final (i, guest) in _guests.indexed) i + 1: guest};
   }
 
-  /// Shuts the lobby and every link to it.
+  @override
   Future<void> close() async {
     _closing = true;
     for (final guest in [..._guests]) {
