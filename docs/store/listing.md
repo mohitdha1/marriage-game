@@ -46,6 +46,11 @@ computer players who think like real opponents.
 - Cards that deal, slide and land, and a celebration when you win
 - Sounds and gentle vibration on your turn, all switchable
 
+**Play with friends**
+- Pass and play: 2 to 5 people share one phone or tablet
+- The table hides your cards while the phone changes hands, and shows
+  what everyone did since your last turn
+
 Quick Play starts a full table in one tap; Single Player lets you choose the
 players and the bots. Coins are just for fun: you can't buy them and they
 can't be cashed out.
@@ -61,10 +66,11 @@ can't be cashed out.
 |---|---|---|
 | App icon | `assets/branding/icon.png` | 1024 × 1024 (Play wants 512 × 512; scale it down) |
 | Feature graphic | `docs/store/feature-graphic.jpg` | 1024 × 500 |
-| Phone screenshots | `docs/store/screenshots/1-home.jpg` … `6-scores.jpg` | 1920 × 1080 |
+| Phone screenshots | `docs/store/screenshots/1-home.jpg` … `7-pass.jpg` | 1920 × 1080 |
 
 Screenshots, in order: the home screen, a full table, the Dashain table, the
-game setup, winning a round, and the scoreboard.
+game setup, winning a round, the scoreboard, and passing the device between
+friends.
 
 ## Content rating notes
 

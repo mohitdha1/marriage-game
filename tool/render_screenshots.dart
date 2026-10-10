@@ -5,6 +5,7 @@
 //
 // Run from the project folder:  flutter test tool/render_screenshots.dart
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
@@ -48,7 +49,12 @@ Future<void> pumpApp(
       child: ProviderScope(
         overrides: [
           preferencesProvider.overrideWithValue(
-            InMemoryPreferences({'profile.name': 'Mohit', ...saved}),
+            // A returning player: the first-time guide's tips are done.
+            InMemoryPreferences({
+              'profile.name': 'Mohit',
+              'guide.done': 'draw,discard,sets,joker',
+              ...saved,
+            }),
           ),
           botThinkingTimeProvider.overrideWithValue(
             () => const Duration(days: 1),
@@ -180,6 +186,28 @@ void main() {
     await shoot(tester, '4-setup');
   });
 
+  testWidgets('passing the device between friends', (tester) async {
+    atPhoneSize(tester);
+    await pumpApp(
+      tester,
+      home: singlePlayerTable,
+      overrides: [
+        randomProvider.overrideWithValue(Random(5)),
+        matchSetupProvider.overrideWith(_ThreeFriends.new),
+      ],
+    );
+    await play(tester, const Duration(seconds: 2));
+    final controller = controllerOf(tester)
+      ..takeOver()
+      ..draw(DrawSource.stock);
+    final hand = ProviderScope.containerOf(
+      tester.element(find.byType(TableScreen)),
+    ).read(tableProvider).hand;
+    unawaited(controller.discard(hand.last.id));
+    await play(tester, const Duration(seconds: 1));
+    await shoot(tester, '7-pass');
+  });
+
   testWidgets('winning and the scores', (tester) async {
     atPhoneSize(tester);
     final hearts = run(Suit.hearts, [Rank.three, Rank.four, Rank.five]);
@@ -252,4 +280,10 @@ void main() {
     await play(tester, scoreboardDelay + const Duration(seconds: 1));
     await shoot(tester, '6-scores');
   });
+}
+
+/// Three friends passing the device round.
+class _ThreeFriends extends MatchSetupController {
+  @override
+  MatchSetup build() => MatchSetup.passAndPlay(['Mohit', 'Bina', 'Chandra']);
 }
