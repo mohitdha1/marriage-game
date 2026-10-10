@@ -20,8 +20,12 @@ The game is built in phases (see [`docs/roadmap.md`](docs/roadmap.md)):
   screen is playable against bots at three difficulty levels: draw, discard,
   group and show sets, see the joker, win, and follow the scores round by
   round, with sound effects.
-- **Phase 3, polish, is in progress.** Cards are dealt and fly between the
-  piles and hands, and the winner is celebrated.
+- **Phase 3, polish, is nearly done.** Printed-style cards with classic
+  court figures, three table themes with textured felt and a wooden rim,
+  animated dealing, draws and discards, a win celebration, sounds and
+  vibration, drag-up and flick discarding, Quick Play and a custom game
+  setup, an app icon and splash screen, and a draft store listing. A
+  playtest with friends and family comes next.
 
 ### How the code is organised
 
