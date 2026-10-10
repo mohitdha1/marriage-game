@@ -35,10 +35,12 @@ class TableTheme extends ThemeExtension<TableTheme> {
     required this.cardBackEdge,
     required this.accent,
     required this.seed,
+    required this.wood,
+    this.inlay,
     this.motif = 0,
   });
 
-  /// Green baize under warm light, with a red-backed deck.
+  /// Green baize in a walnut rim, under warm light, with a red-backed deck.
   static const classic = TableTheme(
     felt: [Color(0xFF2E7D32), Color(0xFF1B5E20), Color(0xFF0D3B12)],
     panel: Color(0xCC0D3B12),
@@ -46,9 +48,11 @@ class TableTheme extends ThemeExtension<TableTheme> {
     cardBackEdge: Color(0xFF8E1B1B),
     accent: Color(0xFFFFD54F),
     seed: Color(0xFF1B5E20),
+    wood: [Color(0xFF8D5A3B), Color(0xFF6B4226), Color(0xFF3E2414)],
   );
 
-  /// A dark slate table with a navy deck and cool teal highlights.
+  /// A dark slate table in an ebony rim, with a navy deck and cool teal
+  /// highlights.
   static const midnight = TableTheme(
     felt: [Color(0xFF37474F), Color(0xFF232E35), Color(0xFF11181C)],
     panel: Color(0xCC11181C),
@@ -56,10 +60,11 @@ class TableTheme extends ThemeExtension<TableTheme> {
     cardBackEdge: Color(0xFF123761),
     accent: Color(0xFF4DD0E1),
     seed: Color(0xFF37474F),
+    wood: [Color(0xFF4A4038), Color(0xFF2B2420), Color(0xFF141110)],
   );
 
-  /// Festival colours: a deep red table scattered with faint kites, and a
-  /// marigold deck.
+  /// Festival colours: a deep red table scattered with faint kites, in a
+  /// rosewood rim with a gold inlay, and a marigold deck.
   static const dashain = TableTheme(
     felt: [Color(0xFF9C2A2A), Color(0xFF6E1A22), Color(0xFF3E0C14)],
     panel: Color(0xCC3E0C14),
@@ -67,6 +72,8 @@ class TableTheme extends ThemeExtension<TableTheme> {
     cardBackEdge: Color(0xFFBF5B00),
     accent: Color(0xFFFFCA28),
     seed: Color(0xFF9C2A2A),
+    wood: [Color(0xFF9A4A35), Color(0xFF6E2C20), Color(0xFF3D1510)],
+    inlay: Color(0xFFE0B04A),
     motif: 1,
   );
 
@@ -79,7 +86,7 @@ class TableTheme extends ThemeExtension<TableTheme> {
   /// The face-down card's gradient, top left to bottom right.
   final List<Color> cardBack;
 
-  /// The border round a face-down card.
+  /// The darker colour a face-down card's pattern is printed in.
   final Color cardBackEdge;
 
   /// Highlights: whose turn it is, and selected things.
@@ -87,6 +94,13 @@ class TableTheme extends ThemeExtension<TableTheme> {
 
   /// The colour Material's own widgets (buttons, dialogs) are derived from.
   final Color seed;
+
+  /// The table's wooden rim, light to dark: where the light catches it,
+  /// its body, and its grain and shadows.
+  final List<Color> wood;
+
+  /// A thin line set into the middle of the rim, if the theme has one.
+  final Color? inlay;
 
   /// How strongly the theme's kite pattern shows on the felt, from 0 (no
   /// pattern) to 1.
@@ -108,6 +122,8 @@ class TableTheme extends ThemeExtension<TableTheme> {
     Color? cardBackEdge,
     Color? accent,
     Color? seed,
+    List<Color>? wood,
+    Color? inlay,
     double? motif,
   }) => TableTheme(
     felt: felt ?? this.felt,
@@ -116,6 +132,8 @@ class TableTheme extends ThemeExtension<TableTheme> {
     cardBackEdge: cardBackEdge ?? this.cardBackEdge,
     accent: accent ?? this.accent,
     seed: seed ?? this.seed,
+    wood: wood ?? this.wood,
+    inlay: inlay ?? this.inlay,
     motif: motif ?? this.motif,
   );
 
@@ -132,78 +150,9 @@ class TableTheme extends ThemeExtension<TableTheme> {
       cardBackEdge: Color.lerp(cardBackEdge, other.cardBackEdge, t)!,
       accent: Color.lerp(accent, other.accent, t)!,
       seed: Color.lerp(seed, other.seed, t)!,
+      wood: colors(wood, other.wood),
+      inlay: Color.lerp(inlay, other.inlay, t),
       motif: lerpDouble(motif, other.motif, t)!,
     );
   }
-}
-
-/// The felt of the current [TableTheme], filling its space, with the
-/// theme's faint kite pattern when it has one.
-class TableFelt extends StatelessWidget {
-  const TableFelt({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = TableTheme.of(context);
-    return DecoratedBox(
-      decoration: theme.feltDecoration,
-      child: theme.motif == 0
-          ? child
-          : CustomPaint(
-              key: const Key('felt-motif'),
-              painter: _KitePainter(theme.motif),
-              child: child,
-            ),
-    );
-  }
-}
-
-/// Faint diamond kites with tails, scattered in a loose grid.
-class _KitePainter extends CustomPainter {
-  const _KitePainter(this.strength);
-
-  final double strength;
-
-  static const _spacing = 150.0;
-  static const _size = 26.0;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Color.fromRGBO(255, 255, 255, 0.06 * strength)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    var row = 0;
-    for (var y = _spacing / 2; y < size.height + _size; y += _spacing * 0.7) {
-      // Every other row shifts half a step, so the kites don't line up.
-      final shift = row.isOdd ? _spacing / 2 : 0.0;
-      for (var x = shift; x < size.width + _size; x += _spacing) {
-        final kite = Path()
-          ..moveTo(x, y - _size)
-          ..lineTo(x + _size * 0.7, y)
-          ..lineTo(x, y + _size)
-          ..lineTo(x - _size * 0.7, y)
-          ..close()
-          ..moveTo(x, y - _size)
-          ..lineTo(x, y + _size)
-          ..moveTo(x - _size * 0.7, y)
-          ..lineTo(x + _size * 0.7, y)
-          // The tail.
-          ..moveTo(x, y + _size)
-          ..quadraticBezierTo(
-            x + _size * 0.5,
-            y + _size * 1.5,
-            x,
-            y + _size * 2,
-          );
-        canvas.drawPath(kite, paint);
-      }
-      row++;
-    }
-  }
-
-  @override
-  bool shouldRepaint(_KitePainter old) => old.strength != strength;
 }

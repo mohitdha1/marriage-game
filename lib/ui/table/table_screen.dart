@@ -14,6 +14,7 @@ import '../sound/sound_effects.dart';
 import '../state/table_controller.dart';
 import '../state/table_state.dart';
 import '../state/table_view.dart';
+import '../theme/table_felt.dart';
 import '../theme/table_theme.dart';
 import 'card_face_art.dart';
 import 'card_flights.dart';
@@ -250,7 +251,10 @@ class _TableScreenState extends ConsumerState<TableScreen> {
 
     return Scaffold(
       body: TableFelt(
+        rim: true,
+        // Clear of the rim, wherever the screen's own insets are narrower.
         child: SafeArea(
+          minimum: const EdgeInsets.all(TableFelt.rimWidth),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final cardWidth = (constraints.maxHeight * 0.16).clamp(
@@ -322,7 +326,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                       ),
                     ),
                     Align(
-                      alignment: const Alignment(0, -0.25),
+                      alignment: const Alignment(0, -0.2),
                       child: Column(
                         key: const Key('table-centre'),
                         mainAxisSize: MainAxisSize.min,
@@ -384,7 +388,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                       ),
                     ),
                     Align(
-                      alignment: const Alignment(1, 0.05),
+                      alignment: const Alignment(1, 0.1),
                       child: _ActionBar(state: state, controller: controller),
                     ),
                     Align(

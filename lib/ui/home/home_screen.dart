@@ -9,7 +9,7 @@ import '../sound/table_sounds.dart';
 import '../state/table_controller.dart';
 import '../table/suit_icon.dart';
 import '../table/table_screen.dart';
-import '../theme/table_theme.dart';
+import '../theme/table_felt.dart';
 import 'coins.dart';
 import 'player_avatar.dart';
 

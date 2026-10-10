@@ -6,6 +6,7 @@ import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/settings/settings.dart';
 import 'package:marriage_game/ui/table/card_back_art.dart';
 import 'package:marriage_game/ui/table/card_view.dart';
+import 'package:marriage_game/ui/theme/table_felt.dart';
 import 'package:marriage_game/ui/theme/table_theme.dart';
 
 ProviderContainer containerWith(InMemoryPreferences store) {
@@ -54,6 +55,7 @@ void main() {
       expect(from.lerp(to, 0).accent, from.accent);
       expect(from.lerp(to, 1).accent, to.accent);
       expect(from.lerp(to, 1).felt, to.felt);
+      expect(from.lerp(to, 1).wood, to.wood);
       expect(from.lerp(to, 0.5).panel, Color.lerp(from.panel, to.panel, 0.5));
       expect(from.lerp(null, 0.5), same(from));
     });
@@ -80,6 +82,70 @@ void main() {
       );
 
       expect(found, same(TableTheme.classic));
+    });
+  });
+
+  group('Felt', () {
+    test('only the table has a rim, and each theme has its own wood', () {
+      expect(
+        TableThemeId.values.map((t) => t.theme.wood).toSet(),
+        hasLength(3),
+      );
+      expect(TableTheme.dashain.inlay, isNotNull);
+      expect(TableTheme.classic.inlay, isNull);
+    });
+
+    test('repaints only when the theme or the rim changes', () {
+      const classic = FeltPainter(theme: TableTheme.classic, rim: true);
+
+      expect(
+        classic.shouldRepaint(
+          const FeltPainter(theme: TableTheme.classic, rim: true),
+        ),
+        isFalse,
+      );
+      expect(
+        classic.shouldRepaint(
+          const FeltPainter(theme: TableTheme.midnight, rim: true),
+        ),
+        isTrue,
+      );
+      expect(
+        classic.shouldRepaint(
+          const FeltPainter(theme: TableTheme.classic, rim: false),
+        ),
+        isTrue,
+      );
+    });
+
+    testWidgets('paints every theme, with and without a rim', (tester) async {
+      for (final id in TableThemeId.values) {
+        for (final rim in [false, true]) {
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData(extensions: [id.theme]),
+              home: TableFelt(rim: rim, child: const SizedBox()),
+            ),
+          );
+          expect(tester.takeException(), isNull, reason: '$id, rim: $rim');
+        }
+      }
+    });
+
+    testWidgets('the felt is kept apart from what moves over it', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: TableFelt(child: SizedBox())),
+      );
+
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('felt')),
+          matching: find.byType(RepaintBoundary),
+        ),
+        findsWidgets,
+      );
     });
   });
 
@@ -167,19 +233,10 @@ void main() {
         await pumpThemed(tester, id);
         final theme = id.theme;
 
-        final felt = tester.widget<DecoratedBox>(
-          find
-              .descendant(
-                of: find.byType(TableFelt),
-                matching: find.byType(DecoratedBox),
-              )
-              .first,
-        );
-        expect(
-          ((felt.decoration as BoxDecoration).gradient! as RadialGradient)
-              .colors,
-          theme.felt,
-        );
+        final felt =
+            tester.widget<CustomPaint>(find.byKey(const Key('felt'))).painter!
+                as FeltPainter;
+        expect(felt.theme, same(theme));
 
         final back = tester.widget<CustomPaint>(
           find.byKey(const Key('card-back-pattern')),
@@ -187,11 +244,6 @@ void main() {
         final painter = back.painter! as CardBackPainter;
         expect(painter.field, theme.cardBack);
         expect(painter.ink, theme.cardBackEdge);
-
-        expect(
-          find.byKey(const Key('felt-motif')),
-          theme.motif > 0 ? findsOneWidget : findsNothing,
-        );
       });
     }
   });
