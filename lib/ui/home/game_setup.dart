@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../bots/bot_player.dart';
 import '../settings/settings.dart';
+import '../state/table_controller.dart';
 
-/// Opens the setup for a game against bots: how many play and how well the
-/// bots play. The choices are saved as they're made, so Quick Play uses
-/// them next time. Completes with `true` when the player taps Play.
+/// Opens the setup for a custom game against bots: how many play and how
+/// well the bots play. The choices are saved as they're made, so the setup
+/// opens with them next time. Completes with `true` when the player taps
+/// Play.
 Future<bool> showGameSetup(BuildContext context) async =>
     await showDialog<bool>(
       context: context,
@@ -21,10 +23,10 @@ String describeDifficulty(BotDifficulty difficulty) => switch (difficulty) {
   BotDifficulty.hard => 'Sharp bots that remember every discard.',
 };
 
-/// The setup's summary, as shown on the Quick Play button: "4 bots · Medium".
-String describeSetup(Settings settings) {
-  final bots = settings.playerCount - 1;
-  final level = settings.botDifficulty.name;
+/// [setup] summed up, as on the Quick Play button: "4 bots · Medium".
+String describeSetup(MatchSetup setup) {
+  final bots = setup.playerCount - 1;
+  final level = setup.difficulty.name;
   return '$bots ${bots == 1 ? 'bot' : 'bots'} · '
       '${level[0].toUpperCase()}${level.substring(1)}';
 }

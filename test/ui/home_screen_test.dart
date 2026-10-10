@@ -28,10 +28,7 @@ Future<ProviderContainer> pumpHome(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        // A small table unless a test says otherwise.
-        preferencesProvider.overrideWithValue(
-          InMemoryPreferences({'lobby.playerCount': 3, ...?saved}),
-        ),
+        preferencesProvider.overrideWithValue(InMemoryPreferences(saved)),
         randomProvider.overrideWithValue(Random(0)),
         botThinkingTimeProvider.overrideWithValue(() => Duration.zero),
         soundEffectsProvider.overrideWithValue(const SilentSoundEffects()),
@@ -97,13 +94,19 @@ void main() {
   });
 
   group('Game setup', () {
-    testWidgets('Quick Play shows the setup it will use', (tester) async {
-      await pumpHome(
+    testWidgets('Quick Play always deals the default table, whatever was '
+        'chosen for a custom game', (tester) async {
+      final container = await pumpHome(
         tester,
-        saved: {'lobby.playerCount': 4, 'lobby.botDifficulty': 'hard'},
+        saved: {'lobby.playerCount': 2, 'lobby.botDifficulty': 'hard'},
       );
+      expect(find.text('4 bots · Medium'), findsOneWidget);
 
-      expect(find.text('3 bots · Hard'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('quick-play')));
+      await tester.pumpAndSettle();
+
+      expect(container.read(tableProvider).view.opponents, hasLength(4));
+      expect(container.read(botDifficultyProvider), BotDifficulty.medium);
     });
 
     testWidgets('Single Player asks for the players and bots, then plays '
@@ -129,7 +132,7 @@ void main() {
       expect(container.read(botDifficultyProvider), BotDifficulty.easy);
     });
 
-    testWidgets('Cancel stays home, but keeps the choices for Quick Play', (
+    testWidgets('Cancel stays home, but keeps the choices for next time', (
       tester,
     ) async {
       final container = await pumpHome(tester);
@@ -143,7 +146,13 @@ void main() {
 
       expect(find.byType(TableScreen), findsNothing);
       expect(container.read(settingsProvider).playerCount, 2);
-      expect(find.text('1 bot · Medium'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('single-player')));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<ChoiceChip>(find.byKey(const Key('players-2'))).selected,
+        isTrue,
+      );
     });
 
     testWidgets('a match keeps its setup when the next game\'s changes', (
@@ -154,7 +163,10 @@ void main() {
       await tester.pumpAndSettle();
       final opponents = container.read(tableProvider).view.opponents.length;
 
-      container.read(settingsProvider.notifier).setPlayerCount(5);
+      container.read(matchSetupProvider.notifier).choose((
+        playerCount: 2,
+        difficulty: BotDifficulty.easy,
+      ));
       await tester.pump();
 
       expect(
@@ -177,11 +189,12 @@ void main() {
     });
 
     test('the setup sums up as bots and level', () {
-      expect(describeSetup(const Settings(playerCount: 2)), '1 bot · Medium');
       expect(
-        describeSetup(
-          const Settings(playerCount: 5, botDifficulty: BotDifficulty.hard),
-        ),
+        describeSetup((playerCount: 2, difficulty: BotDifficulty.medium)),
+        '1 bot · Medium',
+      );
+      expect(
+        describeSetup((playerCount: 5, difficulty: BotDifficulty.hard)),
         '4 bots · Hard',
       );
     });

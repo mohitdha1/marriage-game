@@ -23,8 +23,9 @@ const singlePlayerTable = TableSounds(
 );
 
 /// The first screen: the player's avatar, name and coins along the top, a
-/// settings gear, a large tile for each way to play, and a Quick Play button
-/// that starts a game against bots straight away.
+/// settings gear, a large tile for each way to play (Single Player sets up a
+/// custom game), and a Quick Play button that starts a game against bots
+/// straight away.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -85,7 +86,13 @@ class HomeScreen extends ConsumerWidget {
                                     onTap: () async {
                                       if (await showGameSetup(context) &&
                                           context.mounted) {
-                                        _startSinglePlayer(context, ref);
+                                        final chosen = ref.read(
+                                          settingsProvider,
+                                        );
+                                        _startSinglePlayer(context, ref, (
+                                          playerCount: chosen.playerCount,
+                                          difficulty: chosen.botDifficulty,
+                                        ));
                                       }
                                     },
                                   ),
@@ -116,9 +123,12 @@ class HomeScreen extends ConsumerWidget {
                               ),
                               const SizedBox(height: 14),
                               _QuickPlayButton(
-                                setup: describeSetup(settings),
-                                onPressed: () =>
-                                    _startSinglePlayer(context, ref),
+                                setup: describeSetup(quickPlaySetup),
+                                onPressed: () => _startSinglePlayer(
+                                  context,
+                                  ref,
+                                  quickPlaySetup,
+                                ),
                               ),
                               const SizedBox(height: 8),
                             ],
@@ -136,8 +146,13 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  /// Opens a fresh match against bots.
-  void _startSinglePlayer(BuildContext context, WidgetRef ref) {
+  /// Opens a fresh match against bots with [setup].
+  void _startSinglePlayer(
+    BuildContext context,
+    WidgetRef ref,
+    MatchSetup setup,
+  ) {
+    ref.read(matchSetupProvider.notifier).choose(setup);
     ref.invalidate(tableProvider);
     Navigator.of(
       context,
@@ -145,8 +160,8 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-/// The big button that starts a game against bots with the last setup
-/// chosen, named underneath.
+/// The big button that starts a game against bots straight away, with the
+/// default setup named underneath.
 class _QuickPlayButton extends StatelessWidget {
   const _QuickPlayButton({required this.setup, required this.onPressed});
 

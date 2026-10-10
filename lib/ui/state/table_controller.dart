@@ -13,16 +13,32 @@ import '../../engine/round.dart';
 import '../../engine/scoring.dart';
 import '../../engine/win_check.dart';
 import '../home/coins.dart';
-import '../settings/settings.dart';
 import 'table_state.dart';
 import 'table_view.dart';
 
-/// Settings for the current game: as many players as chosen before the
-/// game. Tests override it.
+/// How many play, the human player included, and how well the bots play.
+typedef MatchSetup = ({int playerCount, BotDifficulty difficulty});
+
+/// Quick Play's setup: a full table of five against Medium bots.
+const quickPlaySetup = (playerCount: 5, difficulty: BotDifficulty.medium);
+
+/// The setup the next match starts with. Whatever starts a match chooses it:
+/// Quick Play its own, a custom game the player's choices.
+final matchSetupProvider = NotifierProvider<MatchSetupController, MatchSetup>(
+  MatchSetupController.new,
+);
+
+class MatchSetupController extends Notifier<MatchSetup> {
+  @override
+  MatchSetup build() => quickPlaySetup;
+
+  void choose(MatchSetup setup) => state = setup;
+}
+
+/// Settings for the current game: as many players as its setup says. Tests
+/// override it.
 final gameConfigProvider = Provider<GameConfig>(
-  (ref) => GameConfig(
-    playerCount: ref.watch(settingsProvider.select((s) => s.playerCount)),
-  ),
+  (ref) => GameConfig(playerCount: ref.watch(matchSetupProvider).playerCount),
 );
 
 /// The random source for shuffling and bot choices. Tests override it with a
@@ -37,9 +53,9 @@ final roundFactoryProvider = Provider<Round Function(int firstSeat)>((ref) {
       Round.deal(config: config, random: random, firstSeat: firstSeat);
 });
 
-/// How well the bots play, as chosen before the game.
+/// How well the bots play, as the game's setup says.
 final botDifficultyProvider = Provider<BotDifficulty>(
-  (ref) => ref.watch(settingsProvider.select((s) => s.botDifficulty)),
+  (ref) => ref.watch(matchSetupProvider).difficulty,
 );
 
 /// How long a bot "thinks" before each move: a slightly different pause
