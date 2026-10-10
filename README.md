@@ -29,10 +29,11 @@ The game is built in phases (see [`docs/roadmap.md`](docs/roadmap.md)):
 |---|---|
 | `lib/engine/` | The rules engine: cards, the shoe, sets, jokers, hands, rounds, scoring. Pure Dart with **no Flutter imports**, and the single source of truth for the rules. |
 | `lib/bots/` | Computer players at three levels (Easy, Medium, Hard) with named personalities. Pure Dart; they only see what a player at the table could. |
-| `lib/ui/` | The Flutter app: the home screen and coins (`ui/home/`), settings, profile and rules (`ui/settings/`), Riverpod state for the table (`ui/state/`), the table screen's widgets (`ui/table/`), the scoreboard and sounds. |
+| `lib/ui/` | The Flutter app: the home screen, Quick Play and game setup, and coins (`ui/home/`), settings, profile and rules (`ui/settings/`), Riverpod state for the table (`ui/state/`), the table screen's widgets and card art (`ui/table/`), table themes and felt (`ui/theme/`), the scoreboard, sounds and vibration. |
 | `lib/console/` | The terminal version of the game. It only turns commands into engine calls and engine state into text. |
 | `bin/marriage.dart` | Command-line entry point for the console game. |
 | `tool/generate_sounds.dart` | Synthesises the placeholder sound effects into `assets/sounds/` (run with `dart run tool/generate_sounds.dart`). |
+| `tool/render_branding.dart` | Draws the app icon and splash logo with the game's own card faces into `assets/branding/` (run with `flutter test tool/render_branding.dart`, then `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create`). |
 | `test/` | Unit tests for every engine rule and the bots, widget tests for the table screen, and tests that script whole console games. |
 | `docs/` | [`roadmap.md`](docs/roadmap.md) (phased build plan) and [`app-spec.md`](docs/app-spec.md) (product spec). |
 
