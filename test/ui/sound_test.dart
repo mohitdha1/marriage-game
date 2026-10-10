@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -220,6 +221,23 @@ void main() {
       expect(sounds.played.last, Sfx.roundOver);
       await tester.pump(scoreboardDelay);
       await tester.pumpAndSettle();
+    });
+  });
+
+  group('Sharing the speaker', () {
+    test('Android: sounds never take audio focus from other apps', () {
+      final android = soundEffectsAudioContext().android;
+
+      expect(android.audioFocus, AndroidAudioFocus.none);
+      expect(android.usageType, AndroidUsageType.game);
+      expect(android.contentType, AndroidContentType.sonification);
+    });
+
+    test('iOS: sounds mix with other audio and respect the silent switch', () {
+      expect(
+        soundEffectsAudioContext().iOS.category,
+        AVAudioSessionCategory.ambient,
+      );
     });
   });
 

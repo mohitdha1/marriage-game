@@ -36,29 +36,49 @@ class SilentSoundEffects implements SoundEffects {
   Future<void> dispose() async {}
 }
 
+/// How the game's sounds share the device's audio with other apps.
+///
+/// Sound effects shouldn't interrupt anything: on Android they never ask
+/// for audio focus, so music or a podcast keeps playing underneath; on iOS
+/// the "ambient" category mixes with other audio and stays quiet when the
+/// silent switch is on.
+AudioContext soundEffectsAudioContext() => AudioContext(
+  android: const AudioContextAndroid(
+    contentType: AndroidContentType.sonification,
+    usageType: AndroidUsageType.game,
+    audioFocus: AndroidAudioFocus.none,
+  ),
+  iOS: AudioContextIOS(category: AVAudioSessionCategory.ambient),
+);
+
 /// Real audio through the audioplayers package: one low-latency player per
 /// sound, so a sound restarts if it's played again before it finishes.
 class AudioPlayerSoundEffects implements SoundEffects {
-  final _players = <Sfx, AudioPlayer>{};
+  final _players = <Sfx, Future<AudioPlayer>>{};
 
   @override
   void play(Sfx sound) {
-    final player = _players.putIfAbsent(
-      sound,
-      () => AudioPlayer()..setPlayerMode(PlayerMode.lowLatency),
-    );
     // A sound that fails to play is not worth interrupting the game for.
     unawaited(
-      player
-          .play(AssetSource('sounds/${sound.file}'))
+      _playerFor(sound)
+          .then((player) => player.play(AssetSource('sounds/${sound.file}')))
           .catchError((Object e) => debugPrint('Could not play $sound: $e')),
     );
   }
 
+  /// The player for [sound], set up once with [soundEffectsAudioContext]
+  /// before it plays anything.
+  Future<AudioPlayer> _playerFor(Sfx sound) => _players[sound] ??= () async {
+    final player = AudioPlayer();
+    await player.setAudioContext(soundEffectsAudioContext());
+    await player.setPlayerMode(PlayerMode.lowLatency);
+    return player;
+  }();
+
   @override
   Future<void> dispose() async {
     for (final player in _players.values) {
-      await player.dispose();
+      await (await player).dispose();
     }
     _players.clear();
   }
