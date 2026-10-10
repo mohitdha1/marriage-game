@@ -9,6 +9,7 @@ import 'package:marriage_game/main.dart';
 import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/ui/home/game_setup.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
+import 'package:marriage_game/ui/home/pass_and_play_setup.dart';
 import 'package:marriage_game/ui/settings/how_to_play_screen.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/settings/settings.dart';
@@ -205,15 +206,60 @@ void main() {
     });
   });
 
-  testWidgets('Hotspot / Local says it is coming soon', (tester) async {
-    await pumpHome(tester);
-    expect(find.byKey(const Key('coming-soon')), findsOneWidget);
+  testWidgets('Play with Friends sets up pass and play, opening covered', (
+    tester,
+  ) async {
+    final container = await pumpHome(tester, saved: {'profile.name': 'Mohit'});
 
-    await tester.tap(find.byKey(const Key('hotspot')));
-    await tester.pump();
+    await tester.tap(find.byKey(const Key('friends')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pass-and-play-setup')), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('person-name-0')))
+          .controller!
+          .text,
+      'Mohit',
+    );
 
-    expect(find.textContaining('coming soon'), findsOneWidget);
-    expect(find.byType(TableScreen), findsNothing);
+    await tester.tap(find.byKey(const Key('people-3')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('person-name-1')), 'Bina');
+    await tester.tap(find.byKey(const Key('pass-and-play-start')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TableScreen), findsOneWidget);
+    final table = container.read(tableProvider);
+    expect(table.seatNames, ['Mohit', 'Bina', 'Player 3']);
+    expect(find.text('Pass the device to Mohit'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('pass-ready')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pass-screen')), findsNothing);
+  });
+
+  testWidgets(
+    'the pass and play setup fits a small phone, five names and all',
+    (tester) async {
+      await pumpHome(tester);
+      tester.view.physicalSize = const Size(667, 375);
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('friends')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('people-5')));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.byKey(const Key('pass-and-play-start')).hitTestable(),
+        findsOneWidget,
+      );
+    },
+  );
+
+  test('names are tidied: blanks get a seat name, repeats a number', () {
+    expect(tidyNames([' Asha ', '', 'Asha']), ['Asha', 'Player 2', 'Asha 3']);
   });
 
   testWidgets('the settings popover switches sound, vibration and the hand '

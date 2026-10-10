@@ -13,6 +13,7 @@ import '../table/table_screen.dart';
 import '../theme/table_felt.dart';
 import 'coins.dart';
 import 'game_setup.dart';
+import 'pass_and_play_setup.dart';
 import 'player_avatar.dart';
 
 /// The table for a game against bots, with its sounds and vibration, asking
@@ -89,7 +90,7 @@ class HomeScreen extends ConsumerWidget {
                                         final chosen = ref.read(
                                           settingsProvider,
                                         );
-                                        _startSinglePlayer(
+                                        _startMatch(
                                           context,
                                           ref,
                                           MatchSetup(
@@ -101,38 +102,34 @@ class HomeScreen extends ConsumerWidget {
                                     },
                                   ),
                                   _ModeTile(
-                                    key: const Key('hotspot'),
-                                    title: 'Hotspot / Local',
-                                    subtitle:
-                                        'Friends on the same Wi-Fi or hotspot',
-                                    icon: Icons.wifi_tethering,
+                                    key: const Key('friends'),
+                                    title: 'Play with Friends',
+                                    subtitle: 'Pass and play on this device',
+                                    icon: Icons.groups_outlined,
                                     colors: const [
                                       Color(0xFF7E57C2),
                                       Color(0xFF3949AB),
                                     ],
-                                    comingSoon: true,
-                                    onTap: () => ScaffoldMessenger.of(context)
-                                      ..hideCurrentSnackBar()
-                                      ..showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Playing with friends on the same '
-                                            'Wi-Fi or hotspot is coming soon.',
-                                          ),
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
-                                      ),
+                                    onTap: () async {
+                                      final names = await showPassAndPlaySetup(
+                                        context,
+                                      );
+                                      if (names != null && context.mounted) {
+                                        _startMatch(
+                                          context,
+                                          ref,
+                                          MatchSetup.passAndPlay(names),
+                                        );
+                                      }
+                                    },
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 14),
                               _QuickPlayButton(
                                 setup: describeSetup(quickPlaySetup),
-                                onPressed: () => _startSinglePlayer(
-                                  context,
-                                  ref,
-                                  quickPlaySetup,
-                                ),
+                                onPressed: () =>
+                                    _startMatch(context, ref, quickPlaySetup),
                               ),
                               const SizedBox(height: 8),
                             ],
@@ -150,12 +147,8 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  /// Opens a fresh match against bots with [setup].
-  void _startSinglePlayer(
-    BuildContext context,
-    WidgetRef ref,
-    MatchSetup setup,
-  ) {
+  /// Opens a fresh match with [setup].
+  void _startMatch(BuildContext context, WidgetRef ref, MatchSetup setup) {
     ref.read(matchSetupProvider.notifier).choose(setup);
     ref.invalidate(tableProvider);
     Navigator.of(
@@ -349,7 +342,6 @@ class _ModeTile extends StatelessWidget {
     required this.icon,
     required this.colors,
     required this.onTap,
-    this.comingSoon = false,
   });
 
   final String title;
@@ -357,9 +349,6 @@ class _ModeTile extends StatelessWidget {
   final IconData icon;
   final List<Color> colors;
   final VoidCallback onTap;
-
-  /// Shows the tile faded, with a "Coming soon" ribbon.
-  final bool comingSoon;
 
   @override
   Widget build(BuildContext context) {
@@ -412,40 +401,8 @@ class _ModeTile extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: comingSoon ? '$title, coming soon' : title,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Opacity(opacity: comingSoon ? 0.55 : 1, child: tile),
-            if (comingSoon)
-              Positioned(
-                top: 12,
-                right: -6,
-                child: Container(
-                  key: const Key('coming-soon'),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFC400),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'Coming soon',
-                    style: TextStyle(
-                      color: Color(0xFF3E2723),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
+      label: title,
+      child: GestureDetector(onTap: onTap, child: tile),
     );
   }
 }
