@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../engine/card.dart';
 import '../theme/table_theme.dart';
+import 'card_back_art.dart';
 import 'card_face_art.dart';
 import 'suit_icon.dart';
 
@@ -48,7 +49,6 @@ class CardFace extends StatelessWidget {
     final index = _CornerIndex(card: card, width: width, color: color);
     final face = _CardShape(
       width: width,
-      paper: true,
       highlighted: highlighted,
       child: Stack(
         children: [
@@ -229,7 +229,8 @@ class _JokerGlowState extends State<JokerGlow>
   }
 }
 
-/// A face-down card.
+/// A face-down card: a white margin round a printed field in the current
+/// [TableTheme]'s colours (see [CardBackPainter]).
 class CardBack extends StatelessWidget {
   const CardBack({super.key, required this.width});
 
@@ -240,17 +241,17 @@ class CardBack extends StatelessWidget {
     final theme = TableTheme.of(context);
     return _CardShape(
       width: width,
-      edge: theme.cardBackEdge,
       child: Padding(
-        padding: EdgeInsets.all(width * 0.08),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0x99FFFFFF)),
-            borderRadius: BorderRadius.circular(width * 0.06),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: theme.cardBack,
+        padding: EdgeInsets.all(width * 0.07),
+        // Its own layer, so the detailed pattern is painted once and reused
+        // while the card moves, rather than repainted every frame.
+        child: RepaintBoundary(
+          child: CustomPaint(
+            key: const Key('card-back-pattern'),
+            size: Size.infinite,
+            painter: CardBackPainter(
+              field: theme.cardBack,
+              ink: theme.cardBackEdge,
             ),
           ),
         ),
@@ -280,21 +281,17 @@ class CardSlot extends StatelessWidget {
   }
 }
 
-/// The rounded, shadowed rectangle every card is drawn on: card stock with
-/// a faint sheen for a face ([paper]), or a solid [edge] colour for a back.
+/// The rounded, shadowed piece of card stock every card is drawn on, with a
+/// faint sheen.
 class _CardShape extends StatelessWidget {
   const _CardShape({
     required this.width,
     required this.child,
-    this.paper = false,
-    this.edge = Colors.white,
     this.highlighted = false,
   });
 
   final double width;
   final Widget child;
-  final bool paper;
-  final Color edge;
   final bool highlighted;
 
   /// Card stock: bright white where the light catches it, a touch warmer
@@ -311,8 +308,7 @@ class _CardShape extends StatelessWidget {
       width: width,
       height: width / cardAspectRatio,
       decoration: BoxDecoration(
-        color: paper ? null : edge,
-        gradient: paper ? _paper : null,
+        gradient: _paper,
         borderRadius: BorderRadius.circular(width * 0.08),
         border: highlighted
             ? Border.all(color: const Color(0xFFFFC107), width: 2.5)

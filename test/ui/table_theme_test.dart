@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/main.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/settings/settings.dart';
+import 'package:marriage_game/ui/table/card_back_art.dart';
 import 'package:marriage_game/ui/table/card_view.dart';
 import 'package:marriage_game/ui/theme/table_theme.dart';
 
@@ -82,6 +83,54 @@ void main() {
     });
   });
 
+  group('Card back pattern', () {
+    const red = CardBackPainter(
+      field: [Color(0xFFB71C1C), Color(0xFF6D1010)],
+      ink: Color(0xFF8E1B1B),
+    );
+
+    test('repaints only when its colours change', () {
+      expect(
+        red.shouldRepaint(
+          const CardBackPainter(
+            field: [Color(0xFFB71C1C), Color(0xFF6D1010)],
+            ink: Color(0xFF8E1B1B),
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        red.shouldRepaint(
+          CardBackPainter(
+            field: TableTheme.midnight.cardBack,
+            ink: Color(0xFF8E1B1B),
+          ),
+        ),
+        isTrue,
+      );
+      expect(
+        red.shouldRepaint(
+          const CardBackPainter(
+            field: [Color(0xFFB71C1C), Color(0xFF6D1010)],
+            ink: Color(0xFF000000),
+          ),
+        ),
+        isTrue,
+      );
+    });
+
+    testWidgets('paints at any size, down to the tiniest card', (tester) async {
+      for (final width in [12.0, 28.0, 60.0, 120.0]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Center(child: CardBack(width: width)),
+          ),
+        );
+        expect(tester.takeException(), isNull, reason: 'width $width');
+      }
+    });
+  });
+
   group('Choosing a theme', () {
     test('Classic is the default', () {
       expect(
@@ -132,16 +181,12 @@ void main() {
           theme.felt,
         );
 
-        final backGradients = tester
-            .widgetList<DecoratedBox>(
-              find.descendant(
-                of: find.byType(CardBack),
-                matching: find.byType(DecoratedBox),
-              ),
-            )
-            .map((box) => (box.decoration as BoxDecoration).gradient)
-            .whereType<LinearGradient>();
-        expect(backGradients.single.colors, theme.cardBack);
+        final back = tester.widget<CustomPaint>(
+          find.byKey(const Key('card-back-pattern')),
+        );
+        final painter = back.painter! as CardBackPainter;
+        expect(painter.field, theme.cardBack);
+        expect(painter.ink, theme.cardBackEdge);
 
         expect(
           find.byKey(const Key('felt-motif')),
