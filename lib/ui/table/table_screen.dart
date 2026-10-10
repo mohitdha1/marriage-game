@@ -27,6 +27,7 @@ import 'joker_reveal.dart';
 import 'opening_picker.dart';
 import 'move_log.dart';
 import 'opponent_seat.dart';
+import 'pass_screen.dart';
 import 'set_chips.dart';
 import 'suit_icon.dart';
 import 'table_center.dart';
@@ -342,235 +343,257 @@ class _TableScreenState extends ConsumerState<TableScreen> {
     });
 
     return Scaffold(
-      body: TableFelt(
-        rim: true,
-        // Clear of the rim, wherever the screen's own insets are narrower.
-        child: SafeArea(
-          minimum: const EdgeInsets.all(TableFelt.rimWidth),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final cardWidth = (constraints.maxHeight * 0.16).clamp(
-                40.0,
-                100.0,
-              );
-              final seats = seatAlignments(table.opponents.length);
-              final choice = state.openingChoice;
-              final jokers = table.yourJokers;
-              return Padding(
-                padding: const EdgeInsets.all(8),
-                child: Stack(
-                  children: [
-                    for (var i = 0; i < table.opponents.length; i++)
-                      Align(
-                        alignment: seats[i],
-                        child: KeyedSubtree(
-                          key: _anchors.seat(table.opponents[i].seat),
-                          child: OpponentSeat(
-                            seat: table.opponents[i],
-                            isCurrentTurn:
-                                table.winner == null &&
-                                table.currentSeat == table.opponents[i].seat,
-                          ),
-                        ),
-                      ),
-                    Align(
-                      alignment: Alignment.topLeft,
-                      child: Row(
-                        key: const Key('top-left-buttons'),
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _TopButton(
-                            key: const Key('back-button'),
-                            tooltip: 'Leave the table',
-                            icon: Icons.arrow_back,
-                            onPressed: () => _leave(context, table),
-                          ),
-                          _TopButton(
-                            key: const Key('log-button'),
-                            tooltip: 'Log of this round\'s moves',
-                            icon: Icons.history,
-                            onPressed: () => showModalBottomSheet<void>(
-                              context: context,
-                              builder: (_) => MoveLog(
-                                events: table.events,
-                                nameOf: (seat) => state.seatNames[seat],
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          TableFelt(
+            rim: true,
+            // Clear of the rim, wherever the screen's own insets are narrower.
+            child: SafeArea(
+              minimum: const EdgeInsets.all(TableFelt.rimWidth),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final cardWidth = (constraints.maxHeight * 0.16).clamp(
+                    40.0,
+                    100.0,
+                  );
+                  final seats = seatAlignments(table.opponents.length);
+                  final choice = state.openingChoice;
+                  final jokers = table.yourJokers;
+                  return Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Stack(
+                      children: [
+                        for (var i = 0; i < table.opponents.length; i++)
+                          Align(
+                            alignment: seats[i],
+                            child: KeyedSubtree(
+                              key: _anchors.seat(table.opponents[i].seat),
+                              child: OpponentSeat(
+                                seat: table.opponents[i],
+                                isCurrentTurn:
+                                    table.winner == null &&
+                                    table.currentSeat ==
+                                        table.opponents[i].seat,
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: Row(
-                        key: const Key('top-right-items'),
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _TopButton(
-                            key: const Key('scores-button'),
-                            tooltip: 'Scores',
-                            icon: Icons.leaderboard,
-                            onPressed: () => _openScoreboard(context),
-                          ),
-                          const SizedBox(width: 6),
-                          _JokerChip(table: table),
-                        ],
-                      ),
-                    ),
-                    Align(
-                      alignment: const Alignment(0, -0.2),
-                      child: Column(
-                        key: const Key('table-centre'),
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          TableCenter(
-                            stockCount: table.stockCount,
-                            topDiscard: _discardsFlying > 0
-                                ? _pileShowing
-                                : table.topDiscard,
-                            stockKey: _anchors.stock,
-                            discardKey: _anchors.discardPile,
-                            cardWidth: cardWidth,
-                            onStockTap: () => controller.draw(DrawSource.stock),
-                            onDiscardPileTap: _discardPileTapped,
-                            onCardDropped: _discardReleased,
-                          ),
-                          const SizedBox(height: 6),
-                          ConstrainedBox(
-                            // Keep clear of the seats at the sides.
-                            constraints: BoxConstraints(
-                              maxWidth:
-                                  constraints.maxWidth - 2 * _sideClearance,
-                            ),
-                            // The first-time guide's tips sit here.
-                            child: CompositedTransformTarget(
-                              link: _statusLine,
-                              child: Text(
-                                statusLine(state),
-                                key: const Key('status-line'),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
+                        Align(
+                          alignment: Alignment.topLeft,
+                          child: Row(
+                            key: const Key('top-left-buttons'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _TopButton(
+                                key: const Key('back-button'),
+                                tooltip: 'Leave the table',
+                                icon: Icons.arrow_back,
+                                onPressed: () => _leave(context, table),
+                              ),
+                              _TopButton(
+                                key: const Key('log-button'),
+                                tooltip: 'Log of this round\'s moves',
+                                icon: Icons.history,
+                                onPressed: () => showModalBottomSheet<void>(
+                                  context: context,
+                                  builder: (_) => MoveLog(
+                                    events: table.events,
+                                    nameOf: (seat) => state.seatNames[seat],
+                                  ),
                                 ),
                               ),
+                            ],
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: Row(
+                            key: const Key('top-right-items'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _TopButton(
+                                key: const Key('scores-button'),
+                                tooltip: 'Scores',
+                                icon: Icons.leaderboard,
+                                onPressed: () => _openScoreboard(context),
+                              ),
+                              const SizedBox(width: 6),
+                              _JokerChip(table: table),
+                            ],
+                          ),
+                        ),
+                        Align(
+                          alignment: const Alignment(0, -0.2),
+                          child: Column(
+                            key: const Key('table-centre'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TableCenter(
+                                stockCount: table.stockCount,
+                                topDiscard: _discardsFlying > 0
+                                    ? _pileShowing
+                                    : table.topDiscard,
+                                stockKey: _anchors.stock,
+                                discardKey: _anchors.discardPile,
+                                cardWidth: cardWidth,
+                                onStockTap: () =>
+                                    controller.draw(DrawSource.stock),
+                                onDiscardPileTap: _discardPileTapped,
+                                onCardDropped: _discardReleased,
+                              ),
+                              const SizedBox(height: 6),
+                              ConstrainedBox(
+                                // Keep clear of the seats at the sides.
+                                constraints: BoxConstraints(
+                                  maxWidth:
+                                      constraints.maxWidth - 2 * _sideClearance,
+                                ),
+                                // The first-time guide's tips sit here.
+                                child: CompositedTransformTarget(
+                                  link: _statusLine,
+                                  child: Text(
+                                    statusLine(state),
+                                    key: const Key('status-line'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Just above the hand, clear of the space a selected card
+                        // lifts into: laid-down sets on the left, buttons on the
+                        // right.
+                        Align(
+                          alignment: const Alignment(-1, 0.05),
+                          child: Row(
+                            key: const Key('hand-tools'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _TopButton(
+                                key: const Key('sort-button'),
+                                tooltip: 'Sort by suit, then rank',
+                                icon: Icons.sort,
+                                onPressed: controller.sortHand,
+                              ),
+                              if (table.you.laidDown.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                _LaidDownSets(sets: table.you.laidDown),
+                              ],
+                            ],
+                          ),
+                        ),
+                        Align(
+                          alignment: const Alignment(1, 0.1),
+                          child: _ActionBar(
+                            state: state,
+                            controller: controller,
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: HandFan(
+                            key: _anchors.hand,
+                            hiddenIds: _arriving,
+                            cardKey: _handCardKey,
+                            cards: state.hand,
+                            selected: state.selected,
+                            groupOf: state.groupOf,
+                            jokers: jokers,
+                            cardWidth: cardWidth,
+                            onCardTap: (id) {
+                              sounds.play(Sfx.select);
+                              controller.toggleSelected(id);
+                            },
+                            onDraw: controller.draw,
+                            onReorder: controller.moveCard,
+                            onFlick: _discardReleased,
+                            onDropMissed: _snapBack,
+                          ),
+                        ),
+                        // Badges over the hand's lower corners; taps go through
+                        // to the cards.
+                        if (maalOf(state.handProgress) case final maal?)
+                          Align(
+                            alignment: Alignment.bottomLeft,
+                            child: _CornerBadge(
+                              key: const Key('maal-badge'),
+                              text: 'Maal $maal',
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    // Just above the hand, clear of the space a selected card
-                    // lifts into: laid-down sets on the left, buttons on the
-                    // right.
-                    Align(
-                      alignment: const Alignment(-1, 0.05),
-                      child: Row(
-                        key: const Key('hand-tools'),
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _TopButton(
-                            key: const Key('sort-button'),
-                            tooltip: 'Sort by suit, then rank',
-                            icon: Icons.sort,
-                            onPressed: controller.sortHand,
+                        if (state.handProgress case final progress?
+                            when settings.handHelper)
+                          Align(
+                            alignment: Alignment.bottomRight,
+                            child: _CornerBadge(
+                              key: const Key('hand-helper'),
+                              text: handHelperText(progress),
+                            ),
                           ),
-                          if (table.you.laidDown.isNotEmpty) ...[
-                            const SizedBox(width: 6),
-                            _LaidDownSets(sets: table.you.laidDown),
-                          ],
-                        ],
-                      ),
+                        Positioned.fill(
+                          child: CardFlightLayer(
+                            key: _flights,
+                            cardWidth: cardWidth,
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: TableGuideLayer(statusLine: _statusLine),
+                        ),
+                        if (table.winner case final winner?)
+                          Positioned.fill(
+                            child: WinCelebration(
+                              winnerName: winner.name,
+                              youWon: winner.seat == table.you.seat,
+                            ),
+                          ),
+                        if (choice != null)
+                          _Overlay(
+                            child: OpeningPicker(
+                              tunnellas: choice,
+                              onConfirm: controller.chooseOpeningTunnellas,
+                            ),
+                          ),
+                        if (state.pickingTiplu)
+                          _Overlay(
+                            child: TipluPicker(
+                              stockCount: table.stockCount,
+                              onPick: controller.pickTiplu,
+                              onCancel: controller.cancelTipluPick,
+                            ),
+                          ),
+                        if (state.revealingJoker && jokers != null)
+                          _Overlay(
+                            child: JokerReveal(
+                              jokers: jokers,
+                              onDone: controller.dismissReveal,
+                            ),
+                          ),
+                      ],
                     ),
-                    Align(
-                      alignment: const Alignment(1, 0.1),
-                      child: _ActionBar(state: state, controller: controller),
-                    ),
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: HandFan(
-                        key: _anchors.hand,
-                        hiddenIds: _arriving,
-                        cardKey: _handCardKey,
-                        cards: state.hand,
-                        selected: state.selected,
-                        groupOf: state.groupOf,
-                        jokers: jokers,
-                        cardWidth: cardWidth,
-                        onCardTap: (id) {
-                          sounds.play(Sfx.select);
-                          controller.toggleSelected(id);
-                        },
-                        onDraw: controller.draw,
-                        onReorder: controller.moveCard,
-                        onFlick: _discardReleased,
-                        onDropMissed: _snapBack,
-                      ),
-                    ),
-                    // Badges over the hand's lower corners; taps go through
-                    // to the cards.
-                    if (maalOf(state.handProgress) case final maal?)
-                      Align(
-                        alignment: Alignment.bottomLeft,
-                        child: _CornerBadge(
-                          key: const Key('maal-badge'),
-                          text: 'Maal $maal',
-                        ),
-                      ),
-                    if (state.handProgress case final progress?
-                        when settings.handHelper)
-                      Align(
-                        alignment: Alignment.bottomRight,
-                        child: _CornerBadge(
-                          key: const Key('hand-helper'),
-                          text: handHelperText(progress),
-                        ),
-                      ),
-                    Positioned.fill(
-                      child: CardFlightLayer(
-                        key: _flights,
-                        cardWidth: cardWidth,
-                      ),
-                    ),
-                    Positioned.fill(
-                      child: TableGuideLayer(statusLine: _statusLine),
-                    ),
-                    if (table.winner case final winner?)
-                      Positioned.fill(
-                        child: WinCelebration(
-                          winnerName: winner.name,
-                          youWon: winner.seat == table.you.seat,
-                        ),
-                      ),
-                    if (choice != null)
-                      _Overlay(
-                        child: OpeningPicker(
-                          tunnellas: choice,
-                          onConfirm: controller.chooseOpeningTunnellas,
-                        ),
-                      ),
-                    if (state.pickingTiplu)
-                      _Overlay(
-                        child: TipluPicker(
-                          stockCount: table.stockCount,
-                          onPick: controller.pickTiplu,
-                          onCancel: controller.cancelTipluPick,
-                        ),
-                      ),
-                    if (state.revealingJoker && jokers != null)
-                      _Overlay(
-                        child: JokerReveal(
-                          jokers: jokers,
-                          onDone: controller.dismissReveal,
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            },
+                  );
+                },
+              ),
+            ),
           ),
-        ),
+          // Among friends, the whole screen stays covered while the device
+          // is passed, so nobody sees another's cards.
+          if (state.passingTo case final seat?)
+            PassScreen(
+              name: state.seatNames[seat],
+              color: Color(
+                Settings.avatarColors[seat % Settings.avatarColors.length],
+              ),
+              since: movesSince(table.events, seat, (s) => state.seatNames[s]),
+              choosingOpening: state.openingChoice != null,
+              onReady: controller.takeOver,
+            ),
+        ],
       ),
     );
   }

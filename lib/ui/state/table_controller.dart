@@ -233,7 +233,16 @@ class TableController extends Notifier<TableState> {
       roundScores: List.unmodifiable(_match.rounds),
       totals: List.unmodifiable(_match.totals),
       handProgress: _handProgress(),
+      // Among friends, the round opens covered until whoever goes first has
+      // the device.
+      passingTo: _peopleNames.isNotEmpty ? _viewer : null,
     );
+  }
+
+  /// Uncovers the table once the person it was passed to has the device.
+  void takeOver() {
+    if (state.passingTo == null) return;
+    state = state.copyWith(passingTo: () => null);
   }
 
   /// Selects [cardId] if it isn't selected, or deselects it if it is.
@@ -459,6 +468,10 @@ class TableController extends Notifier<TableState> {
 
   /// Whether the human player may move now; if not, says why.
   bool _checkYourTurn() {
+    if (state.passingTo case final seat?) {
+      _publish(notice: 'Pass the device to ${_nameOf(seat)} first.');
+      return false;
+    }
     if (state.view.isYourTurn) return true;
     final winner = state.view.winner;
     _publish(
@@ -528,6 +541,8 @@ class TableController extends Notifier<TableState> {
       openingChoice: () => desk.openingChoice,
       pickingTiplu: false,
       revealingJoker: false,
+      // Covered until [seat]'s person has the device.
+      passingTo: () => seat,
     );
     _publish();
   }

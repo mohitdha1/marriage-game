@@ -559,10 +559,13 @@ void main() {
 
   group('Several people on one device', () {
     // Asha at seat 0 holds yourCards; Bina at seat 1 holds idleBotCards.
+    /// Asha and Bina's table, with the device already in Asha's hands.
     ProviderContainer twoPeople({
       List<PlayingCard>? asha,
       List<PlayingCard>? bina,
-    }) => tableWith(people: ['Asha', 'Bina'], yourHand: asha, botHand: bina);
+    }) =>
+        tableWith(people: ['Asha', 'Bina'], yourHand: asha, botHand: bina)
+          ..controller.takeOver();
 
     test('everyone is called by name, and nobody is a bot', () {
       final container = twoPeople();
@@ -572,19 +575,42 @@ void main() {
       expect(container.table.view.opponents.single.name, 'Bina');
     });
 
-    test('after a turn, the table turns to the next person\'s view', () async {
-      final container = twoPeople()..controller.draw(DrawSource.stock);
+    test('the round opens covered until the first player has the device', () {
+      final container = tableWith(people: ['Asha', 'Bina']);
+      expect(container.table.passingTo, 0);
 
-      await container.controller.discard(
-        container.idOf(c(Suit.spades, Rank.king)),
-      );
+      container.controller.draw(DrawSource.stock);
+      expect(container.table.notice, 'Pass the device to Asha first.');
+      expect(container.table.view.youHaveDrawn, isFalse);
 
-      final view = container.table.view;
-      expect(view.you.seat, 1);
-      expect(view.isYourTurn, isTrue);
-      expect(container.table.hand.map((h) => h.card), idleBotCards);
-      expect(view.opponents.single.name, 'Asha');
+      container.controller.takeOver();
+      expect(container.table.passingTo, isNull);
+      container.controller.draw(DrawSource.stock);
+      expect(container.table.view.youHaveDrawn, isTrue);
     });
+
+    test('a game against bots is never covered', () {
+      expect(tableWith().table.passingTo, isNull);
+    });
+
+    test(
+      'after a turn, the table is covered and turns to the next person',
+      () async {
+        final container = twoPeople()..controller.draw(DrawSource.stock);
+
+        await container.controller.discard(
+          container.idOf(c(Suit.spades, Rank.king)),
+        );
+        expect(container.table.passingTo, 1);
+        container.controller.takeOver();
+
+        final view = container.table.view;
+        expect(view.you.seat, 1);
+        expect(view.isYourTurn, isTrue);
+        expect(container.table.hand.map((h) => h.card), idleBotCards);
+        expect(view.opponents.single.name, 'Asha');
+      },
+    );
 
     test(
       'each person\'s arrangement waits for them while others play',
@@ -603,8 +629,11 @@ void main() {
           container.idOf(c(Suit.spades, Rank.king)),
         );
         // Bina plays her turn.
-        container.controller.draw(DrawSource.stock);
+        container.controller
+          ..takeOver()
+          ..draw(DrawSource.stock);
         await container.controller.discard(container.table.hand.last.id);
+        container.controller.takeOver();
 
         expect(container.table.view.you.seat, 0);
         expect(container.table.hand.map((h) => h.card), [
@@ -655,10 +684,13 @@ void main() {
 
       container.controller.chooseOpeningTunnellas([0, 1, 2]);
       expect(container.table.view.you.seat, 1, reason: 'Bina chooses next');
+      expect(container.table.passingTo, 1);
+      container.controller.takeOver();
       expect(container.table.openingChoice, hasLength(4));
 
       container.controller.chooseOpeningTunnellas([1, 2, 3]);
       expect(container.table.view.you.seat, 0, reason: 'Asha plays first');
+      container.controller.takeOver();
       expect(container.table.openingChoice, isNull);
       container.controller.draw(DrawSource.stock);
       expect(container.table.view.youHaveDrawn, isTrue);

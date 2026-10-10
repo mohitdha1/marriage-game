@@ -44,6 +44,7 @@ class TableState {
     this.handProgress,
     this.notice,
     this.noticeId = 0,
+    this.passingTo,
   });
 
   final TableView view;
@@ -96,6 +97,11 @@ class TableState {
   /// counts as new.
   final int noticeId;
 
+  /// When people share the device, the seat of the person it's being passed
+  /// to: the table stays covered, so nobody else sees their cards, until
+  /// they say they have it. `null` when nothing is being passed.
+  final int? passingTo;
+
   /// The selected card, if exactly one is selected.
   HandCard? get singleSelected => selected.length == 1
       ? hand.firstWhere((c) => c.id == selected.single)
@@ -122,6 +128,7 @@ class TableState {
     List<int>? totals,
     HandProgress? handProgress,
     String? notice,
+    int? Function()? passingTo,
   }) => TableState(
     view: view ?? this.view,
     hand: hand ?? this.hand,
@@ -138,5 +145,6 @@ class TableState {
     handProgress: handProgress ?? this.handProgress,
     notice: notice ?? this.notice,
     noticeId: notice != null ? noticeId + 1 : noticeId,
+    passingTo: passingTo != null ? passingTo() : this.passingTo,
   );
 }
