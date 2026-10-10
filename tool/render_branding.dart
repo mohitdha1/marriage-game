@@ -1,6 +1,7 @@
 // Draws the app icon and splash logo with the game's own card faces and
 // saves them as PNGs in assets/branding/, for flutter_launcher_icons and
-// flutter_native_splash to turn into each platform's files.
+// flutter_native_splash to turn into each platform's files. Also draws the
+// store's feature graphic into docs/store/.
 //
 // Run from the project folder:
 //   flutter test tool/render_branding.dart
@@ -13,6 +14,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:marriage_game/engine/card.dart';
 import 'package:marriage_game/ui/table/card_face_art.dart';
 import 'package:marriage_game/ui/table/card_view.dart';
@@ -83,7 +85,63 @@ class PairAlone extends StatelessWidget {
   );
 }
 
-Future<void> save(WidgetTester tester, Widget art, String path) async {
+/// The store's 1024 × 500 banner: the name and a line about the game beside
+/// the pair, on the Classic table.
+class FeatureGraphic extends StatelessWidget {
+  const FeatureGraphic({super.key});
+
+  @override
+  Widget build(BuildContext context) => TableFelt(
+    rim: true,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 70),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Marriage',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 96,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'The Nepali card game, against smart bots',
+                  style: TextStyle(
+                    color: Color(0xFFFFD54F),
+                    fontSize: 30,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 380,
+            child: Transform.translate(
+              offset: const Offset(0, 20),
+              child: const FannedPair(scale: 0.22),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> save(
+  WidgetTester tester,
+  Widget art,
+  String path, {
+  Size frame = const Size.square(size),
+}) async {
   final key = GlobalKey();
   await tester.pumpWidget(
     MaterialApp(
@@ -97,7 +155,7 @@ Future<void> save(WidgetTester tester, Widget art, String path) async {
         child: Center(
           child: RepaintBoundary(
             key: key,
-            child: SizedBox.square(dimension: size, child: art),
+            child: SizedBox.fromSize(size: frame, child: art),
           ),
         ),
       ),
@@ -116,10 +174,27 @@ Future<void> save(WidgetTester tester, Widget art, String path) async {
     final boundary =
         key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
     final image = await boundary.toImage();
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    // A JPEG when asked for one: the store's banner has no see-through
+    // parts, and its felt makes a PNG much larger.
+    final List<int> bytes;
+    if (path.endsWith('.jpg')) {
+      final rgba = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      bytes = img.encodeJpg(
+        img.Image.fromBytes(
+          width: image.width,
+          height: image.height,
+          bytes: rgba!.buffer,
+          numChannels: 4,
+        ),
+        quality: 90,
+      );
+    } else {
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      bytes = png!.buffer.asUint8List();
+    }
     File(path)
       ..createSync(recursive: true)
-      ..writeAsBytesSync(bytes!.buffer.asUint8List());
+      ..writeAsBytesSync(bytes);
   });
   stdout.writeln(path);
 }
@@ -142,6 +217,12 @@ void main() {
       tester,
       const PairAlone(scale: 0.27),
       'assets/branding/splash.png',
+    );
+    await save(
+      tester,
+      const FeatureGraphic(),
+      'docs/store/feature-graphic.jpg',
+      frame: const Size(1024, 500),
     );
   });
 }

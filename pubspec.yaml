@@ -51,6 +51,7 @@ dev_dependencies:
   path: ^1.9.1
   flutter_launcher_icons: ^0.14.4
   flutter_native_splash: ^2.4.7
+  image: ^4.10.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

@@ -35,7 +35,8 @@ The game is built in phases (see [`docs/roadmap.md`](docs/roadmap.md)):
 | `tool/generate_sounds.dart` | Synthesises the placeholder sound effects into `assets/sounds/` (run with `dart run tool/generate_sounds.dart`). |
 | `tool/render_branding.dart` | Draws the app icon and splash logo with the game's own card faces into `assets/branding/` (run with `flutter test tool/render_branding.dart`, then `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create`). |
 | `test/` | Unit tests for every engine rule and the bots, widget tests for the table screen, and tests that script whole console games. |
-| `docs/` | [`roadmap.md`](docs/roadmap.md) (phased build plan) and [`app-spec.md`](docs/app-spec.md) (product spec). |
+| `tool/render_screenshots.dart` | Renders the store screenshots from the app's real screens into `docs/store/screenshots/` (run with `flutter test tool/render_screenshots.dart`). |
+| `docs/` | [`roadmap.md`](docs/roadmap.md) (phased build plan), [`app-spec.md`](docs/app-spec.md) (product spec), and [`store/listing.md`](docs/store/listing.md) (Play Store copy and assets). |
 
 ## Running the console game
 

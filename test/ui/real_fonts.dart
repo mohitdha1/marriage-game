@@ -26,6 +26,24 @@ Future<void> loadRealFonts() async {
   await roboto.load();
 }
 
+/// Loads the Material icon font from the Flutter SDK, so icons draw as
+/// themselves rather than as empty boxes, for rendered screenshots.
+Future<void> loadMaterialIcons() async {
+  final bytes = File(
+    p.join(
+      _flutterRoot(),
+      'bin',
+      'cache',
+      'artifacts',
+      'material_fonts',
+      'MaterialIcons-Regular.otf',
+    ),
+  ).readAsBytesSync();
+  await (FontLoader(
+    'MaterialIcons',
+  )..addFont(Future.value(ByteData.sublistView(bytes)))).load();
+}
+
 /// The Flutter SDK folder: from FLUTTER_ROOT if the test runner set it,
 /// otherwise found from the test runner's own location inside the SDK.
 String _flutterRoot() {
