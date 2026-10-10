@@ -12,7 +12,8 @@ enum Sfx {
   cardSnap('card_snap.wav'),
   select('select.wav'),
   win('win.wav'),
-  roundOver('round_over.wav');
+  roundOver('round_over.wav'),
+  yourTurn('your_turn.wav');
 
   const Sfx(this.file);
 

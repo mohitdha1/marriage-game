@@ -18,6 +18,7 @@ void main() {
     'select': select(),
     'win': winJingle(),
     'round_over': roundOver(),
+    'your_turn': yourTurn(),
   };
   Directory('assets/sounds').createSync(recursive: true);
   for (final MapEntry(key: name, value: samples) in sounds.entries) {
@@ -66,6 +67,11 @@ List<double> winJingle() => _notes([523.25, 659.25, 783.99, 1046.5], 0.14);
 
 /// A gentle falling pair of notes for when someone else wins.
 List<double> roundOver() => _notes([587.33, 440.0], 0.2);
+
+/// A soft two-note chime, low then high, for when it's the player's turn.
+List<double> yourTurn() => [
+  for (final sample in _notes([783.99, 1174.66], 0.08)) sample * 0.6,
+];
 
 /// [frequencies] played one after another, each [noteSeconds] long, as soft
 /// bell-like tones that ring on slightly.

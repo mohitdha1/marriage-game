@@ -49,6 +49,7 @@ void main() {
       select(),
       winJingle(),
       roundOver(),
+      yourTurn(),
     ]) {
       expect(samples, isNotEmpty);
       expect(samples.every((s) => s.abs() <= 1), isTrue);

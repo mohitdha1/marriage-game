@@ -166,8 +166,19 @@ void main() {
       sounds.played.clear();
       await tester.tap(find.byKey(const Key('discard-pile')));
       await tester.pumpAndSettle();
-      // Your discard, then the bot's draw and discard.
-      expect(sounds.played, [Sfx.cardSnap, Sfx.cardSnap, Sfx.cardSnap]);
+      // Your discard, the bot's draw and discard, then your turn again.
+      expect(sounds.played, [
+        Sfx.cardSnap,
+        Sfx.cardSnap,
+        Sfx.cardSnap,
+        Sfx.yourTurn,
+      ]);
+    });
+
+    testWidgets('no chime when a round starts on your turn', (tester) async {
+      final sounds = await pumpTable(tester);
+
+      expect(sounds.played, isNot(contains(Sfx.yourTurn)));
     });
 
     testWidgets('winning plays the jingle, and the next round shuffles', (

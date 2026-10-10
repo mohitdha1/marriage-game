@@ -15,7 +15,8 @@ Sfx? soundFor(TableEvent event, {required int humanSeat}) => switch (event) {
 };
 
 /// Plays the table's sounds as the game unfolds: a shuffle whenever a round
-/// is dealt, and a sound for each new event in the round's public history.
+/// is dealt, a sound for each new event in the round's public history, and
+/// a chime when another player's move makes it the human player's turn.
 /// Sounds follow the engine's events, so bots' moves are heard too.
 class TableSounds extends ConsumerStatefulWidget {
   const TableSounds({super.key, required this.child});
@@ -40,7 +41,11 @@ class _TableSoundsState extends ConsumerState<TableSounds> {
   Widget build(BuildContext context) {
     ref.listen(
       tableProvider.select(
-        (s) => (round: s.roundNumber, events: s.view.events),
+        (s) => (
+          round: s.roundNumber,
+          events: s.view.events,
+          yourTurn: s.view.isYourTurn,
+        ),
       ),
       (previous, next) {
         final sounds = ref.read(soundEffectsProvider);
@@ -52,6 +57,7 @@ class _TableSoundsState extends ConsumerState<TableSounds> {
           final sound = soundFor(event, humanSeat: humanSeat);
           if (sound != null) sounds.play(sound);
         }
+        if (next.yourTurn && !previous.yourTurn) sounds.play(Sfx.yourTurn);
       },
     );
     return widget.child;
