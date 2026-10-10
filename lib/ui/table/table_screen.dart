@@ -18,6 +18,7 @@ import 'hand_fan.dart';
 import 'joker_reveal.dart';
 import 'opening_picker.dart';
 import 'opponent_seat.dart';
+import 'set_chips.dart';
 import 'suit_icon.dart';
 import 'table_center.dart';
 import 'tiplu_picker.dart';
@@ -414,7 +415,7 @@ class _JokerChip extends StatelessWidget {
   }
 }
 
-/// The human player's laid-down sets, as small cards.
+/// The human player's laid-down sets, as chips above their hand.
 class _LaidDownSets extends StatelessWidget {
   const _LaidDownSets({required this.sets});
 
@@ -425,17 +426,7 @@ class _LaidDownSets extends StatelessWidget {
     return ConstrainedBox(
       key: const Key('your-laid-down-sets'),
       constraints: const BoxConstraints(maxWidth: 220),
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 4,
-        children: [
-          for (final set in sets)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [for (final card in set) CardFace(card, width: 18)],
-            ),
-        ],
-      ),
+      child: SetChips(sets, direction: Axis.horizontal),
     );
   }
 }

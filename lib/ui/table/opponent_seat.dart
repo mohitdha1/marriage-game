@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../state/table_view.dart';
 import 'card_view.dart';
+import 'set_chips.dart';
 
-/// An opponent at the table: avatar beside their name, how many cards they
-/// hold, and whether they've seen the joker. Laid out in a row to stay short,
+/// An opponent at the table: their last discard and avatar beside their
+/// name, how many cards they hold, whether they've seen the joker, and the
+/// sets they've laid down as chips. Laid out in a row to stay short,
 /// so seats along the top leave room for the piles below. The seat glows
 /// while it's their turn.
 class OpponentSeat extends StatelessWidget {
@@ -42,7 +44,7 @@ class OpponentSeat extends StatelessWidget {
           // Their most recent discard, so everyone can see what they've
           // been throwing away.
           if (seat.lastDiscard case final card?) ...[
-            CardFace(card, width: 20, key: Key('last-discard-${seat.seat}')),
+            CardFace(card, width: 18, key: Key('last-discard-${seat.seat}')),
             const SizedBox(width: 6),
           ],
           CircleAvatar(
@@ -93,6 +95,18 @@ class OpponentSeat extends StatelessWidget {
                   ],
                 ],
               ),
+              if (seat.laidDown.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 124),
+                    child: SetChips(
+                      seat.laidDown,
+                      key: Key('seat-sets-${seat.seat}'),
+                      direction: Axis.horizontal,
+                    ),
+                  ),
+                ),
             ],
           ),
         ],

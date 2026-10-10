@@ -70,8 +70,16 @@ void main() {
               random: Random(0),
               hands: [
                 [...runs.expand((r) => r), ...rest.take(12)],
+                // Bots hold three runs, so they show on their first turn
+                // and every seat has chips to lay out.
                 for (var bot = 1; bot < playerCount; bot++)
-                  run(Suit.spades, [Rank.six, Rank.eight, Rank.queen]),
+                  [
+                    ...run(Suit.clubs, [Rank.four, Rank.five, Rank.six]),
+                    ...run(Suit.diamonds, [Rank.seven, Rank.eight, Rank.nine]),
+                    ...run(Suit.hearts, [Rank.jack, Rank.queen, Rank.king]),
+                    c(Suit.spades, Rank.two),
+                    c(Suit.clubs, Rank.nine),
+                  ],
               ],
               stock: [for (var i = 0; i < 10; i++) c(Suit.hearts, Rank.king)],
               discardPile: [c(Suit.clubs, Rank.king)],
@@ -115,6 +123,11 @@ void main() {
       container.read(tableProvider).view.opponents.map((s) => s.lastDiscard),
       everyElement(isNotNull),
       reason: 'every seat shows its last discard',
+    );
+    expect(
+      container.read(tableProvider).view.opponents.map((s) => s.laidDown),
+      everyElement(hasLength(3)),
+      reason: 'every bot has shown its sets',
     );
   }
 
