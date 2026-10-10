@@ -155,6 +155,17 @@ class TableController extends Notifier<TableState> {
     state = state.copyWith(selected: selected);
   }
 
+  /// Moves the card with [cardId] to [newIndex] in the hand, where it stays
+  /// until it's moved again or the hand is sorted.
+  void moveCard(int cardId, int newIndex) {
+    final hand = [...state.hand];
+    final from = hand.indexWhere((c) => c.id == cardId);
+    if (from < 0) return;
+    final card = hand.removeAt(from);
+    hand.insert(newIndex.clamp(0, hand.length), card);
+    state = state.copyWith(hand: hand);
+  }
+
   /// Sorts the hand by suit, then rank.
   void sortHand() {
     final sorted = [...state.hand]

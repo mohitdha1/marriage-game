@@ -93,9 +93,16 @@ Finder lastHandCard(WidgetTester tester) =>
 String status(WidgetTester tester) =>
     tester.widget<Text>(find.byKey(const Key('status-line'))).data!;
 
-/// Drags from [from] to [to] the way a finger would.
-Future<void> dragBetween(WidgetTester tester, Finder from, Finder to) async {
+/// Drags from [from] to [to] the way a finger would. Hand cards only start
+/// dragging after a long press, so [longPress] holds still first.
+Future<void> dragBetween(
+  WidgetTester tester,
+  Finder from,
+  Finder to, {
+  bool longPress = false,
+}) async {
   final gesture = await tester.startGesture(tester.getCenter(from));
+  if (longPress) await tester.pump(const Duration(milliseconds: 400));
   await gesture.moveBy(const Offset(0, -20));
   await tester.pump();
   await gesture.moveTo(tester.getCenter(to));
@@ -194,6 +201,7 @@ void main() {
       tester,
       lastHandCard(tester),
       find.byKey(const Key('discard-pile')),
+      longPress: true,
     );
 
     expect(
@@ -201,6 +209,46 @@ void main() {
       isNot(contains(queenOfDiamonds)),
     );
     expect(stateOf(tester).view.isYourTurn, isTrue);
+  });
+
+  testWidgets('long-press and drag moves a card within the hand', (
+    tester,
+  ) async {
+    await pumpTable(tester);
+    final before = stateOf(tester).hand;
+    final moved = before.last;
+
+    // Drop the last card onto the first card's slot.
+    final firstSlot = find.byKey(ValueKey(before.first.id));
+    final gesture = await tester.startGesture(
+      tester.getCenter(lastHandCard(tester)),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await gesture.moveBy(const Offset(0, -20));
+    await tester.pump();
+    await gesture.moveTo(tester.getTopLeft(firstSlot) + const Offset(20, 40));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    final after = stateOf(tester).hand;
+    expect(after.first, moved);
+    expect(after, hasLength(before.length));
+    expect(stateOf(tester).view.youHaveDrawn, isFalse, reason: 'not a draw');
+  });
+
+  testWidgets('a quick drag on a hand card does nothing; it needs a long '
+      'press', (tester) async {
+    await pumpTable(tester);
+    final before = stateOf(tester).hand;
+
+    await dragBetween(
+      tester,
+      lastHandCard(tester),
+      find.byKey(const Key('discard-pile')),
+    );
+
+    expect(stateOf(tester).hand, before);
   });
 
   testWidgets('Sort orders the hand by suit, then rank', (tester) async {

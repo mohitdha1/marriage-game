@@ -183,6 +183,7 @@ class TableScreen extends ConsumerWidget {
                           controller.toggleSelected(id);
                         },
                         onDraw: controller.draw,
+                        onReorder: controller.moveCard,
                       ),
                     ),
                     if (choice != null)

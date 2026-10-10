@@ -185,6 +185,32 @@ void main() {
       expect(container.table.selected, {twos.first});
     });
 
+    test('a card can be moved to any position, and stays there', () {
+      final container = tableWith();
+      final ids = container.table.hand.map((c) => c.id).toList();
+
+      container.controller.moveCard(ids.last, 0);
+      expect(container.table.hand.first.id, ids.last);
+
+      container.controller.moveCard(ids.last, 3);
+      expect(container.table.hand[3].id, ids.last);
+      expect(container.table.hand.map((c) => c.id).toSet(), ids.toSet());
+
+      // Drawing adds at the end without disturbing the arrangement.
+      final arranged = container.table.hand;
+      container.controller.draw(DrawSource.stock);
+      expect(container.table.hand.take(arranged.length), arranged);
+    });
+
+    test('moving to a position past the end puts the card last', () {
+      final container = tableWith();
+      final first = container.table.hand.first.id;
+
+      container.controller.moveCard(first, 99);
+
+      expect(container.table.hand.last.id, first);
+    });
+
     test(
       'Sort orders the hand by suit, then rank, keeping each card\'s id',
       () {

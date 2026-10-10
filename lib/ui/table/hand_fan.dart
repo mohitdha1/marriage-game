@@ -23,6 +23,7 @@ class HandFan extends StatelessWidget {
     this.jokers,
     this.onCardTap,
     this.onDraw,
+    this.onReorder,
   });
 
   final List<HandCard> cards;
@@ -42,6 +43,10 @@ class HandFan extends StatelessWidget {
 
   /// Called when a pile is dragged onto the fan.
   final void Function(DrawSource source)? onDraw;
+
+  /// Called when a card is long-pressed and dropped back on the fan, with
+  /// the position it was dropped at.
+  final void Function(int cardId, int newIndex)? onReorder;
 
   /// Largest gap between neighbouring cards, as a share of a card's width,
   /// so small hands still overlap a little.
@@ -68,12 +73,7 @@ class HandFan extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
-    return DragTarget<DrawSource>(
-      onAcceptWithDetails: (details) => onDraw?.call(details.data),
-      builder: (context, candidates, rejected) => _fan(),
-    );
-  }
+  Widget build(BuildContext context) => _fan();
 
   Widget _fan() {
     final cardHeight = cardWidth / cardAspectRatio;
@@ -133,7 +133,23 @@ class HandFan extends StatelessWidget {
         // Room above the cards for a selected card to lift into.
         final top = lift + overhangY;
 
-        return SizedBox(
+        // Where a card dropped on the fan should go: the slot whose centre is
+        // nearest the drop.
+        int slotAt(Offset globalDropTopLeft) {
+          final box = context.findRenderObject()! as RenderBox;
+          final dropCentre =
+              box.globalToLocal(globalDropTopLeft).dx + cardWidth / 2;
+          var nearest = 0;
+          for (var i = 1; i < n; i++) {
+            final here = (left + offsets[i] + cardWidth / 2 - dropCentre).abs();
+            final best = (left + offsets[nearest] + cardWidth / 2 - dropCentre)
+                .abs();
+            if (here < best) nearest = i;
+          }
+          return nearest;
+        }
+
+        final fan = SizedBox(
           height: top + cardHeight + drops.reduce(max) + overhangY,
           child: Stack(
             clipBehavior: Clip.none,
@@ -166,12 +182,24 @@ class HandFan extends StatelessWidget {
             ],
           ),
         );
+
+        // A pile dropped on the fan draws from it; a hand card dropped on
+        // the fan moves to where it was dropped.
+        return DragTarget<DrawSource>(
+          onAcceptWithDetails: (details) => onDraw?.call(details.data),
+          builder: (context, candidates, rejected) => DragTarget<HandCard>(
+            onAcceptWithDetails: (details) =>
+                onReorder?.call(details.data.id, slotAt(details.offset)),
+            builder: (context, candidates, rejected) => fan,
+          ),
+        );
       },
     );
   }
 }
 
-/// One card in the hand: tap to select, drag to discard.
+/// One card in the hand: tap to select; long-press and drag to move it
+/// within the hand or onto the discard pile.
 class _HandCardView extends StatelessWidget {
   const _HandCardView({
     required this.handCard,
@@ -198,8 +226,9 @@ class _HandCardView extends StatelessWidget {
       wild: wild,
       groupColor: groupColor,
     );
-    return Draggable<HandCard>(
+    return LongPressDraggable<HandCard>(
       data: handCard,
+      delay: const Duration(milliseconds: 250),
       feedback: Material(
         color: Colors.transparent,
         child: CardFace(handCard.card, width: width, highlighted: true),
