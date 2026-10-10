@@ -11,6 +11,7 @@ import 'package:marriage_game/main.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
+import 'package:marriage_game/ui/table/card_view.dart';
 import 'package:marriage_game/ui/table/hand_fan.dart';
 import 'package:marriage_game/ui/table/opponent_seat.dart';
 import 'package:marriage_game/ui/table/table_center.dart';
@@ -172,6 +173,44 @@ void main() {
               reason: 'a corner badge ($badge) overlaps a seat',
             );
           }
+        }
+
+        // The first-time guide's tip may cover the status line, which says
+        // much the same, but nothing the player needs to see or tap.
+        final tip = find.byKey(const Key('guide-sets'));
+        expect(tip, findsOneWidget);
+        final tipRect = tester.getRect(tip);
+        for (final MapEntry(key: what, value: finder) in above.entries) {
+          if (what == 'status line') continue;
+          expect(
+            tipRect.overlaps(tester.getRect(finder)),
+            isFalse,
+            reason: 'the guide tip ($tipRect) overlaps the $what',
+          );
+        }
+        for (final seat in seats.evaluate()) {
+          expect(
+            tipRect.overlaps(tester.getRect(find.byWidget(seat.widget))),
+            isFalse,
+            reason: 'the guide tip ($tipRect) overlaps a seat',
+          );
+        }
+        // Nor does it hide the corners of the cards in hand (a selected card
+        // lifts into the room the tip uses).
+        for (final element
+            in find
+                .descendant(
+                  of: find.byType(HandFan),
+                  matching: find.byType(CardFace),
+                )
+                .evaluate()) {
+          if ((element.widget as CardFace).highlighted) continue;
+          final card = tester.getRect(find.byWidget(element.widget));
+          expect(
+            tipRect.bottom,
+            lessThanOrEqualTo(card.top + 0.5),
+            reason: 'the guide tip ($tipRect) covers a card in hand ($card)',
+          );
         }
 
         final rects = {

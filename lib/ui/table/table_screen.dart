@@ -10,6 +10,7 @@ import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
 import '../../engine/scoring.dart';
 import '../../engine/table_event.dart';
+import '../guide/table_guide.dart';
 import '../scoreboard/scoreboard_screen.dart';
 import '../settings/settings.dart';
 import '../sound/sound_effects.dart';
@@ -55,6 +56,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
   static const _sideClearance = 200.0;
 
   final _anchors = TableAnchors();
+  final _statusLine = LayerLink();
   final _flights = GlobalKey<CardFlightLayerState>();
   final _handCardKeys = <int, GlobalKey>{};
 
@@ -439,15 +441,19 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                               maxWidth:
                                   constraints.maxWidth - 2 * _sideClearance,
                             ),
-                            child: Text(
-                              statusLine(state),
-                              key: const Key('status-line'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
+                            // The first-time guide's tips sit here.
+                            child: CompositedTransformTarget(
+                              link: _statusLine,
+                              child: Text(
+                                statusLine(state),
+                                key: const Key('status-line'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
@@ -525,6 +531,9 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                         key: _flights,
                         cardWidth: cardWidth,
                       ),
+                    ),
+                    Positioned.fill(
+                      child: TableGuideLayer(statusLine: _statusLine),
                     ),
                     if (table.winner case final winner?)
                       Positioned.fill(

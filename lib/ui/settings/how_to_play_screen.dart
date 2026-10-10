@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/scoring.dart';
+import '../guide/guide.dart';
 import '../table/suit_icon.dart';
 import '../theme/table_felt.dart';
 import '../theme/table_theme.dart';
 
 /// The rules as this game plays them, and how to handle the cards, in short
-/// sections on the table's felt.
-class HowToPlayScreen extends StatelessWidget {
+/// sections on the table's felt, with a button to replay the first-time
+/// guide.
+class HowToPlayScreen extends ConsumerWidget {
   const HowToPlayScreen({super.key});
 
   static final sections = [
@@ -66,7 +69,7 @@ class HowToPlayScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = TableTheme.of(context);
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -82,6 +85,34 @@ class HowToPlayScreen extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: FilledButton.icon(
+                    key: const Key('guide-restart'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: theme.accent,
+                      foregroundColor: const Color(0xFF1A1A1A),
+                    ),
+                    onPressed: () {
+                      ref.read(guideProvider.notifier).restart();
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'The guide will show in your next game.',
+                            ),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                    },
+                    icon: const Icon(Icons.school_outlined),
+                    label: const Text('Show the guide again'),
+                  ),
+                ),
+              ),
               for (final (title, body) in sections)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
