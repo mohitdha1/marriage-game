@@ -451,6 +451,15 @@ void main() {
 
       expect(status(tester), 'You won the round.');
       expect(find.text('You won the round!'), findsOneWidget);
+      // A banner celebrates; with reduced motion, no confetti falls.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('win-banner')),
+          matching: find.text('You won!'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('confetti')), findsNothing);
 
       // After a moment, the scoreboard opens on its own.
       expect(find.byType(ScoreboardScreen), findsNothing);

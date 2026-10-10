@@ -25,6 +25,7 @@ import 'set_chips.dart';
 import 'suit_icon.dart';
 import 'table_center.dart';
 import 'tiplu_picker.dart';
+import 'win_celebration.dart';
 
 /// The main game screen, in landscape: opponents around the top and sides
 /// (the one whose turn it is glows), the stock and discard pile in the
@@ -433,6 +434,13 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                         cardWidth: cardWidth,
                       ),
                     ),
+                    if (table.winner case final winner?)
+                      Positioned.fill(
+                        child: WinCelebration(
+                          winnerName: winner.name,
+                          youWon: winner.seat == table.you.seat,
+                        ),
+                      ),
                     if (choice != null)
                       _Overlay(
                         child: OpeningPicker(
