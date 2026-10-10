@@ -164,10 +164,11 @@ void main() {
       await tester.pumpAndSettle();
       final opponents = container.read(tableProvider).view.opponents.length;
 
-      container.read(matchSetupProvider.notifier).choose((
-        playerCount: 2,
-        difficulty: BotDifficulty.easy,
-      ));
+      container
+          .read(matchSetupProvider.notifier)
+          .choose(
+            const MatchSetup(playerCount: 2, difficulty: BotDifficulty.easy),
+          );
       await tester.pump();
 
       expect(
@@ -190,12 +191,9 @@ void main() {
     });
 
     test('the setup sums up as bots and level', () {
+      expect(describeSetup(const MatchSetup(playerCount: 2)), '1 bot · Medium');
       expect(
-        describeSetup((playerCount: 2, difficulty: BotDifficulty.medium)),
-        '1 bot · Medium',
-      );
-      expect(
-        describeSetup((playerCount: 5, difficulty: BotDifficulty.hard)),
+        describeSetup(const MatchSetup(difficulty: BotDifficulty.hard)),
         '4 bots · Hard',
       );
     });

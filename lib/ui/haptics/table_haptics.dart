@@ -21,6 +21,7 @@ class TableHaptics extends ConsumerWidget {
           round: s.roundNumber,
           events: s.view.events,
           yourTurn: s.view.isYourTurn,
+          you: s.view.you.seat,
         ),
       ),
       (previous, next) {
@@ -28,7 +29,7 @@ class TableHaptics extends ConsumerWidget {
         final haptics = ref.read(hapticsProvider);
         final youWon = next.events
             .skip(previous.events.length)
-            .any((e) => e is WonRound && e.seat == humanSeat);
+            .any((e) => e is WonRound && e.seat == next.you);
         if (youWon) {
           haptics.buzz(Buzz.win);
         } else if (next.yourTurn && !previous.yourTurn) {

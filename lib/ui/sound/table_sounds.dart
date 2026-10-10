@@ -6,11 +6,11 @@ import '../state/table_controller.dart';
 import 'sound_effects.dart';
 
 /// The sound, if any, for something that happened at the table, heard from
-/// [humanSeat]: every draw and discard snaps, and the end of a round plays a
+/// [yourSeat]: every draw and discard snaps, and the end of a round plays a
 /// jingle if they won or a gentler tone if someone else did.
-Sfx? soundFor(TableEvent event, {required int humanSeat}) => switch (event) {
+Sfx? soundFor(TableEvent event, {required int yourSeat}) => switch (event) {
   DrewCard() || DiscardedCard() => Sfx.cardSnap,
-  WonRound(:final seat) => seat == humanSeat ? Sfx.win : Sfx.roundOver,
+  WonRound(:final seat) => seat == yourSeat ? Sfx.win : Sfx.roundOver,
   OpenedTunnellas() || ShowedSets() || StockReshuffled() => null,
 };
 
@@ -45,6 +45,7 @@ class _TableSoundsState extends ConsumerState<TableSounds> {
           round: s.roundNumber,
           events: s.view.events,
           yourTurn: s.view.isYourTurn,
+          you: s.view.you.seat,
         ),
       ),
       (previous, next) {
@@ -54,7 +55,7 @@ class _TableSoundsState extends ConsumerState<TableSounds> {
           return;
         }
         for (final event in next.events.skip(previous.events.length)) {
-          final sound = soundFor(event, humanSeat: humanSeat);
+          final sound = soundFor(event, yourSeat: next.you);
           if (sound != null) sounds.play(sound);
         }
         if (next.yourTurn && !previous.yourTurn) sounds.play(Sfx.yourTurn);

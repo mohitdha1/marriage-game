@@ -116,27 +116,27 @@ void main() {
   group('soundFor', () {
     test('draws and discards snap', () {
       expect(
-        soundFor(const DrewCard(1, DrawSource.stock), humanSeat: 0),
+        soundFor(const DrewCard(1, DrawSource.stock), yourSeat: 0),
         Sfx.cardSnap,
       );
       expect(
-        soundFor(DiscardedCard(0, twoOfDiamonds), humanSeat: 0),
+        soundFor(DiscardedCard(0, twoOfDiamonds), yourSeat: 0),
         Sfx.cardSnap,
       );
     });
 
     test('winning plays the jingle; someone else winning a gentler tone', () {
-      expect(soundFor(WonRound(0, twoOfDiamonds), humanSeat: 0), Sfx.win);
-      expect(soundFor(WonRound(1, twoOfDiamonds), humanSeat: 0), Sfx.roundOver);
+      expect(soundFor(WonRound(0, twoOfDiamonds), yourSeat: 0), Sfx.win);
+      expect(soundFor(WonRound(1, twoOfDiamonds), yourSeat: 0), Sfx.roundOver);
     });
 
     test('shows, openings and reshuffles are silent', () {
       expect(
-        soundFor(ShowedSets(0, ShowKind.pureSets, [heartsRun]), humanSeat: 0),
+        soundFor(ShowedSets(0, ShowKind.pureSets, [heartsRun]), yourSeat: 0),
         isNull,
       );
-      expect(soundFor(OpenedTunnellas(0, [heartsRun]), humanSeat: 0), isNull);
-      expect(soundFor(const StockReshuffled(0), humanSeat: 0), isNull);
+      expect(soundFor(OpenedTunnellas(0, [heartsRun]), yourSeat: 0), isNull);
+      expect(soundFor(const StockReshuffled(0), yourSeat: 0), isNull);
     });
   });
 

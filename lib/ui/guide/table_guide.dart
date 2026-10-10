@@ -33,8 +33,9 @@ class TableGuideLayer extends ConsumerWidget {
           ? 0
           : previous.length;
       final guide = ref.read(guideProvider.notifier);
+      final you = ref.read(tableProvider).view.you.seat;
       for (final event in next.skip(seen)) {
-        if (event.seat != humanSeat) continue;
+        if (event.seat != you) continue;
         switch (event) {
           case DrewCard():
             guide.complete(GuideStep.draw);

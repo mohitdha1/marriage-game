@@ -89,10 +89,14 @@ class HomeScreen extends ConsumerWidget {
                                         final chosen = ref.read(
                                           settingsProvider,
                                         );
-                                        _startSinglePlayer(context, ref, (
-                                          playerCount: chosen.playerCount,
-                                          difficulty: chosen.botDifficulty,
-                                        ));
+                                        _startSinglePlayer(
+                                          context,
+                                          ref,
+                                          MatchSetup(
+                                            playerCount: chosen.playerCount,
+                                            difficulty: chosen.botDifficulty,
+                                          ),
+                                        );
                                       }
                                     },
                                   ),

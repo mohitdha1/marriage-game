@@ -50,6 +50,7 @@ ProviderContainer tableWith({
   int? firstSeat,
   Duration thinkingTime = Duration.zero,
   GameConfig? config,
+  List<String>? people,
 }) {
   final container = ProviderContainer(
     overrides: [
@@ -75,6 +76,11 @@ ProviderContainer tableWith({
     ],
   );
   addTearDown(container.dispose);
+  if (people != null) {
+    container
+        .read(matchSetupProvider.notifier)
+        .choose(MatchSetup.passAndPlay(people));
+  }
   return container;
 }
 
@@ -548,6 +554,114 @@ void main() {
 
       expect(container.table.view.youHaveSeenJoker, isTrue);
       expect(container.table.view.you.laidDown, pairs);
+    });
+  });
+
+  group('Several people on one device', () {
+    // Asha at seat 0 holds yourCards; Bina at seat 1 holds idleBotCards.
+    ProviderContainer twoPeople({
+      List<PlayingCard>? asha,
+      List<PlayingCard>? bina,
+    }) => tableWith(people: ['Asha', 'Bina'], yourHand: asha, botHand: bina);
+
+    test('everyone is called by name, and nobody is a bot', () {
+      final container = twoPeople();
+
+      expect(container.table.seatNames, ['Asha', 'Bina']);
+      expect(container.table.view.you.name, 'Asha');
+      expect(container.table.view.opponents.single.name, 'Bina');
+    });
+
+    test('after a turn, the table turns to the next person\'s view', () async {
+      final container = twoPeople()..controller.draw(DrawSource.stock);
+
+      await container.controller.discard(
+        container.idOf(c(Suit.spades, Rank.king)),
+      );
+
+      final view = container.table.view;
+      expect(view.you.seat, 1);
+      expect(view.isYourTurn, isTrue);
+      expect(container.table.hand.map((h) => h.card), idleBotCards);
+      expect(view.opponents.single.name, 'Asha');
+    });
+
+    test(
+      'each person\'s arrangement waits for them while others play',
+      () async {
+        final container = twoPeople()..controller.draw(DrawSource.stock);
+        // Asha groups a run and puts K♦ first among the rest.
+        container.group(heartsRun);
+        container.controller.moveCard(
+          container.idOf(c(Suit.diamonds, Rank.king)),
+          3,
+        );
+        final ashas = container.table.hand.map((h) => h.card).toList();
+        final ashasGroups = container.table.groups.length;
+
+        await container.controller.discard(
+          container.idOf(c(Suit.spades, Rank.king)),
+        );
+        // Bina plays her turn.
+        container.controller.draw(DrawSource.stock);
+        await container.controller.discard(container.table.hand.last.id);
+
+        expect(container.table.view.you.seat, 0);
+        expect(container.table.hand.map((h) => h.card), [
+          ...ashas.where((card) => card != c(Suit.spades, Rank.king)),
+        ]);
+        expect(container.table.groups, hasLength(ashasGroups));
+      },
+    );
+
+    test('a win is announced by name, and coins are left alone', () {
+      final container = twoPeople(
+        asha: [
+          ...yourCards.take(9),
+          c(Suit.spades, Rank.king),
+          c(Suit.diamonds, Rank.king),
+          c(Suit.clubs, Rank.seven),
+          c(Suit.diamonds, Rank.ten),
+          c(Suit.diamonds, Rank.jack),
+          c(Suit.hearts, Rank.eight),
+          twoOfDiamonds,
+        ],
+      );
+      final coins = container.read(coinsProvider);
+      container
+        ..controller.draw(DrawSource.stock)
+        ..group(heartsRun)
+        ..group(spadesRun)
+        ..group(clubsRun)
+        ..controller.showGroups()
+        ..controller.pickTiplu(1)
+        ..controller.toggleSelected(container.idOf(twoOfDiamonds))
+        ..controller.declareWin();
+
+      expect(container.table.view.winner?.name, 'Asha');
+      expect(container.table.notice, 'Asha won the round.');
+      expect(container.read(coinsProvider), coins);
+    });
+
+    test('everyone with more than 3 tunnellas chooses in turn before play', () {
+      final four = [
+        for (final rank in [Rank.two, Rank.five, Rank.nine, Rank.king])
+          ...tunnellaOf(c(Suit.clubs, rank)),
+      ];
+      final container = twoPeople(asha: four, bina: four);
+
+      expect(container.table.view.you.seat, 0);
+      expect(container.table.openingChoice, hasLength(4));
+
+      container.controller.chooseOpeningTunnellas([0, 1, 2]);
+      expect(container.table.view.you.seat, 1, reason: 'Bina chooses next');
+      expect(container.table.openingChoice, hasLength(4));
+
+      container.controller.chooseOpeningTunnellas([1, 2, 3]);
+      expect(container.table.view.you.seat, 0, reason: 'Asha plays first');
+      expect(container.table.openingChoice, isNull);
+      container.controller.draw(DrawSource.stock);
+      expect(container.table.view.youHaveDrawn, isTrue);
     });
   });
 

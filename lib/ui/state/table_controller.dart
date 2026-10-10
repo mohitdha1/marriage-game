@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../bots/bot_personality.dart';
@@ -16,11 +18,36 @@ import '../home/coins.dart';
 import 'table_state.dart';
 import 'table_view.dart';
 
-/// How many play, the human player included, and how well the bots play.
-typedef MatchSetup = ({int playerCount, BotDifficulty difficulty});
+/// Who plays a match: one person against bots, or several [people] passing
+/// this device round the table.
+@immutable
+class MatchSetup {
+  /// One person against [playerCount] − 1 bots at [difficulty].
+  const MatchSetup({
+    this.playerCount = 5,
+    this.difficulty = BotDifficulty.medium,
+  }) : people = const [];
+
+  /// [people], named in seat order, taking turns on this device; no bots.
+  MatchSetup.passAndPlay(List<String> people)
+    : playerCount = people.length,
+      difficulty = BotDifficulty.medium,
+      people = List.unmodifiable(people);
+
+  /// How many play, people and bots together.
+  final int playerCount;
+
+  /// How well the bots play, when there are bots.
+  final BotDifficulty difficulty;
+
+  /// The people sharing this device, by seat; empty against bots.
+  final List<String> people;
+
+  bool get isPassAndPlay => people.isNotEmpty;
+}
 
 /// Quick Play's setup: a full table of five against Medium bots.
-const quickPlaySetup = (playerCount: 5, difficulty: BotDifficulty.medium);
+const quickPlaySetup = MatchSetup();
 
 /// The setup the next match starts with. Whatever starts a match chooses it:
 /// Quick Play its own, a custom game the player's choices.
@@ -65,10 +92,10 @@ final botThinkingTimeProvider = Provider<Duration Function()>((ref) {
   return () => Duration(milliseconds: 700 + random.nextInt(701));
 });
 
-/// The seat the person using this device plays.
+/// The seat the person using this device plays in a game against bots.
 const humanSeat = 0;
 
-/// The table as the human player sees it.
+/// The table as the person whose view it is sees it.
 final tableProvider = NotifierProvider<TableController, TableState>(
   TableController.new,
 );
@@ -78,14 +105,31 @@ final tableProvider = NotifierProvider<TableController, TableState>(
 /// source of truth: every move goes through it, and when it refuses one, its
 /// reason is shown to the player as a notice.
 ///
-/// Every other seat is a [BotPlayer] with its own personality. Bots play one
-/// at a time after a short thinking pause, and the table is published after
-/// each bot's move, so the player watches the game unfold. The human player
-/// can't move while a bot is thinking.
+/// Every seat is a person or a [BotPlayer] with its own personality: one
+/// person against bots, or several people passing this device round. Bots
+/// play one at a time after a short thinking pause, and the table is
+/// published after each bot's move, so the people watch the game unfold.
+/// Nobody can move while a bot is thinking.
+///
+/// The table shows one person's view at a time: their hand, groups and
+/// selection. Each person's are kept on their own [_Desk] while someone
+/// else's turn is showing.
 class TableController extends Notifier<TableState> {
   late Round Function(int firstSeat) _newRound;
   late Round _round;
   late Map<int, BotPlayer> _bots;
+
+  /// The seats people play, and their names (empty against bots, where the
+  /// one person is "You").
+  late Set<int> _people;
+  late List<String> _peopleNames;
+
+  /// Whose view the table shows: the person playing now, or the last one to
+  /// play while bots take their turns.
+  var _viewer = humanSeat;
+
+  /// Everyone else's private table, kept while it isn't their view.
+  final _desks = <int, _Desk>{};
   late Duration Function() _thinkingTime;
   late MatchScore _match;
   Future<void>? _botsPlaying;
@@ -105,12 +149,17 @@ class TableController extends Notifier<TableState> {
     _round = _newRound(_firstSeat);
     _match = MatchScore(_round.hands.length);
 
+    final setup = ref.read(matchSetupProvider);
+    final seats = [for (var seat = 0; seat < _round.hands.length; seat++) seat];
+    _peopleNames = setup.people;
+    _people = setup.isPassAndPlay ? seats.toSet() : {humanSeat};
+
     // The same bots play every round of the match.
     final random = ref.watch(randomProvider);
     final difficulty = ref.read(botDifficultyProvider);
     final botSeats = [
-      for (var seat = 0; seat < _round.hands.length; seat++)
-        if (seat != humanSeat) seat,
+      for (final seat in seats)
+        if (!_people.contains(seat)) seat,
     ];
     final personalities = BotPersonality.pick(botSeats.length, random);
     _bots = {
@@ -141,6 +190,7 @@ class TableController extends Notifier<TableState> {
     _botsPlaying = null;
     _nextCardId = 0;
     _roundRecorded = false;
+    _desks.clear();
 
     for (final MapEntry(key: seat, value: bot) in _bots.entries) {
       _round.showOpeningTunnellas(
@@ -149,20 +199,33 @@ class TableController extends Notifier<TableState> {
       );
     }
 
-    // The human player's tunnellas are shown for them, unless they hold
-    // more than 3 and have to choose.
-    final tunnellas = findTunnellas(_round.hands[humanSeat].cards);
-    final mustChoose = tunnellas.length > PlayerHand.maxOpeningTunnellas;
-    if (!mustChoose) {
-      _round.showOpeningTunnellas(humanSeat, tunnellas);
+    // Each person's tunnellas are shown for them, unless they hold more
+    // than 3 and have to choose.
+    final choosing = <int>[];
+    for (final seat in _inTurnOrder(_people)) {
+      final tunnellas = findTunnellas(_round.hands[seat].cards);
+      if (tunnellas.length > PlayerHand.maxOpeningTunnellas) {
+        choosing.add(seat);
+        _desks[seat] = _Desk(openingChoice: tunnellas);
+      } else {
+        _round.showOpeningTunnellas(seat, tunnellas);
+      }
+    }
+    // The view opens on the first person who has to choose, or else on the
+    // first person to play.
+    _viewer = choosing.isNotEmpty
+        ? choosing.first
+        : _inTurnOrder(_people).first;
+    final desk = _desks.remove(_viewer) ?? _Desk();
+    if (choosing.isEmpty) {
       // If a bot goes first, start it once this first state is in place.
-      Future.microtask(_playBots);
+      Future.microtask(_advance);
     }
 
     return TableState(
       view: _snapshot(),
-      hand: _reconcile(const []),
-      openingChoice: mustChoose ? tunnellas : null,
+      hand: _reconcile(desk.hand),
+      openingChoice: desk.openingChoice,
       roundNumber: _roundNumber,
       seatNames: [
         for (var seat = 0; seat < _round.hands.length; seat++) _nameOf(seat),
@@ -236,13 +299,20 @@ class TableController extends Notifier<TableState> {
       return;
     }
     final shown = _act(
-      () => _round.showOpeningTunnellas(humanSeat, [
+      () => _round.showOpeningTunnellas(_viewer, [
         for (final i in picks) choice[i],
       ]),
     );
-    if (shown) {
-      state = state.copyWith(openingChoice: () => null);
-      _playBots();
+    if (!shown) return;
+    state = state.copyWith(openingChoice: () => null);
+    // Anyone else who has to choose goes next; then play begins.
+    final stillChoosing = _inTurnOrder(
+      _people,
+    ).where((seat) => _desks[seat]?.openingChoice != null);
+    if (stillChoosing.isNotEmpty) {
+      _switchTo(stillChoosing.first);
+    } else {
+      unawaited(_advance());
     }
   }
 
@@ -259,12 +329,12 @@ class TableController extends Notifier<TableState> {
     final card = _cardWithId(cardId);
     if (card == null || !_checkYourTurn()) return;
     if (_act(() => _round.discard(card), removing: {cardId})) {
-      await _playBots();
+      await _advance();
     }
   }
 
-  /// Whether discarding the card with [cardId] now would cost the human
-  /// player the joker-discard penalty: it's their turn to discard, the
+  /// Whether discarding the card with [cardId] now would cost the person
+  /// playing the joker-discard penalty: it's their turn to discard, the
   /// penalty is in play, they've seen the joker, and the card is wild.
   bool discardCostsPenalty(int cardId) {
     final view = state.view;
@@ -422,7 +492,7 @@ class TableController extends Notifier<TableState> {
     final accepted = notice == null;
     final winner = _round.winner;
     if (accepted && winner != null) {
-      notice = winner == humanSeat
+      notice = _nameOf(winner) == 'You'
           ? 'You won the round!'
           : '${_nameOf(winner)} won the round.';
     }
@@ -430,14 +500,55 @@ class TableController extends Notifier<TableState> {
     return accepted;
   }
 
-  /// Plays bot turns, with a thinking pause before each, until it's the
-  /// human player's turn or the round is over. Only one run happens at a
+  /// Plays any bots' turns, then turns the table to the person who plays
+  /// next.
+  Future<void> _advance() async {
+    // With no bot to wait for, the table turns straight away.
+    if (!_people.contains(_round.currentSeat)) await _playBots();
+    if (!ref.mounted || _round.isOver) return;
+    final next = _round.currentSeat;
+    if (_people.contains(next) && next != _viewer) _switchTo(next);
+  }
+
+  /// Turns the table to [seat]'s view, keeping the current person's hand,
+  /// groups and selection on their desk until it's their view again.
+  void _switchTo(int seat) {
+    _desks[_viewer] = _Desk(
+      hand: state.hand,
+      groups: state.groups,
+      selected: state.selected,
+      openingChoice: state.openingChoice,
+    );
+    _viewer = seat;
+    final desk = _desks.remove(seat) ?? _Desk();
+    state = state.copyWith(
+      hand: desk.hand,
+      groups: desk.groups,
+      selected: desk.selected,
+      openingChoice: () => desk.openingChoice,
+      pickingTiplu: false,
+      revealingJoker: false,
+    );
+    _publish();
+  }
+
+  /// [seats] in the order they play this round, from the first player.
+  List<int> _inTurnOrder(Iterable<int> seats) {
+    final count = _round.hands.length;
+    return [
+      for (var i = 0; i < count; i++)
+        if (seats.contains((_firstSeat + i) % count)) (_firstSeat + i) % count,
+    ];
+  }
+
+  /// Plays bot turns, with a thinking pause before each, until it's a
+  /// person's turn or the round is over. Only one run happens at a
   /// time; calling again while bots are playing joins the current run.
   Future<void> _playBots() =>
       _botsPlaying ??= _runBots().whenComplete(() => _botsPlaying = null);
 
   Future<void> _runBots() async {
-    while (!_round.isOver && _round.currentSeat != humanSeat) {
+    while (!_round.isOver && !_people.contains(_round.currentSeat)) {
       await Future<void>.delayed(_thinkingTime());
       if (!ref.mounted) return;
       final seat = _round.currentSeat;
@@ -451,7 +562,11 @@ class TableController extends Notifier<TableState> {
     if (_round.isOver && !_roundRecorded) {
       final score = _round.score();
       _match.addRound(score);
-      ref.read(coinsProvider.notifier).addRoundResult(score.net[humanSeat]);
+      // Coins are the device owner's, won against bots; a game passed
+      // round among friends doesn't touch them.
+      if (_peopleNames.isEmpty) {
+        ref.read(coinsProvider.notifier).addRoundResult(score.net[humanSeat]);
+      }
       _roundRecorded = true;
     }
 
@@ -477,14 +592,14 @@ class TableController extends Notifier<TableState> {
   }
 
   /// Ids of the cards in [hand] that would leave a winning hand if
-  /// discarded now. Empty unless it's the human player's turn, they've drawn
-  /// and they've seen the joker.
+  /// discarded now. Empty unless it's the viewer's turn, they've drawn and
+  /// they've seen the joker.
   Set<int> _winningDiscards(List<HandCard> hand) {
-    final player = _round.hands[humanSeat];
-    final jokers = _round.jokersFor(humanSeat);
+    final player = _round.hands[_viewer];
+    final jokers = _round.jokersFor(_viewer);
     final route = player.showKind;
     if (_round.isOver ||
-        _round.currentSeat != humanSeat ||
+        _round.currentSeat != _viewer ||
         !player.hasDrawn ||
         jokers == null ||
         route == null) {
@@ -510,7 +625,7 @@ class TableController extends Notifier<TableState> {
   /// keep their place and id, cards that have left are dropped, and new
   /// cards are added at the right-hand end.
   List<HandCard> _reconcile(List<HandCard> shown) {
-    final held = [..._round.hands[humanSeat].cards];
+    final held = [..._round.hands[_viewer].cards];
     final kept = <HandCard>[];
     for (final handCard in shown) {
       if (held.remove(handCard.card)) kept.add(handCard);
@@ -534,17 +649,37 @@ class TableController extends Notifier<TableState> {
   }
 
   HandProgress _handProgress() =>
-      handProgress(_round.hands[humanSeat], _round.jokersFor(humanSeat));
+      handProgress(_round.hands[_viewer], _round.jokersFor(_viewer));
 
   TableView _snapshot() => TableView.fromRound(
     _round,
-    humanSeat: humanSeat,
+    humanSeat: _viewer,
     nameOf: _nameOf,
     avatarOf: (seat) => _bots[seat]?.personality.avatarColor,
   );
 
-  String _nameOf(int seat) =>
-      seat == humanSeat ? 'You' : _bots[seat]!.personality.name;
+  String _nameOf(int seat) => switch (_bots[seat]) {
+    final bot? => bot.personality.name,
+    null when _peopleNames.isEmpty => 'You',
+    null => _peopleNames[seat],
+  };
+}
+
+/// One person's private table while someone else's view is showing: their
+/// hand in the order they arranged it, their groups and selection, and the
+/// opening tunnellas they still have to choose from.
+class _Desk {
+  _Desk({
+    this.hand = const [],
+    this.groups = const [],
+    this.selected = const {},
+    this.openingChoice,
+  });
+
+  final List<HandCard> hand;
+  final List<List<int>> groups;
+  final Set<int> selected;
+  final List<List<PlayingCard>>? openingChoice;
 }
 
 /// The engine's reason for refusing a move, naming the card when there is

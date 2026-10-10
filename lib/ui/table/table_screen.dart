@@ -234,7 +234,8 @@ class _TableScreenState extends ConsumerState<TableScreen> {
     // Hide what hasn't arrived yet in this very frame, then launch the
     // flights once the new layout is in place.
     final newest = next.hand.isEmpty ? null : next.hand.last;
-    final humanDraws = fresh.any((e) => e is DrewCard && e.seat == humanSeat);
+    final you = next.view.you.seat;
+    final humanDraws = fresh.any((e) => e is DrewCard && e.seat == you);
     final discards = fresh
         .where((e) => e is DiscardedCard || e is WonRound)
         .length;
@@ -261,7 +262,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
             final from = source == DrawSource.stock
                 ? _anchors.stock
                 : _anchors.discardPile;
-            if (seat == humanSeat && newest != null) {
+            if (seat == you && newest != null) {
               layer.fly(
                 from: from,
                 to: _handCardKey(newest.id),
@@ -282,7 +283,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
             delay += cardFlightTime;
           case DiscardedCard(:final seat, :final card) ||
               WonRound(:final seat, :final card):
-            final yours = seat == humanSeat;
+            final yours = seat == you;
             layer.fly(
               from: yours ? _anchors.hand : _anchors.seat(seat),
               fromPoint: yours ? releasedAt : null,
