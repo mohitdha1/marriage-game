@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../state/table_view.dart';
+import '../theme/table_theme.dart';
 import 'card_view.dart';
 import 'set_chips.dart';
 
@@ -19,10 +20,9 @@ class OpponentSeat extends StatelessWidget {
   final SeatView seat;
   final bool isCurrentTurn;
 
-  static const _glow = Color(0xFFFFD54F);
-
   @override
   Widget build(BuildContext context) {
+    final glow = TableTheme.of(context).accent;
     return AnimatedContainer(
       key: Key('seat-${seat.seat}'),
       duration: const Duration(milliseconds: 250),
@@ -31,11 +31,11 @@ class OpponentSeat extends StatelessWidget {
         color: const Color(0x55000000),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isCurrentTurn ? _glow : Colors.transparent,
+          color: isCurrentTurn ? glow : Colors.transparent,
           width: 2,
         ),
         boxShadow: isCurrentTurn
-            ? const [BoxShadow(color: Color(0x99FFD54F), blurRadius: 12)]
+            ? [BoxShadow(color: glow.withValues(alpha: 0.6), blurRadius: 12)]
             : const [],
       ),
       child: Row(

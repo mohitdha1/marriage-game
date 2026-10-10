@@ -9,6 +9,7 @@ import '../sound/table_sounds.dart';
 import '../state/table_controller.dart';
 import '../table/suit_icon.dart';
 import '../table/table_screen.dart';
+import '../theme/table_theme.dart';
 import 'coins.dart';
 import 'player_avatar.dart';
 
@@ -27,14 +28,7 @@ class HomeScreen extends ConsumerWidget {
     final coins = ref.watch(coinsProvider);
 
     return Scaffold(
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF0B4F4A), Color(0xFF1B5E20), Color(0xFF0D3B12)],
-          ),
-        ),
+      body: TableFelt(
         child: Stack(
           children: [
             const Positioned.fill(child: _SuitBackdrop()),

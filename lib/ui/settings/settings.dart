@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../theme/table_theme.dart';
 import 'preferences.dart';
 
 /// The player's preferences and profile.
@@ -10,6 +11,7 @@ class Settings {
     this.handHelper = true,
     this.playerName = defaultName,
     this.avatarColor = 0xFF90CAF9, // the first of [avatarColors]
+    this.tableTheme = TableThemeId.classic,
   });
 
   static const defaultName = 'Player';
@@ -39,18 +41,23 @@ class Settings {
   /// The player's avatar background, as 0xAARRGGBB.
   final int avatarColor;
 
+  /// The look of the table and the cards' backs.
+  final TableThemeId tableTheme;
+
   Settings copyWith({
     bool? sound,
     bool? vibration,
     bool? handHelper,
     String? playerName,
     int? avatarColor,
+    TableThemeId? tableTheme,
   }) => Settings(
     sound: sound ?? this.sound,
     vibration: vibration ?? this.vibration,
     handHelper: handHelper ?? this.handHelper,
     playerName: playerName ?? this.playerName,
     avatarColor: avatarColor ?? this.avatarColor,
+    tableTheme: tableTheme ?? this.tableTheme,
   );
 }
 
@@ -65,6 +72,7 @@ class SettingsController extends Notifier<Settings> {
   static const _handHelper = 'settings.handHelper';
   static const _playerName = 'profile.name';
   static const _avatarColor = 'profile.avatarColor';
+  static const _tableTheme = 'settings.tableTheme';
 
   PreferencesStore get _store => ref.read(preferencesProvider);
 
@@ -78,6 +86,11 @@ class SettingsController extends Notifier<Settings> {
       handHelper: store.getBool(_handHelper) ?? defaults.handHelper,
       playerName: store.getString(_playerName) ?? defaults.playerName,
       avatarColor: store.getInt(_avatarColor) ?? defaults.avatarColor,
+      // Saved by name; a name that's no longer a theme falls back to the
+      // default.
+      tableTheme:
+          TableThemeId.values.asNameMap()[store.getString(_tableTheme)] ??
+          defaults.tableTheme,
     );
   }
 
@@ -107,5 +120,10 @@ class SettingsController extends Notifier<Settings> {
   void setAvatarColor(int color) {
     state = state.copyWith(avatarColor: color);
     _store.setInt(_avatarColor, color);
+  }
+
+  void setTableTheme(TableThemeId theme) {
+    state = state.copyWith(tableTheme: theme);
+    _store.setString(_tableTheme, theme.name);
   }
 }

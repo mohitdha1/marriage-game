@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ui/home/home_screen.dart';
 import 'ui/settings/preferences.dart';
+import 'ui/settings/settings.dart';
+import 'ui/theme/table_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,20 +24,22 @@ Future<void> main() async {
   );
 }
 
-/// Root widget of the application.
-class MarriageApp extends StatelessWidget {
+/// Root widget of the application, styled with the chosen [TableTheme].
+class MarriageApp extends ConsumerWidget {
   const MarriageApp({super.key, this.home = const HomeScreen()});
 
   /// The first screen. Tests start straight at [singlePlayerTable].
   final Widget home;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final table = ref.watch(settingsProvider.select((s) => s.tableTheme)).theme;
     return MaterialApp(
       title: 'Marriage',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B5E20)),
+        colorScheme: ColorScheme.fromSeed(seedColor: table.seed),
+        extensions: [table],
       ),
       home: home,
     );

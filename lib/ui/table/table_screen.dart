@@ -14,6 +14,7 @@ import '../sound/sound_effects.dart';
 import '../state/table_controller.dart';
 import '../state/table_state.dart';
 import '../state/table_view.dart';
+import '../theme/table_theme.dart';
 import 'card_flights.dart';
 import 'card_view.dart';
 import 'hand_fan.dart';
@@ -246,13 +247,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
     });
 
     return Scaffold(
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            radius: 1.2,
-            colors: [Color(0xFF2E7D32), Color(0xFF1B5E20), Color(0xFF0D3B12)],
-          ),
-        ),
+      body: TableFelt(
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -613,7 +608,7 @@ class _CornerBadge extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xCC0D3B12),
+          color: TableTheme.of(context).panel,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0x66FFFFFF)),
         ),

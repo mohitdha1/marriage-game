@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../engine/card.dart';
+import '../theme/table_theme.dart';
 import 'suit_icon.dart';
 
 /// Width ÷ height of a standard playing card (2.5" × 3.5").
@@ -162,19 +163,20 @@ class CardBack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = TableTheme.of(context);
     return _CardShape(
       width: width,
-      color: const Color(0xFF8E1B1B),
+      color: theme.cardBackEdge,
       child: Padding(
         padding: EdgeInsets.all(width * 0.08),
         child: DecoratedBox(
           decoration: BoxDecoration(
             border: Border.all(color: const Color(0x99FFFFFF)),
             borderRadius: BorderRadius.circular(width * 0.06),
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFFB71C1C), Color(0xFF6D1010)],
+              colors: theme.cardBack,
             ),
           ),
         ),
