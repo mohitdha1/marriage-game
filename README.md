@@ -19,8 +19,9 @@ The game is built in phases (see [`docs/roadmap.md`](docs/roadmap.md)):
 - **Phase 2, the Flutter UI and bots, is complete.** The landscape table
   screen is playable against bots at three difficulty levels: draw, discard,
   group and show sets, see the joker, win, and follow the scores round by
-  round. Known issue: sound effects aren't heard on some Android phones yet.
-- **Phase 3, polish, is in progress.**
+  round, with sound effects.
+- **Phase 3, polish, is in progress.** Cards are dealt and fly between the
+  piles and hands, and the winner is celebrated.
 
 ### How the code is organised
 
