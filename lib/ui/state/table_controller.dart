@@ -6,6 +6,7 @@ import '../../bots/bot_personality.dart';
 import '../../bots/bot_player.dart';
 import '../../engine/card.dart';
 import '../../engine/game_config.dart';
+import '../../engine/hand_arrangement.dart';
 import '../../engine/melds.dart';
 import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
@@ -145,6 +146,7 @@ class TableController extends Notifier<TableState> {
       ],
       roundScores: List.unmodifiable(_match.rounds),
       totals: List.unmodifiable(_match.totals),
+      handProgress: _handProgress(),
     );
   }
 
@@ -436,6 +438,7 @@ class TableController extends Notifier<TableState> {
       botMoves: botMoves,
       roundScores: List.unmodifiable(_match.rounds),
       totals: List.unmodifiable(_match.totals),
+      handProgress: _handProgress(),
       notice: notice,
     );
   }
@@ -496,6 +499,9 @@ class TableController extends Notifier<TableState> {
         if (!grouped.contains(handCard.id)) handCard,
     ];
   }
+
+  HandProgress _handProgress() =>
+      handProgress(_round.hands[humanSeat], _round.jokersFor(humanSeat));
 
   TableView _snapshot() => TableView.fromRound(
     _round,

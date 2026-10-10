@@ -8,6 +8,7 @@ import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/main.dart';
 import 'package:marriage_game/ui/scoreboard/scoreboard_screen.dart';
+import 'package:marriage_game/ui/settings/settings.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_state.dart';
@@ -360,6 +361,20 @@ void main() {
       await pumpTable(tester, yourHand: winnableHand);
       expect(find.byKey(const Key('joker-chip')), findsNothing);
 
+      // Before the joker: the helper counts toward the show; no maal yet.
+      expect(
+        tester
+            .widget<Text>(
+              find.descendant(
+                of: find.byKey(const Key('hand-helper')),
+                matching: find.byType(Text),
+              ),
+            )
+            .data,
+        'Ready to show · Dublees 0/7',
+      );
+      expect(find.byKey(const Key('maal-badge')), findsNothing);
+
       await tester.tap(find.byKey(const Key('stock')));
       await tester.pump();
 
@@ -389,6 +404,19 @@ void main() {
       await tester.tap(find.text('Got it'));
       await tester.pump();
       expect(find.byType(JokerReveal), findsNothing);
+
+      // After the joker: sets made and unmatched cards, and the maal badge
+      // (8♥ is the poplu, worth 2).
+      String badge(String key) => tester
+          .widget<Text>(
+            find.descendant(
+              of: find.byKey(Key(key)),
+              matching: find.byType(Text),
+            ),
+          )
+          .data!;
+      expect(badge('hand-helper'), '5 sets · 1 unmatched');
+      expect(badge('maal-badge'), 'Maal 2');
 
       // The joker stays in the corner, and wild cards in hand get a badge.
       expect(find.byKey(const Key('joker-chip')), findsOneWidget);
@@ -502,5 +530,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(status(tester), 'Your turn: draw a card.');
     expect(find.byKey(Key('last-move-${bot.seat}')), findsOneWidget);
+  });
+
+  testWidgets('the hand helper can be turned off in settings', (tester) async {
+    await pumpTable(tester);
+    expect(find.byKey(const Key('hand-helper')), findsOneWidget);
+
+    ProviderScope.containerOf(
+      tester.element(find.byType(TableScreen)),
+    ).read(settingsProvider.notifier).setHandHelper(false);
+    await tester.pump();
+
+    expect(find.byKey(const Key('hand-helper')), findsNothing);
   });
 }

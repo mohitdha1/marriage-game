@@ -1,4 +1,5 @@
 import '../../engine/card.dart';
+import '../../engine/hand_arrangement.dart';
 import '../../engine/scoring.dart';
 import 'table_view.dart';
 
@@ -41,6 +42,7 @@ class TableState {
     this.seatNames = const [],
     this.roundScores = const [],
     this.totals = const [],
+    this.handProgress,
     this.notice,
     this.noticeId = 0,
   });
@@ -88,6 +90,9 @@ class TableState {
   /// Each player's running match total, by seat.
   final List<int> totals;
 
+  /// How far the human player's hand has come, for the hand helper.
+  final HandProgress? handProgress;
+
   /// A message to show the player, such as why a move wasn't allowed.
   final String? notice;
 
@@ -120,6 +125,7 @@ class TableState {
     Map<int, String>? botMoves,
     List<RoundScore>? roundScores,
     List<int>? totals,
+    HandProgress? handProgress,
     String? notice,
   }) => TableState(
     view: view ?? this.view,
@@ -135,6 +141,7 @@ class TableState {
     seatNames: seatNames,
     roundScores: roundScores ?? this.roundScores,
     totals: totals ?? this.totals,
+    handProgress: handProgress ?? this.handProgress,
     notice: notice ?? this.notice,
     noticeId: notice != null ? noticeId + 1 : noticeId,
   );

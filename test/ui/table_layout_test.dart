@@ -133,6 +133,23 @@ void main() {
         final seats = find.byType(OpponentSeat);
         expect(seats, findsNWidgets(players - 1));
 
+        // The corner badges sit over the hand by design, but must stay clear
+        // of every seat and of each other.
+        final badges = [
+          tester.getRect(find.byKey(const Key('maal-badge'))),
+          tester.getRect(find.byKey(const Key('hand-helper'))),
+        ];
+        expect(badges[0].overlaps(badges[1]), isFalse);
+        for (final badge in badges) {
+          for (final seat in find.byType(OpponentSeat).evaluate()) {
+            expect(
+              badge.overlaps(tester.getRect(find.byWidget(seat.widget))),
+              isFalse,
+              reason: 'a corner badge ($badge) overlaps a seat',
+            );
+          }
+        }
+
         final rects = {
           for (final MapEntry(key: what, value: finder) in above.entries)
             what: tester.getRect(finder),

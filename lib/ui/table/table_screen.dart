@@ -1,9 +1,14 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/card.dart';
+import '../../engine/hand_arrangement.dart';
+import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
 import '../scoreboard/scoreboard_screen.dart';
+import '../settings/settings.dart';
 import '../sound/sound_effects.dart';
 import '../state/table_controller.dart';
 import '../state/table_state.dart';
@@ -36,6 +41,7 @@ class TableScreen extends ConsumerWidget {
     final state = ref.watch(tableProvider);
     final table = state.view;
     final controller = ref.read(tableProvider.notifier);
+    final settings = ref.watch(settingsProvider);
     final sounds = ref.read(soundEffectsProvider);
 
     // When a round ends, give the player a moment to see the winning move,
@@ -186,6 +192,25 @@ class TableScreen extends ConsumerWidget {
                         onReorder: controller.moveCard,
                       ),
                     ),
+                    // Badges over the hand's lower corners; taps go through
+                    // to the cards.
+                    if (maalOf(state.handProgress) case final maal?)
+                      Align(
+                        alignment: Alignment.bottomLeft,
+                        child: _CornerBadge(
+                          key: const Key('maal-badge'),
+                          text: 'Maal $maal',
+                        ),
+                      ),
+                    if (state.handProgress case final progress?
+                        when settings.handHelper)
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: _CornerBadge(
+                          key: const Key('hand-helper'),
+                          text: handHelperText(progress),
+                        ),
+                      ),
                     if (choice != null)
                       _Overlay(
                         child: OpeningPicker(
@@ -246,6 +271,58 @@ String statusLine(TableState state) {
   if (!table.youHaveDrawn) return 'Your turn: draw a card.';
   if (table.youHaveSeenJoker) return 'Discard a card, or win.';
   return 'Select a card to discard.';
+}
+
+/// The hand helper's summary of [progress]: progress toward showing before
+/// the joker is seen, and toward winning after.
+String handHelperText(HandProgress progress) => switch (progress) {
+  ShowProgress(:final pureSets, :final pureSetsNeeded, :final doublees)
+      when pureSets >= pureSetsNeeded =>
+    'Ready to show · Dublees ${min(doublees, PlayerHand.doubleesToShow)}/'
+        '${PlayerHand.doubleesToShow}',
+  ShowProgress(:final pureSets, :final pureSetsNeeded, :final doublees) =>
+    'Sets $pureSets/$pureSetsNeeded · Dublees '
+        '${min(doublees, PlayerHand.doubleesToShow)}/'
+        '${PlayerHand.doubleesToShow}',
+  WinProgress(:final setsMade, :final unmatched) =>
+    '$setsMade sets · $unmatched unmatched',
+  DubleeProgress(:final doublees, :final doubleesNeeded) =>
+    'Dublees $doublees/$doubleesNeeded',
+};
+
+/// The hand's maal points, once the player has seen the joker.
+int? maalOf(HandProgress? progress) => switch (progress) {
+  WinProgress(:final maal) || DubleeProgress(:final maal) => maal,
+  ShowProgress() || null => null,
+};
+
+/// A small read-only label over a corner of the hand.
+class _CornerBadge extends StatelessWidget {
+  const _CornerBadge({super.key, required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xCC0D3B12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0x66FFFFFF)),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// The buttons that make sense right now: grouping and showing sets before
