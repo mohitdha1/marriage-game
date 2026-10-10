@@ -26,10 +26,13 @@ The game is built in phases (see [`docs/roadmap.md`](docs/roadmap.md)):
   vibration, drag-up and flick discarding, Quick Play and a custom game
   setup, a first-time guide, an app icon and splash screen, and a draft
   store listing.
-- **Phase 4, local multiplayer, is in progress.** Pass and play works: 2
-  to 5 people share one device, and the table is covered between turns so
-  nobody sees another's cards. Playing on separate phones over Wi-Fi comes
-  next.
+- **Phase 4, local multiplayer, is built.** Pass and play: 2 to 5 people
+  share one device, and the table is covered between turns so nobody sees
+  another's cards. Over Wi-Fi or a phone's hotspot: one phone hosts and
+  shows a room code, friends join from theirs, and bots fill any empty
+  seats. The host runs the game and sends each phone only what its player
+  may see. Tested between a phone and an emulator; a game with friends on
+  their own phones comes next.
 
 ### How the code is organised
 
@@ -38,6 +41,7 @@ The game is built in phases (see [`docs/roadmap.md`](docs/roadmap.md)):
 | `lib/engine/` | The rules engine: cards, the shoe, sets, jokers, hands, rounds, scoring. Pure Dart with **no Flutter imports**, and the single source of truth for the rules. |
 | `lib/bots/` | Computer players at three levels (Easy, Medium, Hard) with named personalities. Pure Dart; they only see what a player at the table could. |
 | `lib/ui/` | The Flutter app: the home screen, Quick Play and game setup, and coins (`ui/home/`), settings, profile and rules (`ui/settings/`), Riverpod state for the table (`ui/state/`), the table screen's widgets and card art (`ui/table/`), table themes and felt (`ui/theme/`), the scoreboard, sounds and vibration. |
+| `lib/net/` | Playing across devices: room codes, the messages phones send each other and their JSON form, the host's lobby over WebSockets, and the link a joining phone keeps to the host. Pure Dart, tested over real sockets on the loopback address. |
 | `lib/console/` | The terminal version of the game. It only turns commands into engine calls and engine state into text. |
 | `bin/marriage.dart` | Command-line entry point for the console game. |
 | `tool/generate_sounds.dart` | Synthesises the placeholder sound effects into `assets/sounds/` (run with `dart run tool/generate_sounds.dart`). |

@@ -50,6 +50,9 @@ computer players who think like real opponents.
 - Pass and play: 2 to 5 people share one phone or tablet
 - The table hides your cards while the phone changes hands, and shows
   what everyone did since your last turn
+- Or play on your own phones over Wi-Fi or a hotspot: one phone hosts and
+  shows a short code, friends type it in to join, and bots fill any empty
+  seats. No internet needed
 
 Quick Play starts a full table in one tap; Single Player lets you choose the
 players and the bots. Coins are just for fun: you can't buy them and they
@@ -85,9 +88,11 @@ For the IARC questionnaire in Play Console:
 
 ## Data safety
 
-The release build asks for no permissions (not even internet access) and
-collects or shares no data. The player's name, settings and coin balance stay
-on the device, in the app's own storage.
+The release build asks for one permission, network access, used only to play
+with friends' phones on the same Wi-Fi or hotspot; nothing goes to the
+internet or any server. It collects and shares no data. The player's name,
+settings and coin balance stay on the device, in the app's own storage, and a
+player's name is shown only to the friends at their table.
 
 - Data collected: none
 - Data shared: none

@@ -22,7 +22,7 @@ Phase order (don't skip ahead):
 1. Game logic engine (pure Dart) — complete
 2. Single-player Flutter UI vs bots — complete
 3. Polish (card art, themes, animation, sound) — complete (MVP); a playtest with friends and family is still to come
-4. Local multiplayer (pass-and-play, LAN/hotspot) — current phase; pass-and-play is done
+4. Local multiplayer (pass-and-play, LAN/hotspot) — current phase; pass-and-play and Wi-Fi/hotspot play are built, and a game with friends on their own phones is still to come
 5. Online multiplayer (separate later project, not part of MVP)
 6. Publish & iterate
 
