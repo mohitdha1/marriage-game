@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/round.dart';
+import 'package:marriage_game/engine/scoring.dart';
 import 'package:marriage_game/main.dart';
 import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/ui/home/game_setup.dart';
@@ -319,7 +320,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(HowToPlayScreen), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Seeing the joker'), 200);
     expect(find.text('Seeing the joker'), findsOneWidget);
+  });
+
+  test('the rules explain the ways to discard and the joker penalty', () {
+    final rules = HowToPlayScreen.sections.map((s) => s.$2).join(' ');
+
+    expect(rules, contains('drag a card up onto the pile'));
+    expect(rules, contains('flick it'));
+    expect(rules, contains('Long-press'));
+    expect(rules, contains('${ScoringTable.jokerDiscardPenalty} points'));
   });
 
   testWidgets('the home screen fits a small phone', (tester) async {
