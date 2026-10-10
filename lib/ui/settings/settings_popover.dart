@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../table/card_view.dart';
 import '../theme/table_theme.dart';
+import 'about.dart';
 import 'how_to_play_screen.dart';
 import 'profile_dialog.dart';
 import 'settings.dart';
@@ -96,6 +97,17 @@ class _SettingsPopover extends ConsumerWidget {
                           builder: (_) => const HowToPlayScreen(),
                         ),
                       );
+                    },
+                  ),
+                  _SettingTile(
+                    key: const Key('setting-about'),
+                    label: 'About',
+                    icon: Icons.info_outline,
+                    onTap: () {
+                      // The popover's context goes as it closes; the
+                      // navigator's stays.
+                      final navigator = Navigator.of(context)..pop();
+                      showAbout(navigator.context);
                     },
                   ),
                 ],

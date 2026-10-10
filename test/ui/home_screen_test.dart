@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +11,7 @@ import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/ui/home/game_setup.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/home/pass_and_play_setup.dart';
+import 'package:marriage_game/ui/settings/about.dart';
 import 'package:marriage_game/ui/settings/how_to_play_screen.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/settings/settings.dart';
@@ -17,6 +19,7 @@ import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
 import 'package:marriage_game/ui/theme/table_theme.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 Future<ProviderContainer> pumpHome(
   WidgetTester tester, {
@@ -357,6 +360,36 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('profile-dialog')), findsOneWidget);
+  });
+
+  testWidgets('About shows the version and the credits', (tester) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'Marriage',
+      packageName: 'io.github.mohitdha1.marriage',
+      version: '1.0.0',
+      buildNumber: '7',
+      buildSignature: '',
+    );
+    await pumpHome(tester);
+
+    await tester.tap(find.byKey(const Key('settings-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('setting-about')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AboutDialog), findsOneWidget);
+    expect(find.text('1.0.0 (7)'), findsOneWidget);
+    expect(find.textContaining('Byron Knoll'), findsOneWidget);
+  });
+
+  test('the court art\'s licence is listed with the others', () async {
+    registerArtLicence();
+
+    final entries = await LicenseRegistry.licenses.toList();
+    expect(
+      entries.expand((entry) => entry.packages),
+      contains('Vector Playing Cards (court card figures)'),
+    );
   });
 
   testWidgets('How to play opens the rules', (tester) async {
