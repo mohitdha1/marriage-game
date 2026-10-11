@@ -340,6 +340,11 @@ class TableController extends TableNotifier {
   @override
   bool get jokerPenaltyEnabled => _round.config.jokerDiscardPenaltyEnabled;
 
+  /// Not while hosting: the joined devices would need telling that the
+  /// rounds count again from 1.
+  @override
+  bool get canStartNewMatch => _remote.isEmpty;
+
   @override
   void submitShow({
     required ShowKind kind,

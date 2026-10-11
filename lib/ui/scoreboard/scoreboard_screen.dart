@@ -53,6 +53,13 @@ class _ScoreboardScreenState extends ConsumerState<ScoreboardScreen> {
                 child: Text('The host deals the next round'),
               ),
             ),
+          if (roundOver && ref.read(tableProvider.notifier).canStartNewMatch)
+            TextButton(
+              key: const Key('new-match'),
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              onPressed: () => _startNewMatch(context),
+              child: const Text('New match'),
+            ),
           if (roundOver && ref.read(tableProvider.notifier).dealsRounds)
             Padding(
               padding: const EdgeInsets.only(right: 12),
@@ -121,6 +128,34 @@ class _ScoreboardScreenState extends ConsumerState<ScoreboardScreen> {
       ),
     );
   }
+}
+
+/// Asks before starting the match again, then does so and returns to the
+/// table.
+Future<void> _startNewMatch(BuildContext context) async {
+  final container = ProviderScope.containerOf(context);
+  final go = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      key: const Key('new-match-dialog'),
+      title: const Text('Start a new match?'),
+      content: const Text('The scores so far will be cleared.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('new-match-confirm'),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('New match'),
+        ),
+      ],
+    ),
+  );
+  if (go != true || !context.mounted) return;
+  container.read(tableProvider.notifier).startNewMatch();
+  Navigator.of(context).pop();
 }
 
 /// One round, item by item, for every player. Each player's items add up to

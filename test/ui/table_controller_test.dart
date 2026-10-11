@@ -801,6 +801,22 @@ void main() {
           ..controller.showGroups()
           ..controller.pickTiplu(1);
 
+    test('a new match deals afresh with every total back at zero', () {
+      final container = readyToWin();
+      container.controller
+        ..toggleSelected(container.idOf(twoOfDiamonds))
+        ..declareWin();
+      expect(container.table.roundScores, hasLength(1));
+      expect(container.controller.canStartNewMatch, isTrue);
+
+      container.controller.startNewMatch();
+
+      expect(container.table.roundScores, isEmpty);
+      expect(container.table.totals, everyElement(0));
+      expect(container.table.view.winner, isNull);
+      expect(container.table.roundNumber, 1);
+    });
+
     test('a finished round counts toward the player\'s stats', () {
       final container = readyToWin();
       container.controller

@@ -339,6 +339,9 @@ void main() {
 
       // Only the host deals the next round.
       expect(game.guestTable.dealsRounds, isFalse);
+      // Nobody restarts a networked match from here, for now.
+      expect(game.guestTable.canStartNewMatch, isFalse);
+      expect(game.hostTable.canStartNewMatch, isFalse);
       game.guestTable.startNextRound();
       expect(game.guestState.notice, 'The host deals the next round.');
       game.hostTable.startNextRound();

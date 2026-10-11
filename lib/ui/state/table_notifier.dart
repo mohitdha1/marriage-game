@@ -44,6 +44,13 @@ abstract class TableNotifier extends Notifier<TableState> {
   /// Deals the next round once the current one is over.
   void startNextRound();
 
+  /// Starts the match again with the same players: a fresh deal, and every
+  /// total back at zero.
+  void startNewMatch() => ref.invalidateSelf();
+
+  /// Whether the match can be started again from here.
+  bool get canStartNewMatch => dealsRounds;
+
   /// Whether this device deals the rounds. A device that has joined a game
   /// hosted elsewhere waits for the host to deal.
   bool get dealsRounds => true;

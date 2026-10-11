@@ -13,12 +13,19 @@ class FakeTableController extends TableController {
 
   final TableState fixed;
   var nextRoundRequests = 0;
+  var newMatchRequests = 0;
 
   @override
   TableState build() => fixed;
 
   @override
   void startNextRound() => nextRoundRequests++;
+
+  @override
+  bool get canStartNewMatch => true;
+
+  @override
+  void startNewMatch() => newMatchRequests++;
 }
 
 const names = ['You', 'Priya', 'Jack'];
@@ -224,6 +231,26 @@ void main() {
     expect(controller.nextRoundRequests, 1);
     expect(find.byType(ScoreboardScreen), findsNothing);
     expect(find.text('table'), findsOneWidget);
+  });
+
+  testWidgets('New match asks first, then starts afresh and returns to the '
+      'table', (tester) async {
+    final controller = await openScoreboard(tester, stateWith([round1]));
+
+    await tester.tap(find.byKey(const Key('new-match')));
+    await tester.pumpAndSettle();
+    expect(find.text('Start a new match?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(controller.newMatchRequests, 0);
+    expect(find.byType(ScoreboardScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('new-match')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('new-match-confirm')));
+    await tester.pumpAndSettle();
+    expect(controller.newMatchRequests, 1);
+    expect(find.byType(ScoreboardScreen), findsNothing);
   });
 
   testWidgets('Next round is not offered while a round is being played', (
