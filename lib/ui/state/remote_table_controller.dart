@@ -7,7 +7,7 @@ import '../../engine/melds.dart';
 import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
 import '../../net/remote_session.dart';
-import '../home/stats.dart';
+import '../home/player_data_provider.dart';
 import '../../net/wire.dart';
 import 'table_notifier.dart';
 import 'table_state.dart';
@@ -54,9 +54,14 @@ class RemoteTableController extends TableNotifier {
         if (message.roundScores.length > previous.roundScores.length) {
           final score = message.roundScores.last;
           final seat = message.view.you.seat;
-          ref
-              .read(statsProvider.notifier)
-              .recordRound(won: score.winner == seat, points: score.net[seat]);
+          unawaited(
+            ref
+                .read(playerDataProvider.notifier)
+                .recordGameResult(
+                  won: score.winner == seat,
+                  points: score.net[seat],
+                ),
+          );
         }
       case Refused(:final reason):
         postNotice(reason);

@@ -11,8 +11,7 @@ import 'package:marriage_game/net/connection.dart';
 import 'package:marriage_game/net/game_host.dart' show Rejoin;
 import 'package:marriage_game/net/remote_session.dart';
 import 'package:marriage_game/net/wire.dart';
-import 'package:marriage_game/ui/home/coins.dart';
-import 'package:marriage_game/ui/home/stats.dart';
+import 'package:marriage_game/ui/home/player_data_provider.dart';
 import 'package:marriage_game/ui/state/remote_table_controller.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_notifier.dart';
@@ -291,7 +290,7 @@ void main() {
     'a win on the joined device is everyone\'s news; coins stay put',
     () async {
       final game = await Game.start();
-      final coins = game.host.read(coinsProvider);
+      final coins = (await game.host.read(playerDataProvider.future)).coins;
       // Mohit takes K♣ from the pile, leaving Q♦ on the stock for Bina, and
       // throws K♠.
       game.hostTable.draw(DrawSource.discardPile);
@@ -334,11 +333,14 @@ void main() {
       expect(game.hostState.notice, 'Bina won the round.');
       expect(game.guestState.roundScores, hasLength(1));
       expect(game.hostState.roundScores.single.winner, 1);
-      expect(game.host.read(coinsProvider), coins);
+      await Future<void>.delayed(Duration.zero);
+      final hostData = await game.host.read(playerDataProvider.future);
+      final guestData = await game.guest.read(playerDataProvider.future);
+      expect(hostData.coins, coins);
       // Both devices count the round: a win for Bina, a loss for Mohit.
-      expect(game.guest.read(statsProvider).roundsWon, 1);
-      expect(game.host.read(statsProvider).roundsPlayed, 1);
-      expect(game.host.read(statsProvider).roundsWon, 0);
+      expect(guestData.stats.roundsWon, 1);
+      expect(hostData.stats.roundsPlayed, 1);
+      expect(hostData.stats.roundsWon, 0);
 
       // Only the host deals the next round.
       expect(game.guestTable.dealsRounds, isFalse);

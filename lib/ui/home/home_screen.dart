@@ -14,7 +14,7 @@ import '../state/table_controller.dart';
 import '../table/suit_icon.dart';
 import '../table/table_screen.dart';
 import '../theme/table_felt.dart';
-import 'coins.dart';
+import 'player_data_provider.dart';
 import 'game_setup.dart';
 import 'pass_and_play_setup.dart';
 import 'player_avatar.dart';
@@ -36,7 +36,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
-    final coins = ref.watch(coinsProvider);
+    final coins = ref.watch(playerDataProvider).value?.coins;
 
     return Scaffold(
       body: TableFelt(
@@ -272,7 +272,8 @@ class _PlayerBadge extends StatelessWidget {
 class _CoinPill extends StatelessWidget {
   const _CoinPill({required this.coins});
 
-  final int coins;
+  /// The balance, or `null` while it loads.
+  final int? coins;
 
   @override
   Widget build(BuildContext context) {
@@ -289,7 +290,10 @@ class _CoinPill extends StatelessWidget {
           const CoinIcon(size: 22),
           const SizedBox(width: 6),
           Text(
-            formatCoins(coins),
+            switch (coins) {
+              null => '…',
+              final coins => formatCoins(coins),
+            },
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w700,

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../home/player_avatar.dart';
-import '../home/stats.dart';
+import '../../data/player_data.dart';
+import '../home/player_data_provider.dart';
 import '../scoreboard/scoreboard_screen.dart';
 import 'settings.dart';
 
@@ -75,7 +76,10 @@ class _ProfileDialogState extends ConsumerState<_ProfileDialog> {
             ),
             const SizedBox(height: 14),
             Text(
-              describeStats(ref.watch(statsProvider)),
+              switch (ref.watch(playerDataProvider).value) {
+                null => '',
+                final data => describeStats(data.stats),
+              },
               key: const Key('profile-stats'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,

@@ -7,8 +7,8 @@ import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/bots/bot_personality.dart';
 import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/engine/round.dart';
-import 'package:marriage_game/ui/home/coins.dart';
-import 'package:marriage_game/ui/home/stats.dart';
+import 'package:marriage_game/data/player_data.dart';
+import 'package:marriage_game/ui/home/player_data_provider.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_notifier.dart';
 import 'package:marriage_game/ui/state/table_state.dart';
@@ -107,6 +107,12 @@ extension on ProviderContainer {
   /// The id of the first card in hand equal to [card].
   int idOf(PlayingCard card) =>
       table.hand.firstWhere((handCard) => handCard.card == card).id;
+}
+
+/// The player's coins and stats once every change asked for has been saved.
+Future<PlayerData> settledPlayerData(ProviderContainer container) async {
+  await Future<void>.delayed(Duration.zero);
+  return container.read(playerDataProvider.future);
 }
 
 void main() {
@@ -645,7 +651,7 @@ void main() {
       },
     );
 
-    test('a win is announced by name, and coins are left alone', () {
+    test('a win is announced by name, and coins are left alone', () async {
       final container = twoPeople(
         asha: [
           ...yourCards.take(9),
@@ -658,7 +664,7 @@ void main() {
           twoOfDiamonds,
         ],
       );
-      final coins = container.read(coinsProvider);
+      final before = await container.read(playerDataProvider.future);
       container
         ..controller.draw(DrawSource.stock)
         ..group(heartsRun)
@@ -671,9 +677,8 @@ void main() {
 
       expect(container.table.view.winner?.name, 'Asha');
       expect(container.table.notice, 'Asha won the round.');
-      expect(container.read(coinsProvider), coins);
-      // Several people share the device, so nobody's stats change.
-      expect(container.read(statsProvider).roundsPlayed, 0);
+      // Several people share the device, so neither coins nor stats change.
+      expect(await settledPlayerData(container), before);
     });
 
     test('everyone with more than 3 tunnellas chooses in turn before play', () {
@@ -817,13 +822,13 @@ void main() {
       expect(container.table.roundNumber, 1);
     });
 
-    test('a finished round counts toward the player\'s stats', () {
+    test('a finished round counts toward the player\'s stats', () async {
       final container = readyToWin();
       container.controller
         ..toggleSelected(container.idOf(twoOfDiamonds))
         ..declareWin();
 
-      final stats = container.read(statsProvider);
+      final stats = (await settledPlayerData(container)).stats;
       expect(stats.roundsPlayed, 1);
       expect(stats.roundsWon, 1);
       expect(stats.bestRound, container.table.roundScores.single.net[0]);
@@ -1016,12 +1021,12 @@ void main() {
       expect(table.seatNames[1], table.view.opponents.single.name);
     });
 
-    test('your result each round moves your coins', () {
+    test('your result each round moves your coins', () async {
       final container = wonByYou();
 
       expect(
-        container.read(coinsProvider),
-        CoinsController.startingBalance + container.table.totals[0],
+        (await settledPlayerData(container)).coins,
+        PlayerData.startingCoins + container.table.totals[0],
       );
     });
 

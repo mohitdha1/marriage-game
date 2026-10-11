@@ -17,8 +17,7 @@ import '../../engine/win_check.dart';
 import '../../net/connection.dart';
 import '../../net/game_host.dart' show Rejoin;
 import '../../net/wire.dart';
-import '../home/coins.dart';
-import '../home/stats.dart';
+import '../home/player_data_provider.dart';
 import 'table_notifier.dart';
 import 'table_state.dart';
 import 'table_view.dart';
@@ -646,16 +645,20 @@ class TableController extends TableNotifier {
       // Coins are the device owner's, won against bots; a game among
       // friends, on one device or several, doesn't touch them.
       if (!_passAndPlay && _remote.isEmpty) {
-        ref.read(coinsProvider.notifier).addRoundResult(score.net[humanSeat]);
+        unawaited(
+          ref.read(playerDataProvider.notifier).addCoins(score.net[humanSeat]),
+        );
       }
       // So are the stats, except when several people share the device.
       if (!_passAndPlay) {
-        ref
-            .read(statsProvider.notifier)
-            .recordRound(
-              won: score.winner == humanSeat,
-              points: score.net[humanSeat],
-            );
+        unawaited(
+          ref
+              .read(playerDataProvider.notifier)
+              .recordGameResult(
+                won: score.winner == humanSeat,
+                points: score.net[humanSeat],
+              ),
+        );
       }
       _roundRecorded = true;
     }

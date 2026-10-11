@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:marriage_game/ui/home/coins.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/settings/settings.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
@@ -60,30 +59,6 @@ void main() {
       container.read(settingsProvider.notifier).setPlayerName('   ');
 
       expect(container.read(settingsProvider).playerName, 'Player');
-    });
-  });
-
-  group('Coins', () {
-    test('a new player starts with 1,000', () {
-      expect(containerWith(InMemoryPreferences()).read(coinsProvider), 1000);
-    });
-
-    test('round results add or take away coins, and are saved', () {
-      final store = InMemoryPreferences();
-      containerWith(store).read(coinsProvider.notifier)
-        ..addRoundResult(59)
-        ..addRoundResult(-9);
-
-      expect(containerWith(store).read(coinsProvider), 1050);
-    });
-
-    test('the balance never goes below zero', () {
-      final container = containerWith(
-        InMemoryPreferences({'coins.balance': 20}),
-      );
-      container.read(coinsProvider.notifier).addRoundResult(-50);
-
-      expect(container.read(coinsProvider), 0);
     });
   });
 
