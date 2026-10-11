@@ -92,6 +92,7 @@ Planned for right after the MVP.
 - Rewarded video ads for extra coins; banners only on non-game screens, never mid-hand
 - Theme/card-back shop (coins or small in-app purchases)
 - Remove-ads purchase
+- Gems, a premium currency: bought with real money, spent on themes, card backs, or converting to coins; never cashed out (not built yet)
 
 ## 10. App-side technical must-haves
 
