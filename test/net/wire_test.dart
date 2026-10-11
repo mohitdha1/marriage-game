@@ -109,6 +109,7 @@ void main() {
         ),
       );
       expectRoundTrip(MoveWin(c(Suit.diamonds, Rank.two)));
+      expectRoundTrip(const MoveDiscard(PlayingCard.man()));
     });
 
     test('a seat update from a real round, with every kind of event', () {

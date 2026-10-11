@@ -56,14 +56,15 @@ bool isCourt(Rank rank) =>
 /// The figure panel for a jack, queen or king, from Byron Knoll's
 /// public-domain vector playing cards (see the README's credits).
 String courtArtAsset(PlayingCard card) {
-  assert(isCourt(card.rank), '$card has no court figure');
-  final suit = switch (card.suit) {
+  final rank = card.rank;
+  assert(rank != null && isCourt(rank), '$card has no court figure');
+  final suit = switch (card.suit!) {
     Suit.clubs => 'C',
     Suit.diamonds => 'D',
     Suit.hearts => 'H',
     Suit.spades => 'S',
   };
-  return 'assets/cards/court/${card.rank.label}$suit.jpg';
+  return 'assets/cards/court/${rank!.label}$suit.jpg';
 }
 
 /// Loads every court figure ahead of time, so the first jack, queen or king

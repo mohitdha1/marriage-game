@@ -17,28 +17,38 @@ enum JokerKind {
 
   /// Same rank as the tiplu, in one of the two opposite-colour suits.
   ordinary,
+
+  /// A printed joker ([PlayingCard.man]), when man cards are in play.
+  man,
 }
 
 /// The jokers for one round, all derived from the [tiplu]: the card the
 /// first player to show picks from the stock.
 ///
 /// Every [JokerKind] is wild: any card of the tiplu's rank (whatever the
-/// suit), plus the jhiplu and poplu. Jhiplu/poplu wrap around the ace, so a
+/// suit), the jhiplu and poplu, and man cards. Jhiplu/poplu wrap around the ace, so a
 /// tiplu of A gives poplu 2, and a tiplu of 2 gives jhiplu A.
 class Jokers {
-  const Jokers(this.tiplu);
+  Jokers(this.tiplu) {
+    if (tiplu.isMan) {
+      throw ArgumentError.value(tiplu, 'tiplu', 'cannot be a man card');
+    }
+  }
 
   final PlayingCard tiplu;
 
-  PlayingCard get jhiplu => PlayingCard(tiplu.suit, _shiftRank(tiplu.rank, -1));
+  PlayingCard get jhiplu => PlayingCard(_suit, _shiftRank(_rank, -1));
 
-  PlayingCard get poplu => PlayingCard(tiplu.suit, _shiftRank(tiplu.rank, 1));
+  PlayingCard get poplu => PlayingCard(_suit, _shiftRank(_rank, 1));
 
-  PlayingCard get alter =>
-      PlayingCard(_sameColourPartner(tiplu.suit), tiplu.rank);
+  PlayingCard get alter => PlayingCard(_sameColourPartner(_suit), _rank);
+
+  Suit get _suit => tiplu.suit!;
+  Rank get _rank => tiplu.rank!;
 
   /// What kind of joker [card] is this round, or `null` if it's a normal card.
   JokerKind? kindOf(PlayingCard card) {
+    if (card.isMan) return JokerKind.man;
     if (card == tiplu) return JokerKind.tiplu;
     if (card == jhiplu) return JokerKind.jhiplu;
     if (card == poplu) return JokerKind.poplu;

@@ -11,10 +11,14 @@ import 'suit_icon.dart';
 /// Width ÷ height of a standard playing card (2.5" × 3.5").
 const cardAspectRatio = 2.5 / 3.5;
 
+/// Ink colour of a man card, unlike either suit colour.
+const manCardColor = Color(0xFF6A1B9A);
+
 /// A face-up card, laid out like a printed one: rank and suit in the top
 /// left corner and, upside down, the bottom right; the pips of a number
 /// card in their usual pattern; one large pip on an ace; and the court
-/// figure on a jack, queen or king.
+/// figure on a jack, queen or king. A man card shows "M" in its corners and
+/// a figure in the middle.
 ///
 /// The corner rank is large, because in an overlapping hand the top left
 /// corner is often all that shows of a card.
@@ -44,7 +48,11 @@ class CardFace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _isRed ? redSuitColor : const Color(0xFF1A1A1A);
+    final color = card.isMan
+        ? manCardColor
+        : _isRed
+        ? redSuitColor
+        : const Color(0xFF1A1A1A);
     final height = width / cardAspectRatio;
     final index = _CornerIndex(card: card, width: width, color: color);
     final face = _CardShape(
@@ -79,12 +87,23 @@ class CardFace extends StatelessWidget {
 
   /// The middle of the card, between the corner indexes.
   Widget _centre(double width, double height, Color color) {
-    if (card.rank == Rank.ace) {
+    final (suit, rank) = (card.suit, card.rank);
+    if (suit == null || rank == null) {
       return Center(
-        child: SuitIcon(card.suit, size: width * 0.5, color: color),
+        child: Icon(
+          Icons.person,
+          key: const Key('man-art'),
+          size: width * 0.55,
+          color: color,
+        ),
       );
     }
-    if (isCourt(card.rank)) {
+    if (rank == Rank.ace) {
+      return Center(
+        child: SuitIcon(suit, size: width * 0.5, color: color),
+      );
+    }
+    if (isCourt(rank)) {
       return Center(
         child: SizedBox(
           key: const Key('court-art'),
@@ -108,8 +127,8 @@ class CardFace extends StatelessWidget {
       child: CustomPaint(
         key: const Key('pips'),
         painter: PipPainter(
-          suit: card.suit,
-          pips: pipLayout(card.rank),
+          suit: suit,
+          pips: pipLayout(rank),
           pipSize: width * 0.14,
           color: color,
         ),
@@ -141,7 +160,7 @@ class _CornerIndex extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              card.rank.label,
+              card.rank?.label ?? 'M',
               maxLines: 1,
               style: TextStyle(
                 color: color,
@@ -152,8 +171,10 @@ class _CornerIndex extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(height: width * 0.02),
-          SuitIcon(card.suit, size: width * 0.17, color: color),
+          if (card.suit case final suit?) ...[
+            SizedBox(height: width * 0.02),
+            SuitIcon(suit, size: width * 0.17, color: color),
+          ],
         ],
       ),
     );

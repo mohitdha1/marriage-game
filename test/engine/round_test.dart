@@ -547,6 +547,48 @@ void main() {
     });
   });
 
+  group('Man cards', () {
+    const man = PlayingCard.man();
+
+    test('discarding one after seeing counts toward the penalty', () {
+      final round =
+          table(
+              seat0: [
+                for (final card in seat0Cards)
+                  card == c(Suit.diamonds, Rank.two) ? man : card,
+              ],
+            )
+            ..draw(DrawSource.stock)
+            ..showPureSets([runA, runB, runC], tipluPosition: 1)
+            ..discard(man);
+
+      expect(round.jokerDiscards, [1, 0]);
+    });
+
+    test('one cannot be picked as the tiplu; the show waits for another '
+        'pick', () {
+      // From the top after drawing Q♦: 2♣ (0), the man card (1), 5♣ (2).
+      final round = table(
+        stockCards: [
+          c(Suit.clubs, Rank.five),
+          man,
+          c(Suit.clubs, Rank.two),
+          c(Suit.diamonds, Rank.queen),
+        ],
+      )..draw(DrawSource.stock);
+
+      expect(
+        () => round.showPureSets([runA, runB, runC], tipluPosition: 1),
+        throwsArgumentError,
+      );
+      expect(round.isJokerChosen, isFalse);
+      expect(round.hands[0].hasSeenJoker, isFalse);
+
+      round.showPureSets([runA, runB, runC], tipluPosition: 0);
+      expect(round.jokersFor(0)!.tiplu, c(Suit.clubs, Rank.two));
+    });
+  });
+
   group('Round.score', () {
     test('cannot score a round that is still being played', () {
       expect(() => table().score(), throwsStateError);
@@ -574,18 +616,19 @@ void main() {
   group('Round.events', () {
     test('opening tunnellas are recorded; an empty opening is not', () {
       final kings = [for (var i = 0; i < 3; i++) c(Suit.spades, Rank.king)];
-      final round = Round.fromCards(
-        config: GameConfig(playerCount: 2),
-        random: Random(0),
-        hands: [
-          [...kings, ...runA],
-          seat1Cards,
-        ],
-        stock: stock,
-        discardPile: [firstDiscard],
-      )
-        ..showOpeningTunnellas(0, [kings])
-        ..showOpeningTunnellas(1, []);
+      final round =
+          Round.fromCards(
+              config: GameConfig(playerCount: 2),
+              random: Random(0),
+              hands: [
+                [...kings, ...runA],
+                seat1Cards,
+              ],
+              stock: stock,
+              discardPile: [firstDiscard],
+            )
+            ..showOpeningTunnellas(0, [kings])
+            ..showOpeningTunnellas(1, []);
 
       expect(round.events, hasLength(1));
       final opened = round.events.single as OpenedTunnellas;

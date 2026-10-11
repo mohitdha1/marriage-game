@@ -84,9 +84,11 @@ List<List<PlayingCard>>? findDoublees(List<PlayingCard> cards, int count) {
 /// How many separate doublees (pairs of identical cards) [cards] holds.
 int countDoublees(List<PlayingCard> cards) => _allDoublees(cards).length;
 
+/// Man cards never pair (see [isDoublee]).
 List<List<PlayingCard>> _allDoublees(List<PlayingCard> cards) => [
   for (final MapEntry(key: card, value: n) in countCopies(cards).entries)
-    for (var i = 0; i < n ~/ 2; i++) [card, card],
+    if (!card.isMan)
+      for (var i = 0; i < n ~/ 2; i++) [card, card],
 ];
 
 /// The best way to arrange [cards] into separate sets: the one covering the
@@ -168,12 +170,15 @@ List<List<PlayingCard>> bestArrangement(
 
 /// The most cards in [cards] that can be covered by separate sets at once —
 /// a measure of how close a hand is to finishing. See [bestArrangement].
-int maxCoverage(List<PlayingCard> cards, Jokers? jokers, {int maxSetSize = 5}) =>
-    bestArrangement(
-      cards,
-      jokers,
-      maxSetSize: maxSetSize,
-    ).fold(0, (total, set) => total + set.length);
+int maxCoverage(
+  List<PlayingCard> cards,
+  Jokers? jokers, {
+  int maxSetSize = 5,
+}) => bestArrangement(
+  cards,
+  jokers,
+  maxSetSize: maxSetSize,
+).fold(0, (total, set) => total + set.length);
 
 /// How far a player's hand has come, as a hand helper would show it. Which
 /// kind depends on where they are in the round.
@@ -274,7 +279,7 @@ HandProgress handProgress(PlayerHand hand, Jokers? jokers) {
 /// make, ignoring overlaps between them.
 List<List<PlayingCard>> _pureSetCandidates(List<PlayingCard> cards) {
   final copies = countCopies(cards);
-  final sets = <List<PlayingCard>>[...findTunnellas(cards)];
+  final sets = <List<PlayingCard>>[...findTunnellas(cards).where(isTunnella)];
   for (final suit in Suit.values) {
     // Ace low (A-2-3) first, then every run up to Q-K-A.
     final runs = [
@@ -316,7 +321,6 @@ int _bitCount(int n) {
 }
 
 String _key(List<PlayingCard> cards) {
-  final ids = cards.map((c) => c.suit.index * 100 + c.rank.index).toList()
-    ..sort();
+  final ids = cards.map(cardIndex).toList()..sort();
   return ids.join(',');
 }

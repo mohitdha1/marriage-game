@@ -1,3 +1,5 @@
+import 'card.dart';
+
 /// How a round treats players who haven't seen the joker when it ends.
 enum GameMode {
   /// Their maal counts for nothing.
@@ -36,6 +38,8 @@ class GameConfig {
   final int cardsPerPlayer;
   final int playerCount;
   final GameMode mode;
+
+  /// House rule: one man card ([PlayingCard.man]) per deck in the shoe.
   final bool manCardsEnabled;
   final bool supermanCardEnabled;
 

@@ -19,24 +19,29 @@ void fisherYatesShuffle<T>(List<T> items, Random random) {
 }
 
 /// All the physical cards in play for a round: [deckCount] standard 52-card
-/// decks mixed together. Cards are drawn from the top, which is the *end* of
-/// [cards] (so drawing is a cheap `removeLast`).
+/// decks mixed together, plus any man cards. Cards are drawn from the top,
+/// which is the *end* of [cards] (so drawing is a cheap `removeLast`).
 ///
 /// Jokers/maal aren't part of the shoe itself — the joker is picked by
 /// flipping a card from the stock after dealing, which is a later step.
 class Shoe {
-  Shoe(int deckCount)
-      : _cards = [
-          for (var deck = 0; deck < deckCount; deck++)
-            for (final suit in Suit.values)
-              for (final rank in Rank.values) PlayingCard(suit, rank),
-        ] {
+  Shoe(int deckCount, {int manCards = 0})
+    : _cards = [
+        for (var deck = 0; deck < deckCount; deck++)
+          for (final suit in Suit.values)
+            for (final rank in Rank.values) PlayingCard(suit, rank),
+        for (var i = 0; i < manCards; i++) const PlayingCard.man(),
+      ] {
     if (deckCount < 1) {
       throw ArgumentError.value(deckCount, 'deckCount', 'must be at least 1');
     }
   }
 
-  factory Shoe.fromConfig(GameConfig config) => Shoe(config.deckCount);
+  /// One man card per deck when [GameConfig.manCardsEnabled] is on.
+  factory Shoe.fromConfig(GameConfig config) => Shoe(
+    config.deckCount,
+    manCards: config.manCardsEnabled ? config.deckCount : 0,
+  );
 
   final List<PlayingCard> _cards;
 

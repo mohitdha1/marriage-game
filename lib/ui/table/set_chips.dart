@@ -13,9 +13,9 @@ class SetChip extends StatelessWidget {
 
   /// "♠A23" when every card shares a suit; otherwise each card in full.
   static String label(List<PlayingCard> cards) {
-    final suit = cards.first.suit;
-    if (cards.every((card) => card.suit == suit)) {
-      return '${suit.symbol}${cards.map((card) => card.rank.label).join()}';
+    if (cards.first.suit case final suit?
+        when cards.every((card) => card.suit == suit)) {
+      return '${suit.symbol}${cards.map((card) => card.rank!.label).join()}';
     }
     return cards.join(' ');
   }

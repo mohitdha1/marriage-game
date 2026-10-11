@@ -381,7 +381,7 @@ class ConsoleGame {
     if (jokers != null) {
       writeLine(
         'Joker: tiplu ${jokers.tiplu}, jhiplu ${jokers.jhiplu}, poplu '
-        '${jokers.poplu}, alter ${jokers.alter} (all ${jokers.tiplu.rank.label}s '
+        '${jokers.poplu}, alter ${jokers.alter} (all ${jokers.tiplu.rank!.label}s '
         'are wild).',
       );
     } else if (round.isJokerChosen) {
@@ -434,12 +434,10 @@ class ConsoleGame {
       sortForDisplay(round.hands[seat].cards);
 }
 
-/// Cards sorted by suit, then rank — the order the console numbers them in.
+/// Cards sorted by suit, then rank, with man cards last — the order the
+/// console numbers them in.
 List<PlayingCard> sortForDisplay(List<PlayingCard> cards) =>
-    [...cards]..sort((a, b) {
-      final bySuit = a.suit.index.compareTo(b.suit.index);
-      return bySuit != 0 ? bySuit : a.rank.order.compareTo(b.rank.order);
-    });
+    [...cards]..sort((a, b) => cardIndex(a).compareTo(cardIndex(b)));
 
 String _set(List<PlayingCard> set) => '[${set.join(' ')}]';
 

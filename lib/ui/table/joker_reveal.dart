@@ -70,7 +70,7 @@ class _JokerRevealState extends State<JokerReveal>
             const SizedBox(height: 4),
             SuitText(
               'Jhiplu ${jokers.jhiplu} · Poplu ${jokers.poplu} · '
-              'Alter ${jokers.alter} · every ${jokers.tiplu.rank.label} is '
+              'Alter ${jokers.alter} · every ${jokers.tiplu.rank!.label} is '
               'wild',
               redColor: redSuitColor,
             ),

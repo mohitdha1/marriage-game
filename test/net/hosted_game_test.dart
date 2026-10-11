@@ -143,7 +143,7 @@ void main() {
     expect(view.you.name, 'Bina');
     expect(view.hand, binasCards);
     // Shown sorted by suit (♠ ♥ ♣ ♦), then rank, as dealt.
-    final suits = [for (final h in game.guestState.hand) h.card.suit];
+    final suits = [for (final h in game.guestState.hand) h.card.suit!];
     expect(
       suits,
       [...suits]..sort(

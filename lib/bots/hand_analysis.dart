@@ -6,7 +6,9 @@ import '../engine/joker.dart';
 /// How likely [card] is to end up in a set alongside [others]. Identical
 /// copies and close same-suit cards always help; same-rank cards only help
 /// once the joker is seen, because trials don't count toward the show.
-/// Wild cards are worth keeping above everything else.
+/// Wild cards are worth keeping above everything else. A man card, dead
+/// until the joker is seen, still beats a loose card: it becomes wild and
+/// is maal.
 ///
 /// [stillAvailable], when given, says how many more copies of a card could
 /// still turn up. Partners that can no longer be completed count for less,
@@ -19,13 +21,15 @@ int usefulness(
   int pairBonus = 0,
 }) {
   if (jokers != null && jokers.isWild(card)) return 100;
+  if (card.isMan) return _manBeforeSeeing;
 
   var score = 0;
   for (final other in others) {
+    if (other.isMan) continue;
     if (other == card) {
       score += 2 + pairBonus;
     } else if (other.suit == card.suit) {
-      final gap = rankGap(card.rank, other.rank);
+      final gap = rankGap(card.rank!, other.rank!);
       if (gap == 1) score += 2;
       if (gap == 2) score += 1;
       // A run with a gap needs the card in between; if every copy of it is
@@ -45,6 +49,10 @@ int usefulness(
   return score;
 }
 
+/// What a man card is worth keeping before the joker is seen: as much as a
+/// card one step from a run.
+const _manBeforeSeeing = 2;
+
 /// Distance between two ranks, letting the ace sit next to the two.
 int rankGap(Rank a, Rank b) {
   final high = (a.order - b.order).abs();
@@ -56,8 +64,8 @@ int rankGap(Rank a, Rank b) {
 /// apart, or `null` if they aren't two apart.
 PlayingCard? _between(PlayingCard a, PlayingCard b) {
   for (final rank in Rank.values) {
-    final middle = PlayingCard(a.suit, rank);
-    if (rankGap(a.rank, rank) == 1 && rankGap(b.rank, rank) == 1) {
+    final middle = PlayingCard(a.suit!, rank);
+    if (rankGap(a.rank!, rank) == 1 && rankGap(b.rank!, rank) == 1) {
       return middle;
     }
   }

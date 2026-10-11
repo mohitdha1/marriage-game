@@ -68,8 +68,10 @@ class TableMemory {
     for (final taken in _takenByNext) {
       if (taken == card) {
         score += 2;
+      } else if (taken.isMan || card.isMan) {
+        continue;
       } else if (taken.suit == card.suit) {
-        final gap = rankGap(taken.rank, card.rank);
+        final gap = rankGap(taken.rank!, card.rank!);
         if (gap == 1) score += 2;
         if (gap == 2) score += 1;
       } else if (_nextHasSeenJoker && taken.rank == card.rank) {

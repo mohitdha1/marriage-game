@@ -36,7 +36,8 @@ bool canSplitIntoSets(List<PlayingCard> cards, Jokers jokers) {
     final partners = <PlayingCard>[];
     final others = <PlayingCard>[];
     for (final card in rest) {
-      final canJoin = firstIndex < 0 ||
+      final canJoin =
+          firstIndex < 0 ||
           jokers.isWild(card) ||
           card.suit == first.suit ||
           card.rank == first.rank;
@@ -79,7 +80,6 @@ bool containsDoubleeWithJokers(List<PlayingCard> cards, Jokers jokers) {
 }
 
 String _key(List<PlayingCard> cards) {
-  final ids = cards.map((c) => c.suit.index * 100 + c.rank.index).toList()
-    ..sort();
+  final ids = cards.map(cardIndex).toList()..sort();
   return ids.join(',');
 }

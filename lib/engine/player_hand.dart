@@ -81,7 +81,7 @@ class PlayerHand {
       throw StateError('Already made the opening show');
     }
     for (final tunnella in tunnellas) {
-      if (!isTunnella(tunnella)) {
+      if (!isOpeningTunnella(tunnella)) {
         throw ArgumentError.value(
           tunnella,
           'tunnellas',

@@ -4,18 +4,25 @@ import 'joker.dart';
 /// A tunnella is exactly 3 physically-identical cards (same suit AND rank) —
 /// the maximum possible with a 3-deck shoe.
 bool isTunnella(List<PlayingCard> cards) {
-  if (cards.length != 3) return false;
+  if (cards.length != 3 || cards.first.isMan) return false;
   return cards[0] == cards[1] && cards[1] == cards[2];
 }
 
+/// A set the opening show can lay down: a [isTunnella], or all 3 man cards,
+/// which count as a tunnella only there.
+bool isOpeningTunnella(List<PlayingCard> cards) =>
+    isTunnella(cards) || (cards.length == 3 && cards.every((c) => c.isMan));
+
 /// A doublee is exactly 2 physically-identical cards (same suit AND rank).
+/// Man cards never pair: they're dead until their holder sees the joker,
+/// and doublees are shown before that.
 bool isDoublee(List<PlayingCard> cards) {
-  if (cards.length != 2) return false;
+  if (cards.length != 2 || cards.first.isMan) return false;
   return cards[0] == cards[1];
 }
 
-/// Every separate tunnella in [cards]: one for each 3 copies of a card, in
-/// the order the cards first appear.
+/// Every separate [isOpeningTunnella] in [cards]: one for each 3 copies of
+/// a card, in the order the cards first appear.
 List<List<PlayingCard>> findTunnellas(List<PlayingCard> cards) {
   final copies = <PlayingCard, int>{};
   for (final card in cards) {
@@ -29,7 +36,7 @@ List<List<PlayingCard>> findTunnellas(List<PlayingCard> cards) {
 
 /// A trial is 3 cards of the same rank across 3 strictly different suits.
 bool isTrial(List<PlayingCard> cards) {
-  if (cards.length != 3) return false;
+  if (cards.length != 3 || cards.any((c) => c.isMan)) return false;
 
   final rank = cards.first.rank;
   if (!cards.every((c) => c.rank == rank)) return false;
@@ -42,17 +49,15 @@ bool isTrial(List<PlayingCard> cards) {
 /// involved. Ace can act as high (Q-K-A) or low (A-2-3), but never wraps
 /// (K-A-2 is not valid either way), so the longest possible run is 13 cards.
 bool isPureSequence(List<PlayingCard> cards) {
-  if (cards.length < 3) return false;
+  if (cards.length < 3 || cards.any((c) => c.isMan)) return false;
 
   final suit = cards.first.suit;
   if (!cards.every((c) => c.suit == suit)) return false;
 
-  final aceHighValues = cards.map((c) => c.rank.order).toList()..sort();
+  final aceHighValues = cards.map((c) => c.rank!.order).toList()..sort();
   if (_isConsecutive(aceHighValues)) return true;
 
-  final aceLowValues =
-      cards.map((c) => c.rank == Rank.ace ? 1 : c.rank.order).toList()
-        ..sort();
+  final aceLowValues = cards.map(_aceLowOrder).toList()..sort();
   return _isConsecutive(aceLowValues);
 }
 
@@ -76,14 +81,16 @@ bool isSequenceWithJokers(List<PlayingCard> cards, Jokers jokers) {
   final suit = naturals.first.suit;
   if (!naturals.every((c) => c.suit == suit)) return false;
 
-  final aceHighValues = naturals.map((c) => c.rank.order).toList();
+  final aceHighValues = naturals.map((c) => c.rank!.order).toList();
   if (_fitsInRun(aceHighValues, cards.length)) return true;
 
-  final aceLowValues = naturals
-      .map((c) => c.rank == Rank.ace ? 1 : c.rank.order)
-      .toList();
+  final aceLowValues = naturals.map(_aceLowOrder).toList();
   return _fitsInRun(aceLowValues, cards.length);
 }
+
+/// A natural card's order with the ace counted as 1, below the two.
+int _aceLowOrder(PlayingCard card) =>
+    card.rank == Rank.ace ? 1 : card.rank!.order;
 
 /// A trial is 3 cards of the same rank in 3 different suits, where wild cards
 /// (see [Jokers.isWild]) can stand in for missing suits. At least one card

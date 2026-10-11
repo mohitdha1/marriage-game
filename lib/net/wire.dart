@@ -261,11 +261,14 @@ class MoveWin extends MoveMessage {
   Json toJson() => {'type': 'win', 'card': cardToJson(card)};
 }
 
-// Cards are written as "rank.suit", such as "queen.diamonds".
+// Cards are written as "rank.suit", such as "queen.diamonds", and a man
+// card as "man".
 
-String cardToJson(PlayingCard card) => '${card.rank.name}.${card.suit.name}';
+String cardToJson(PlayingCard card) =>
+    card.isMan ? 'man' : '${card.rank!.name}.${card.suit!.name}';
 
 PlayingCard cardFromJson(Object? json) {
+  if (json == 'man') return const PlayingCard.man();
   final [rank, suit] = (json! as String).split('.');
   return PlayingCard(Suit.values.byName(suit), Rank.values.byName(rank));
 }

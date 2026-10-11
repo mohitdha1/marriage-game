@@ -14,10 +14,14 @@ abstract final class ScoringTable {
   static const jhipluOrPopluByCount = [0, 2, 5, 10];
   static const alterByCount = [0, 5, 15, 25];
 
+  /// Man cards, when they're in play: one per deck, so up to 3.
+  static const manByCount = [0, 5, 15, 25];
+
   /// Opening-show tunnellas.
   static const alterTunnella = 30;
   static const jhipluOrPopluTunnella = 15;
   static const plainTunnella = 5;
+  static const manTunnella = 35;
 
   /// Jhiplu + tiplu + poplu, replacing those three cards' own points.
   static const shownMarriage = 15;
@@ -43,6 +47,7 @@ class MaalBreakdown {
     this.jhiplu = 0,
     this.poplu = 0,
     this.alter = 0,
+    this.man = 0,
   });
 
   /// Points from opening-show tunnellas.
@@ -58,11 +63,14 @@ class MaalBreakdown {
   final int poplu;
   final int alter;
 
+  /// Points from man cards not in an opening tunnella.
+  final int man;
+
   int get marriages =>
       shownMarriages * ScoringTable.shownMarriage +
       handMarriages * ScoringTable.handMarriage;
 
-  int get total => tunnellas + marriages + tiplu + jhiplu + poplu + alter;
+  int get total => tunnellas + marriages + tiplu + jhiplu + poplu + alter + man;
 }
 
 /// Works out a player's maal points. Players who haven't seen the joker score
@@ -90,6 +98,7 @@ MaalBreakdown _maalOf(
       JokerKind.tiplu => throw StateError(
         'A tiplu tunnella is impossible: only 2 tiplus are in play',
       ),
+      JokerKind.man => ScoringTable.manTunnella,
       JokerKind.ordinary || null => ScoringTable.plainTunnella,
     };
   }
@@ -101,6 +110,7 @@ MaalBreakdown _maalOf(
   final jhipluCount = countOf(jokers.jhiplu);
   final popluCount = countOf(jokers.poplu);
   final alterCount = countOf(jokers.alter);
+  final manCount = countOf(const PlayingCard.man());
 
   final shownTrios = hand.shownSets
       .where(
@@ -137,6 +147,7 @@ MaalBreakdown _maalOf(
           'poplu',
         ),
         alter: _lookup(ScoringTable.alterByCount, alterCount, 'alter'),
+        man: _lookup(ScoringTable.manByCount, manCount, 'man card'),
       );
       if (best == null || candidate.total > best.total) best = candidate;
     }

@@ -307,8 +307,16 @@ class Round {
             '${_stock.length - 1}',
       );
     }
+    final index = _stock.length - 1 - tipluPosition;
+    if (_stock[index].isMan) {
+      throw ArgumentError.value(
+        tipluPosition,
+        'tipluPosition',
+        'is a man card, which cannot be the tiplu',
+      );
+    }
     show();
-    _jokers = Jokers(_stock.removeAt(_stock.length - 1 - tipluPosition));
+    _jokers = Jokers(_stock.removeAt(index));
     _events.add(ShowedSets(_currentSeat, kind, _copySets(sets)));
   }
 

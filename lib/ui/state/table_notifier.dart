@@ -165,13 +165,14 @@ abstract class TableNotifier extends Notifier<TableState> {
     state = state.copyWith(hand: [...groupedCards, ...loose]);
   }
 
+  /// Man cards go after every suit.
   static int _bySuitThenRank(HandCard a, HandCard b) {
-    final bySuit = sortedSuits
-        .indexOf(a.card.suit)
-        .compareTo(sortedSuits.indexOf(b.card.suit));
+    int suitOrder(PlayingCard card) =>
+        card.isMan ? sortedSuits.length : sortedSuits.indexOf(card.suit!);
+    final bySuit = suitOrder(a.card).compareTo(suitOrder(b.card));
     return bySuit != 0
         ? bySuit
-        : a.card.rank.order.compareTo(b.card.rank.order);
+        : (a.card.rank?.order ?? 0).compareTo(b.card.rank?.order ?? 0);
   }
 
   /// Groups the selected cards into a set to show. Grouped cards move

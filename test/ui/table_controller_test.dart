@@ -281,8 +281,8 @@ void main() {
         final b = sorted[i].card;
         final order = TableNotifier.sortedSuits;
         expect(
-          order.indexOf(a.suit) < order.indexOf(b.suit) ||
-              (a.suit == b.suit && a.rank.order <= b.rank.order),
+          order.indexOf(a.suit!) < order.indexOf(b.suit!) ||
+              (a.suit == b.suit && a.rank!.order <= b.rank!.order),
           isTrue,
           reason: '$a should come before $b',
         );

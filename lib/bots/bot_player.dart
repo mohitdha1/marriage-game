@@ -164,7 +164,7 @@ class BotPlayer {
     bool keepPairs = false,
   }) {
     var candidates = cards.where((card) => card != mustKeep).toList()
-      ..sort((a, b) => b.rank.order.compareTo(a.rank.order));
+      ..sort((a, b) => (b.rank?.order ?? 0).compareTo(a.rank?.order ?? 0));
 
     if (difficulty == BotDifficulty.easy &&
         _random.nextDouble() < _easyCarelessDiscard) {
