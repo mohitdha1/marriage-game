@@ -33,7 +33,7 @@ class BotPersonality {
   /// building doublees.
   final int pairBonus;
 
-  /// The full cast, mixing Nepali, Hindi and English names.
+  /// The full cast, all with Nepali names.
   static const all = [
     BotPersonality(
       name: 'Bishal',
@@ -49,7 +49,7 @@ class BotPersonality {
       caution: 1.6,
     ),
     BotPersonality(
-      name: 'Jack',
+      name: 'Kiran',
       tagline: 'Bold, fast and a little reckless',
       avatarColor: 0xFFB3E5FC,
       caution: 0.5,
@@ -66,7 +66,7 @@ class BotPersonality {
       pairBonus: 2,
     ),
     BotPersonality(
-      name: 'Emma',
+      name: 'Sabina',
       tagline: 'Watches everyone\'s discards',
       avatarColor: 0xFFFFF59D,
       caution: 1.2,

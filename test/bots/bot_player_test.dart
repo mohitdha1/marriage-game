@@ -579,11 +579,11 @@ void main() {
   });
 
   group('BotPersonality', () {
-    test('the cast mixes Nepali, Hindi and English names, all different', () {
+    test('the cast has Nepali names, all different', () {
       final names = BotPersonality.all.map((p) => p.name).toList();
 
       expect(names.toSet(), hasLength(names.length));
-      expect(names, containsAll(['Bishal', 'Priya', 'Jack']));
+      expect(names, containsAll(['Bishal', 'Priya', 'Kiran', 'Sabina']));
     });
 
     test('picking gives different personalities', () {
