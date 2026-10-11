@@ -387,6 +387,60 @@ void main() {
     });
   });
 
+  group('Medium', () {
+    test('keeps a finished pure sequence over cards that only look close', () {
+      // 9♣ 9♣ 10♣ each sit next to two partners, so card by card they look
+      // more useful than the ends of 3♥ 4♥ 5♥; but only the hearts are a set.
+      final nines = [
+        c(Suit.clubs, Rank.nine),
+        c(Suit.clubs, Rank.nine),
+        c(Suit.clubs, Rank.ten),
+      ];
+
+      final discard = bot(
+        BotDifficulty.medium,
+      ).chooseDiscard([...heartsRun, ...nines], null);
+
+      expect(heartsRun, isNot(contains(discard)));
+    });
+
+    test('throws its highest deadwood first', () {
+      final deadwood = [c(Suit.diamonds, Rank.four), c(Suit.spades, Rank.king)];
+
+      expect(
+        bot(
+          BotDifficulty.medium,
+        ).chooseDiscard([...heartsRun, ...deadwood], null),
+        c(Suit.spades, Rank.king),
+      );
+    });
+
+    test('keeps a joker over a high card it has no use for', () {
+      final jokers = Jokers(c(Suit.hearts, Rank.seven));
+      final wild = c(Suit.clubs, Rank.seven);
+
+      for (var seed = 0; seed < 20; seed++) {
+        expect(
+          bot(BotDifficulty.medium, seed: seed).chooseDiscard([
+            ...heartsRun,
+            wild,
+            c(Suit.spades, Rank.ace),
+          ], jokers),
+          c(Suit.spades, Rank.ace),
+        );
+      }
+    });
+
+    test('never misses a win', () {
+      for (var seed = 0; seed < 20; seed++) {
+        expect(
+          bot(BotDifficulty.medium, seed: seed).takeTurn(winnableRound()).won,
+          isTrue,
+        );
+      }
+    });
+  });
+
   group('Strength', () {
     /// Wins for [a] and [b] over [games] 2-player rounds, swapping seats
     /// every round so going first evens out.

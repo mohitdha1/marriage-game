@@ -17,8 +17,9 @@ enum BotDifficulty {
   /// cards (jokers included), and occasionally misses a win.
   easy,
 
-  /// Solid: keeps its sets and jokers, takes useful discards, discards the
-  /// card least likely to fit, and never misses a win.
+  /// Solid: never breaks a finished pure set, keeps its jokers, takes
+  /// useful discards, throws its highest deadwood first, and never misses a
+  /// win.
   medium,
 
   /// Careful: plays like Medium, but also counts which cards are gone, avoids
@@ -154,12 +155,23 @@ class BotPlayer {
     PlayingCard? mustKeep,
     TableMemory? memory,
   }) {
-    final candidates = cards.where((card) => card != mustKeep).toList()
+    var candidates = cards.where((card) => card != mustKeep).toList()
       ..sort((a, b) => b.rank.order.compareTo(a.rank.order));
 
     if (difficulty == BotDifficulty.easy &&
         _random.nextDouble() < _easyCarelessDiscard) {
       return candidates[_random.nextInt(candidates.length)];
+    }
+
+    // A Medium bot never breaks up a finished pure set while it has other
+    // cards to throw.
+    if (difficulty == BotDifficulty.medium) {
+      final sets = maxPureSets(cards);
+      final spare = [
+        for (final card in candidates)
+          if (maxPureSets([...cards]..remove(card)) == sets) card,
+      ];
+      if (spare.isNotEmpty) candidates = spare;
     }
 
     double cost(PlayingCard card) {
