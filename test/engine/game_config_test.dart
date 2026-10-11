@@ -9,8 +9,7 @@ void main() {
       expect(config.deckCount, 3);
       expect(config.cardsPerPlayer, 21);
       expect(config.playerCount, 5);
-      expect(config.murderEnabled, isFalse);
-      expect(config.kidnapEnabled, isFalse);
+      expect(config.mode, GameMode.standard);
       expect(config.manCardsEnabled, isFalse);
       expect(config.supermanCardEnabled, isFalse);
       expect(config.jokerDiscardPenaltyEnabled, isTrue);
@@ -21,8 +20,7 @@ void main() {
         deckCount: 2,
         cardsPerPlayer: 13,
         playerCount: 3,
-        murderEnabled: true,
-        kidnapEnabled: true,
+        mode: GameMode.kidnap,
         manCardsEnabled: true,
         supermanCardEnabled: true,
         jokerDiscardPenaltyEnabled: false,
@@ -31,8 +29,7 @@ void main() {
       expect(config.deckCount, 2);
       expect(config.cardsPerPlayer, 13);
       expect(config.playerCount, 3);
-      expect(config.murderEnabled, isTrue);
-      expect(config.kidnapEnabled, isTrue);
+      expect(config.mode, GameMode.kidnap);
       expect(config.manCardsEnabled, isTrue);
       expect(config.supermanCardEnabled, isTrue);
       expect(config.jokerDiscardPenaltyEnabled, isFalse);

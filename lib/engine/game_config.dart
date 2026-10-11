@@ -1,14 +1,24 @@
-/// Settings for one match: how the shoe is built and dealt, plus which
-/// optional house-rule variations are turned on. Variation toggles are plain
-/// booleans for now — what each one actually changes during play is decided
-/// when that rule gets implemented, not here.
+/// How a round treats players who haven't seen the joker when it ends.
+enum GameMode {
+  /// Their maal counts for nothing.
+  standard,
+
+  /// Their maal, apart from opening tunnellas, counts for the winner.
+  kidnap,
+
+  /// Their maal counts for nothing, and each pays the winner the winner's
+  /// maal on top of the usual 10.
+  murder,
+}
+
+/// Settings for one match: how the shoe is built and dealt, the [GameMode],
+/// and which optional house rules are turned on.
 class GameConfig {
   GameConfig({
     this.deckCount = 3,
     this.cardsPerPlayer = 21,
     this.playerCount = 5,
-    this.murderEnabled = false,
-    this.kidnapEnabled = false,
+    this.mode = GameMode.standard,
     this.manCardsEnabled = false,
     this.supermanCardEnabled = false,
     this.jokerDiscardPenaltyEnabled = true,
@@ -25,8 +35,7 @@ class GameConfig {
   final int deckCount;
   final int cardsPerPlayer;
   final int playerCount;
-  final bool murderEnabled;
-  final bool kidnapEnabled;
+  final GameMode mode;
   final bool manCardsEnabled;
   final bool supermanCardEnabled;
 
