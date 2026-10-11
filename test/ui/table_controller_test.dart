@@ -8,6 +8,7 @@ import 'package:marriage_game/bots/bot_personality.dart';
 import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/data/player_data.dart';
+import 'package:marriage_game/data/stake_tables.dart';
 import 'package:marriage_game/ui/home/player_data_provider.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_notifier.dart';
@@ -53,6 +54,7 @@ ProviderContainer tableWith({
   Duration thinkingTime = Duration.zero,
   GameConfig? config,
   List<String>? people,
+  MatchSetup? setup,
 }) {
   final container = ProviderContainer(
     overrides: [
@@ -83,6 +85,7 @@ ProviderContainer tableWith({
         .read(matchSetupProvider.notifier)
         .choose(MatchSetup.passAndPlay(people));
   }
+  if (setup != null) container.read(matchSetupProvider.notifier).choose(setup);
   return container;
 }
 
@@ -1023,9 +1026,10 @@ void main() {
   });
 
   group('Match', () {
-    ProviderContainer wonByYou() {
+    ProviderContainer wonByYou({MatchSetup? setup}) {
       final container =
           tableWith(
+              setup: setup,
               yourHand: [
                 ...yourCards.take(9),
                 c(Suit.spades, Rank.king),
@@ -1069,8 +1073,10 @@ void main() {
       );
     });
 
-    test('a round won by a bot is scored too', () async {
+    /// A round Asha, the bot, wins by going out after the player throws 3♥.
+    Future<ProviderContainer> wonByTheBot({MatchSetup? setup}) async {
       final container = tableWith(
+        setup: setup,
         botHand: [
           ...run(Suit.spades, [Rank.jack, Rank.queen, Rank.king]),
           ...run(Suit.clubs, [Rank.four, Rank.five, Rank.six]),
@@ -1084,8 +1090,74 @@ void main() {
       await container.controller.discard(
         container.idOf(c(Suit.hearts, Rank.three)),
       );
+      return container;
+    }
+
+    test('a round won by a bot is scored too', () async {
+      final container = await wonByTheBot();
 
       expect(container.table.roundScores.single.winner, 1);
+    });
+
+    group('At a stake table', () {
+      const fiftyTable = StakeTable(
+        stake: 50,
+        minBalance: 5000,
+        gamesToUnlock: 75,
+        difficulty: BotDifficulty.easy,
+      );
+      final atFifty = MatchSetup.atTable(fiftyTable, playerCount: 2);
+
+      test('its bots play at the table\'s difficulty', () {
+        expect(atFifty.difficulty, BotDifficulty.easy);
+        expect(atFifty.stake, 50);
+      });
+
+      test('a round won pays its points × the stake', () async {
+        final container = wonByYou(setup: atFifty);
+        final points = container.table.roundScores.single.net[0];
+
+        final data = await settledPlayerData(container);
+        expect(points, greaterThan(0));
+        expect(data.coins, PlayerData.startingCoins + points * 50);
+      });
+
+      test('a round lost costs its points × the stake', () async {
+        final container = await wonByTheBot(setup: atFifty);
+        final points = container.table.roundScores.single.net[0];
+
+        final data = await settledPlayerData(container);
+        expect(points, lessThan(0));
+        expect(data.coins, PlayerData.startingCoins + points * 50);
+      });
+
+      test('a loss bigger than the balance leaves it at zero', () async {
+        const top = StakeTable(
+          stake: 100000,
+          minBalance: 0,
+          gamesToUnlock: 1,
+          difficulty: BotDifficulty.hard,
+        );
+        final container = await wonByTheBot(
+          setup: MatchSetup.atTable(top, playerCount: 2),
+        );
+
+        expect((await settledPlayerData(container)).coins, 0);
+      });
+
+      test('a round won or lost counts as a game at the table', () async {
+        final won = wonByYou(setup: atFifty);
+        final lost = await wonByTheBot(setup: atFifty);
+
+        expect((await settledPlayerData(won)).gamesAt(50), 1);
+        expect((await settledPlayerData(lost)).gamesAt(50), 1);
+      });
+
+      test('a game without a stake counts toward no table', () async {
+        final container = wonByYou();
+
+        expect((await settledPlayerData(container)).gamesAtStake, isEmpty);
+      });
     });
 
     test('Next round only works once the round is over', () {

@@ -17,6 +17,7 @@ import '../../engine/win_check.dart';
 import '../../net/connection.dart';
 import '../../net/game_host.dart' show Rejoin;
 import '../../net/wire.dart';
+import '../../data/stake_tables.dart';
 import '../home/player_data_provider.dart';
 import 'table_notifier.dart';
 import 'table_state.dart';
@@ -27,18 +28,31 @@ import 'table_view.dart';
 /// on other devices.
 @immutable
 class MatchSetup {
-  /// One person against [playerCount] − 1 bots at [difficulty].
+  /// One person against [playerCount] − 1 bots at [difficulty], each point
+  /// worth one coin, or [stake] coins.
   const MatchSetup({
     this.playerCount = 5,
     this.difficulty = BotDifficulty.medium,
+    this.stake,
   }) : people = const [],
        remote = const {},
        rejoins = null;
+
+  /// One person against [playerCount] − 1 bots at a stake [table]: each
+  /// point is worth its stake in coins, and its bots play at its
+  /// difficulty.
+  MatchSetup.atTable(StakeTable table, {this.playerCount = 5})
+    : difficulty = table.difficulty,
+      stake = table.stake,
+      people = const [],
+      remote = const {},
+      rejoins = null;
 
   /// [people], named in seat order, taking turns on this device; no bots.
   MatchSetup.passAndPlay(List<String> people)
     : playerCount = people.length,
       difficulty = BotDifficulty.medium,
+      stake = null,
       people = List.unmodifiable(people),
       remote = const {},
       rejoins = null;
@@ -52,7 +66,8 @@ class MatchSetup {
     required Map<int, RemotePlayer> remote,
     this.difficulty = BotDifficulty.medium,
     this.rejoins,
-  }) : people = [hostName],
+  }) : stake = null,
+       people = [hostName],
        remote = Map.unmodifiable(remote);
 
   /// Players on other devices coming back after their link dropped.
@@ -66,6 +81,10 @@ class MatchSetup {
 
   /// How well the bots play, when there are bots.
   final BotDifficulty difficulty;
+
+  /// The stake table's coins per point, for a game at one; `null` for any
+  /// other game.
+  final int? stake;
 
   /// The people at this device, named by seat: everyone sharing it in pass
   /// and play, or just the host in a hosted game. Empty against bots, where
@@ -168,6 +187,9 @@ class TableController extends TableNotifier {
   /// covered while it changes hands.
   late bool _passAndPlay;
 
+  /// The stake table's coins per point, if the match is at one.
+  int? _stake;
+
   /// Whose view the table shows: the person playing now, or the last one to
   /// play while bots take their turns.
   var _viewer = humanSeat;
@@ -213,6 +235,7 @@ class TableController extends TableNotifier {
     final seats = [for (var seat = 0; seat < _round.hands.length; seat++) seat];
     _peopleNames = setup.people;
     _passAndPlay = setup.isPassAndPlay;
+    _stake = setup.stake;
     _people = setup.isPassAndPlay ? seats.toSet() : {humanSeat};
     _remote = setup.remote;
     _listening.clear();
@@ -642,22 +665,22 @@ class TableController extends TableNotifier {
     if (_round.isOver && !_roundRecorded) {
       final score = _round.score();
       _match.addRound(score);
-      // Coins are the device owner's, won against bots; a game among
-      // friends, on one device or several, doesn't touch them.
+      // Coins are the device owner's, won against bots: each point is worth
+      // the table's stake. A game among friends, on one device or several,
+      // doesn't touch them.
+      final playerData = ref.read(playerDataProvider.notifier);
       if (!_passAndPlay && _remote.isEmpty) {
-        unawaited(
-          ref.read(playerDataProvider.notifier).addCoins(score.net[humanSeat]),
-        );
+        unawaited(playerData.addCoins(score.net[humanSeat] * (_stake ?? 1)));
       }
-      // So are the stats, except when several people share the device.
+      // So are the stats, except when several people share the device, and
+      // the round counts toward unlocking the next stake table.
       if (!_passAndPlay) {
         unawaited(
-          ref
-              .read(playerDataProvider.notifier)
-              .recordGameResult(
-                won: score.winner == humanSeat,
-                points: score.net[humanSeat],
-              ),
+          playerData.recordGameResult(
+            won: score.winner == humanSeat,
+            points: score.net[humanSeat],
+            stake: _remote.isEmpty ? _stake : null,
+          ),
         );
       }
       _roundRecorded = true;
