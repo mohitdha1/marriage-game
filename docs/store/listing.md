@@ -96,9 +96,7 @@ player's name is shown only to the friends at their table.
 
 - Data collected: none
 - Data shared: none
-- Play Console still asks for a privacy policy link; a short page saying the
-  app collects no data, hosted anywhere public (for example GitHub Pages),
-  covers it.
+- Privacy policy: https://mohitdha1.github.io/marriage-game/privacy-policy
 
 ## Before publishing
 

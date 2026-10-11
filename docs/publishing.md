@@ -56,7 +56,8 @@ what their phone needs.
    `assets/branding/icon.png`), feature graphic and phone screenshots from
    `docs/store/`.
 4. **App content**:
-   - Privacy policy: the URL of `docs/privacy-policy.md` once published.
+   - Privacy policy: https://mohitdha1.github.io/marriage-game/privacy-policy
+     (`docs/privacy-policy.md`, published by GitHub Pages from `docs/`).
    - Ads: none. App access: everything is available without signing in.
    - Content rating: answer the questionnaire; see the notes in
      `store/listing.md` about coins (play money only, never bought or
