@@ -7,6 +7,7 @@ import '../../engine/melds.dart';
 import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
 import '../../net/remote_session.dart';
+import '../home/stats.dart';
 import '../../net/wire.dart';
 import 'table_notifier.dart';
 import 'table_state.dart';
@@ -40,6 +41,14 @@ class RemoteTableController extends TableNotifier {
         final previous = state;
         _last = message;
         state = _stateFor(message, previous: previous);
+        // A round just finished counts toward the player's stats.
+        if (message.roundScores.length > previous.roundScores.length) {
+          final score = message.roundScores.last;
+          final seat = message.view.you.seat;
+          ref
+              .read(statsProvider.notifier)
+              .recordRound(won: score.winner == seat, points: score.net[seat]);
+        }
       case Refused(:final reason):
         postNotice(reason);
       case _:

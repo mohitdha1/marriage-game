@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../home/player_avatar.dart';
+import '../home/stats.dart';
+import '../scoreboard/scoreboard_screen.dart';
 import 'settings.dart';
 
 /// Opens a dialog to change the player's name and avatar colour.
@@ -71,6 +73,13 @@ class _ProfileDialogState extends ConsumerState<_ProfileDialog> {
                   ),
               ],
             ),
+            const SizedBox(height: 14),
+            Text(
+              describeStats(ref.watch(statsProvider)),
+              key: const Key('profile-stats'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
         ),
       ),
@@ -87,4 +96,14 @@ class _ProfileDialogState extends ConsumerState<_ProfileDialog> {
       ],
     );
   }
+}
+
+/// [stats] in a line for the profile: "Rounds 12 · Won 5 (42%) · Best +38".
+String describeStats(PlayerStats stats) {
+  if (stats.roundsPlayed == 0) {
+    return 'Your record starts with your first round.';
+  }
+  final percent = (stats.winRate * 100).round();
+  return 'Rounds ${stats.roundsPlayed} · Won ${stats.roundsWon} ($percent%) · '
+      'Best ${signed(stats.bestRound!)}';
 }

@@ -17,6 +17,7 @@ import '../../engine/win_check.dart';
 import '../../net/connection.dart';
 import '../../net/wire.dart';
 import '../home/coins.dart';
+import '../home/stats.dart';
 import 'table_notifier.dart';
 import 'table_state.dart';
 import 'table_view.dart';
@@ -540,6 +541,15 @@ class TableController extends TableNotifier {
       // friends, on one device or several, doesn't touch them.
       if (!_passAndPlay && _remote.isEmpty) {
         ref.read(coinsProvider.notifier).addRoundResult(score.net[humanSeat]);
+      }
+      // So are the stats, except when several people share the device.
+      if (!_passAndPlay) {
+        ref
+            .read(statsProvider.notifier)
+            .recordRound(
+              won: score.winner == humanSeat,
+              points: score.net[humanSeat],
+            );
       }
       _roundRecorded = true;
     }

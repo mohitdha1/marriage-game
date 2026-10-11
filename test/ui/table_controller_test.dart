@@ -8,6 +8,7 @@ import 'package:marriage_game/bots/bot_personality.dart';
 import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/ui/home/coins.dart';
+import 'package:marriage_game/ui/home/stats.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_notifier.dart';
 import 'package:marriage_game/ui/state/table_state.dart';
@@ -671,6 +672,8 @@ void main() {
       expect(container.table.view.winner?.name, 'Asha');
       expect(container.table.notice, 'Asha won the round.');
       expect(container.read(coinsProvider), coins);
+      // Several people share the device, so nobody's stats change.
+      expect(container.read(statsProvider).roundsPlayed, 0);
     });
 
     test('everyone with more than 3 tunnellas chooses in turn before play', () {
@@ -797,6 +800,18 @@ void main() {
           ..group(clubsRun)
           ..controller.showGroups()
           ..controller.pickTiplu(1);
+
+    test('a finished round counts toward the player\'s stats', () {
+      final container = readyToWin();
+      container.controller
+        ..toggleSelected(container.idOf(twoOfDiamonds))
+        ..declareWin();
+
+      final stats = container.read(statsProvider);
+      expect(stats.roundsPlayed, 1);
+      expect(stats.roundsWon, 1);
+      expect(stats.bestRound, container.table.roundScores.single.net[0]);
+    });
 
     test('the cards that would win if discarded are known', () {
       final container = readyToWin();
