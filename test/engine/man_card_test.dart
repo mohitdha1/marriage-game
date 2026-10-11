@@ -255,6 +255,20 @@ void main() {
       expect(maal.total, 35);
     });
 
+    test('one kept aside from a tiplu pick counts with those held', () {
+      final aside = seenHand()..keepAside(man);
+      final both = seenHand(held: [man])..keepAside(man);
+
+      expect(scoreMaal(aside, jokers).man, 5);
+      expect(scoreMaal(both, jokers).man, 15);
+    });
+
+    test('only a player who has shown keeps one aside', () {
+      final unseen = PlayerHand([...spadesRun])..showOpeningTunnellas([]);
+
+      expect(() => unseen.keepAside(man), throwsStateError);
+    });
+
     test('they count for nothing until their holder sees the joker', () {
       final unseen = PlayerHand([man, man, ...spadesRun])
         ..showOpeningTunnellas([]);

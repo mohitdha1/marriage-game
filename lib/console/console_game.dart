@@ -290,6 +290,20 @@ class ConsoleGame {
     } else {
       round.showPureSets(sets, tipluPosition: tipluPosition);
     }
+    while (round.needsTipluPick) {
+      writeLine(
+        'That was a man card, kept aside as your maal. Pick again, from 1 '
+        '(top) to ${round.stockCount}:',
+      );
+      final picked = _parseNumbers(_read());
+      if (picked != null && picked.length == 1) {
+        try {
+          round.pickTiplu(picked.single - 1);
+        } on ArgumentError catch (e) {
+          writeLine('${e.message}');
+        }
+      }
+    }
     writeLine('You showed ${_sets(sets)} and saw the joker.');
     _printJoker(round, seat);
     _printHand(round, seat);

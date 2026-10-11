@@ -213,7 +213,7 @@ class RoundBreakdownTable extends StatelessWidget {
   }
 
   static int _maalCards(MaalBreakdown maal) =>
-      maal.tiplu + maal.jhiplu + maal.poplu + maal.alter;
+      maal.tiplu + maal.jhiplu + maal.poplu + maal.alter + maal.man;
 }
 
 /// Every player's result for each round, and their running total. The

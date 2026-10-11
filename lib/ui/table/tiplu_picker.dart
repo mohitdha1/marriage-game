@@ -3,13 +3,16 @@ import 'package:flutter/material.dart';
 import 'card_view.dart';
 
 /// Shown when the human player is the first to show: the stock is spread out
-/// face down, and they tap any card to make it the tiplu.
+/// face down, and they tap any card to make it the tiplu. [again] says
+/// their last pick was a man card, kept aside; there's no cancelling then,
+/// since the sets are already shown.
 class TipluPicker extends StatelessWidget {
   const TipluPicker({
     super.key,
     required this.stockCount,
     required this.onPick,
     required this.onCancel,
+    this.again = false,
   });
 
   final int stockCount;
@@ -17,6 +20,7 @@ class TipluPicker extends StatelessWidget {
   /// Called with the picked card's position in the stock, 0 being the top.
   final void Function(int position) onPick;
   final VoidCallback onCancel;
+  final bool again;
 
   @override
   Widget build(BuildContext context) {
@@ -29,8 +33,12 @@ class TipluPicker extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'You are the first to show. Pick any card from the stock to '
-                'be the joker.',
+                again
+                    ? 'That was a man card, kept aside as your maal. Pick '
+                          'another card to be the joker.'
+                    : 'You are the first to show. Pick any card from the '
+                          'stock to be the joker.',
+                key: const Key('tiplu-picker-title'),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
@@ -52,8 +60,10 @@ class TipluPicker extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              TextButton(onPressed: onCancel, child: const Text('Cancel')),
+              if (!again) ...[
+                const SizedBox(height: 8),
+                TextButton(onPressed: onCancel, child: const Text('Cancel')),
+              ],
             ],
           ),
         ),

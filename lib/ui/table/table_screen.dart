@@ -305,7 +305,10 @@ class _TableScreenState extends ConsumerState<TableScreen> {
               },
             );
             delay += cardFlightTime;
-          case OpenedTunnellas() || ShowedSets() || StockReshuffled():
+          case OpenedTunnellas() ||
+              ShowedSets() ||
+              StockReshuffled() ||
+              KeptAside():
             break;
         }
       }
@@ -599,6 +602,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                               stockCount: table.stockCount,
                               onPick: controller.pickTiplu,
                               onCancel: controller.cancelTipluPick,
+                              again: table.youMustPickTiplu,
                             ),
                           ),
                         if (state.revealingJoker && jokers != null)

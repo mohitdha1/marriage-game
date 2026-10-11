@@ -109,7 +109,8 @@ class RemoteTableController extends TableNotifier {
           : const {},
       openingChoice: update.choosingOpening ? findTunnellas(view.hand) : null,
       groups: groups,
-      pickingTiplu: sameRound && previous.pickingTiplu,
+      pickingTiplu:
+          view.youMustPickTiplu || (sameRound && previous.pickingTiplu),
       revealingJoker: justSaw || (sameRound && previous.revealingJoker),
       winningDiscards: {
         for (final handCard in hand)
@@ -150,6 +151,9 @@ class RemoteTableController extends TableNotifier {
   }) => _host.send(
     MoveShow(kind: kind, sets: sets, tipluPosition: tipluPosition),
   );
+
+  @override
+  void submitTipluPick(int position) => _host.send(MovePickTiplu(position));
 
   @override
   void submitWin(HandCard winning) => _host.send(MoveWin(winning.card));

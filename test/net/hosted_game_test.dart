@@ -296,6 +296,56 @@ void main() {
     },
   );
 
+  test('a joined player who picks a man card picks again', () async {
+    const man = PlayingCard.man();
+    final game = await Game.start(
+      stock: [
+        c(Suit.clubs, Rank.five),
+        c(Suit.hearts, Rank.seven),
+        man,
+        c(Suit.clubs, Rank.two),
+        c(Suit.diamonds, Rank.queen),
+      ],
+    );
+    game.hostTable.draw(DrawSource.discardPile);
+    await game.hostTable.discard(
+      game.hostState.hand
+          .firstWhere((h) => h.card == c(Suit.spades, Rank.king))
+          .id,
+    );
+    await game.settle();
+
+    // Bina draws Q♦, leaving 2♣, the man card, 7♥ and 5♣ from the top.
+    final guest = game.guestTable..draw(DrawSource.stock);
+    await game.settle();
+    for (final set in [hearts, spades, clubs]) {
+      final used = <int>{};
+      for (final card in set) {
+        final id = game.guestState.hand
+            .firstWhere((h) => h.card == card && !used.contains(h.id))
+            .id;
+        used.add(id);
+        guest.toggleSelected(id);
+      }
+      guest.groupSelected();
+    }
+    guest
+      ..showGroups()
+      ..pickTiplu(1);
+    await game.settle();
+
+    expect(game.guestState.view.youMustPickTiplu, isTrue);
+    expect(game.guestState.pickingTiplu, isTrue);
+    expect(game.hostState.view.opponents.single.laidDown.last, [man]);
+
+    guest.pickTiplu(1);
+    await game.settle();
+
+    expect(game.guestState.pickingTiplu, isFalse);
+    expect(game.guestState.view.yourJokers?.tiplu, c(Suit.hearts, Rank.seven));
+    expect(game.guestState.revealingJoker, isTrue);
+  });
+
   test(
     'a win on the joined device is everyone\'s news; coins stay put',
     () async {

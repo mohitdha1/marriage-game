@@ -11,7 +11,7 @@ import 'sound_effects.dart';
 Sfx? soundFor(TableEvent event, {required int yourSeat}) => switch (event) {
   DrewCard() || DiscardedCard() => Sfx.cardSnap,
   WonRound(:final seat) => seat == yourSeat ? Sfx.win : Sfx.roundOver,
-  OpenedTunnellas() || ShowedSets() || StockReshuffled() => null,
+  OpenedTunnellas() || ShowedSets() || StockReshuffled() || KeptAside() => null,
 };
 
 /// Plays the table's sounds as the game unfolds: a shuffle whenever a round

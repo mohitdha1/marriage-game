@@ -92,6 +92,7 @@ class BotPlayer {
         ? TableMemory.read(round, seat)
         : null;
     final forDoublees = playsForDoublees(hand);
+    _pickTipluAgain(round);
 
     // A turn may already be under way: a player who left after drawing,
     // whose seat a bot has taken over. It finishes the turn from there.
@@ -120,6 +121,7 @@ class BotPlayer {
         } else {
           round.showPureSets(show.sets, tipluPosition: position);
         }
+        _pickTipluAgain(round);
         shown = show.sets;
       }
     }
@@ -364,6 +366,14 @@ class BotPlayer {
       if (wins) return card;
     }
     return null;
+  }
+
+  /// Picks again for as long as the picks are man cards, which are kept
+  /// aside.
+  void _pickTipluAgain(Round round) {
+    while (round.needsTipluPick) {
+      round.pickTiplu(_pickTipluPosition(round));
+    }
   }
 
   /// Any stock position. If the stock is empty, the round refills it from

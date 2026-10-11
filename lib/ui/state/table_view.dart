@@ -26,7 +26,7 @@ class SeatView {
   final bool hasSeenJoker;
 
   /// Sets this player has laid face up: opening tunnellas, then the sets
-  /// shown to see the joker.
+  /// shown to see the joker, then each man card they kept aside on its own.
   final List<List<PlayingCard>> laidDown;
 
   /// The avatar's background colour as 0xAARRGGBB, if this player has one.
@@ -51,6 +51,7 @@ class TableView {
     required this.youHaveDrawn,
     required this.winner,
     this.isJokerChosen = false,
+    this.youMustPickTiplu = false,
     this.yourJokers,
     this.pureSetsStillNeeded = PlayerHand.pureSetsToShow,
     this.events = const [],
@@ -73,7 +74,11 @@ class TableView {
         name: nameOf(seat),
         cardCount: hand.cards.length,
         hasSeenJoker: hand.hasSeenJoker,
-        laidDown: [...hand.openingTunnellas, ...hand.shownSets],
+        laidDown: [
+          ...hand.openingTunnellas,
+          ...hand.shownSets,
+          for (final card in hand.keptAside) [card],
+        ],
         avatarColor: avatarOf?.call(seat),
         lastDiscard: _lastDiscardBy(seat, round.events),
       );
@@ -93,6 +98,7 @@ class TableView {
       youHaveDrawn: yours.hasDrawn,
       winner: round.winner == null ? null : seatView(round.winner!),
       isJokerChosen: round.isJokerChosen,
+      youMustPickTiplu: round.needsTipluPick && round.currentSeat == humanSeat,
       yourJokers: round.jokersFor(humanSeat),
       pureSetsStillNeeded: yours.pureSetsStillNeeded,
       events: round.events,
@@ -121,6 +127,10 @@ class TableView {
 
   /// Whether anyone has picked the tiplu yet.
   final bool isJokerChosen;
+
+  /// Whether the human player picked a man card as the tiplu and must pick
+  /// again.
+  final bool youMustPickTiplu;
 
   /// The jokers, once the human player has seen them; otherwise `null`.
   final Jokers? yourJokers;

@@ -26,7 +26,8 @@ enum DrawSource { stock, discardPile }
 /// The joker isn't chosen at the deal. The first player to show picks any
 /// card from the stock (`tipluPosition`, counted from the top) to be the
 /// tiplu. It goes face down under the stock and is never drawn, so this
-/// class simply takes it out of the stock.
+/// class simply takes it out of the stock. A man card can't be the tiplu:
+/// the picker keeps it aside as maal and picks again ([pickTiplu]).
 ///
 /// Read state from here and act through this class's methods, not through
 /// the [PlayerHand]s directly, so the table rules are always applied.
@@ -91,6 +92,7 @@ class Round {
   Jokers? _jokers;
   PlayingCard? _takenFromDiscardPile;
   int? _winner;
+  bool _needsTipluPick = false;
 
   /// Every player's hand, by seat.
   List<PlayerHand> get hands => List.unmodifiable(_hands);
@@ -113,6 +115,10 @@ class Round {
 
   /// Whether the tiplu has been picked yet (by the first player to show).
   bool get isJokerChosen => _jokers != null;
+
+  /// Whether the current player picked a man card as the tiplu and must
+  /// pick again with [pickTiplu] before anything else happens.
+  bool get needsTipluPick => _needsTipluPick;
 
   /// The jokers as seen by [seat]: `null` until that player has shown and
   /// the tiplu has been picked.
@@ -154,6 +160,7 @@ class Round {
   PlayingCard draw(DrawSource source) {
     _checkNotOver();
     _checkEveryoneOpened();
+    _checkNoTipluPick();
 
     final PlayingCard card;
     switch (source) {
@@ -209,10 +216,22 @@ class Round {
     );
   }
 
+  /// The current player picks the tiplu again, at [position] in the stock
+  /// counted from the top, after their first pick was a man card. Another
+  /// man card is kept aside too, and the pick goes on.
+  void pickTiplu(int position) {
+    _checkNotOver();
+    if (!_needsTipluPick) throw StateError('There is no tiplu to pick');
+    _refillStockIfEmpty();
+    _checkTipluPosition(position);
+    _takeTiplu(position);
+  }
+
   /// Ends the current player's turn by discarding [card], and passes the
   /// turn to the next seat.
   void discard(PlayingCard card) {
     _checkNotOver();
+    _checkNoTipluPick();
     _discardFromCurrentHand(card);
     _events.add(DiscardedCard(_currentSeat, card));
     _currentSeat = (_currentSeat + 1) % _hands.length;
@@ -228,6 +247,7 @@ class Round {
   /// A player can draw, show, and win all in the same turn.
   void declareWin(PlayingCard card) {
     _checkNotOver();
+    _checkNoTipluPick();
     final hand = _currentHand;
     if (!hand.hasSeenJoker) {
       throw StateError('Must see the joker before winning');
@@ -280,6 +300,7 @@ class Round {
   ) {
     _checkNotOver();
     _checkEveryoneOpened();
+    _checkNoTipluPick();
     if (_jokers != null) {
       if (tipluPosition != null) {
         throw ArgumentError.value(
@@ -297,27 +318,34 @@ class Round {
     // leaves everything untouched, then take the card only once the show
     // has succeeded.
     _refillStockIfEmpty();
-    if (tipluPosition == null ||
-        tipluPosition < 0 ||
-        tipluPosition >= _stock.length) {
+    _checkTipluPosition(tipluPosition);
+    show();
+    _events.add(ShowedSets(_currentSeat, kind, _copySets(sets)));
+    _takeTiplu(tipluPosition!);
+  }
+
+  void _checkTipluPosition(int? position) {
+    if (position == null || position < 0 || position >= _stock.length) {
       throw ArgumentError.value(
-        tipluPosition,
+        position,
         'tipluPosition',
         'the first player to show must pick a stock position from 0 to '
             '${_stock.length - 1}',
       );
     }
-    final index = _stock.length - 1 - tipluPosition;
-    if (_stock[index].isMan) {
-      throw ArgumentError.value(
-        tipluPosition,
-        'tipluPosition',
-        'is a man card, which cannot be the tiplu',
-      );
+  }
+
+  /// Takes the card at [position] as the tiplu, or keeps it aside for the
+  /// current player if it's a man card, who then picks again.
+  void _takeTiplu(int position) {
+    final card = _stock.removeAt(_stock.length - 1 - position);
+    _needsTipluPick = card.isMan;
+    if (card.isMan) {
+      _currentHand.keepAside(card);
+      _events.add(KeptAside(_currentSeat, card));
+    } else {
+      _jokers = Jokers(card);
     }
-    show();
-    _jokers = Jokers(_stock.removeAt(index));
-    _events.add(ShowedSets(_currentSeat, kind, _copySets(sets)));
   }
 
   void _discardFromCurrentHand(PlayingCard card) {
@@ -364,6 +392,12 @@ class Round {
 
   void _checkNotOver() {
     if (isOver) throw StateError('The round is over');
+  }
+
+  void _checkNoTipluPick() {
+    if (_needsTipluPick) {
+      throw StateError('The tiplu must be picked again first');
+    }
   }
 
   void _checkEveryoneOpened() {

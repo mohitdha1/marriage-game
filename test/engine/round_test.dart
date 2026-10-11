@@ -565,27 +565,66 @@ void main() {
       expect(round.jokerDiscards, [1, 0]);
     });
 
-    test('one cannot be picked as the tiplu; the show waits for another '
-        'pick', () {
-      // From the top after drawing Q♦: 2♣ (0), the man card (1), 5♣ (2).
-      final round = table(
-        stockCards: [
-          c(Suit.clubs, Rank.five),
-          man,
-          c(Suit.clubs, Rank.two),
-          c(Suit.diamonds, Rank.queen),
-        ],
-      )..draw(DrawSource.stock);
+    // From the top after drawing Q♦: 2♣ (0), a man card (1), another (2),
+    // then 5♣ (3).
+    Round manInTheStock() => table(
+      stockCards: [
+        c(Suit.clubs, Rank.five),
+        man,
+        man,
+        c(Suit.clubs, Rank.two),
+        c(Suit.diamonds, Rank.queen),
+      ],
+    )..draw(DrawSource.stock);
 
-      expect(
-        () => round.showPureSets([runA, runB, runC], tipluPosition: 1),
-        throwsArgumentError,
-      );
+    test('one picked as the tiplu is kept aside, and the picker picks '
+        'again', () {
+      final round = manInTheStock()
+        ..showPureSets([runA, runB, runC], tipluPosition: 1);
+
+      expect(round.hands[0].hasSeenJoker, isTrue);
+      expect(round.hands[0].keptAside, [man]);
+      expect(round.hands[0].cards, isNot(contains(man)));
       expect(round.isJokerChosen, isFalse);
-      expect(round.hands[0].hasSeenJoker, isFalse);
+      expect(round.jokersFor(0), isNull);
+      expect(round.needsTipluPick, isTrue);
+      expect(round.stockCount, 3);
+      expect(round.events.last, isA<KeptAside>());
 
-      round.showPureSets([runA, runB, runC], tipluPosition: 0);
+      round.pickTiplu(0);
+
+      expect(round.needsTipluPick, isFalse);
       expect(round.jokersFor(0)!.tiplu, c(Suit.clubs, Rank.two));
+      expect(round.hands[0].keptAside, [man]);
+    });
+
+    test('nothing else can happen until the tiplu is picked', () {
+      final round = manInTheStock()
+        ..showPureSets([runA, runB, runC], tipluPosition: 1);
+
+      expect(() => round.discard(c(Suit.diamonds, Rank.two)), throwsStateError);
+      expect(
+        () => round.declareWin(c(Suit.diamonds, Rank.two)),
+        throwsStateError,
+      );
+      expect(() => round.pickTiplu(9), throwsArgumentError);
+      expect(round.needsTipluPick, isTrue);
+    });
+
+    test('another man card is kept aside too, and the pick goes on', () {
+      final round = manInTheStock()
+        ..showPureSets([runA, runB, runC], tipluPosition: 1)
+        ..pickTiplu(1);
+
+      expect(round.hands[0].keptAside, [man, man]);
+      expect(round.needsTipluPick, isTrue);
+
+      round.pickTiplu(1);
+      expect(round.jokersFor(0)!.tiplu, c(Suit.clubs, Rank.five));
+    });
+
+    test('there is no picking again without a man card', () {
+      expect(() => seat0HasShown().pickTiplu(0), throwsStateError);
     });
   });
 

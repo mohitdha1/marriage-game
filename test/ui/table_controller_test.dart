@@ -522,6 +522,43 @@ void main() {
       expect(container.table.revealingJoker, isFalse);
     });
 
+    test('a man card picked as the tiplu is kept aside, and the picker '
+        'opens again with no way to cancel', () {
+      const man = PlayingCard.man();
+      final container =
+          tableWith(
+              stock: [
+                c(Suit.clubs, Rank.five),
+                c(Suit.hearts, Rank.seven),
+                man,
+                queenOfDiamonds,
+              ],
+            )
+            ..controller.draw(DrawSource.stock) // Q♦; stock is now man, 7♥, 5♣
+            ..group(heartsRun)
+            ..group(spadesRun)
+            ..group(clubsRun)
+            ..controller.showGroups()
+            ..controller.pickTiplu(0);
+
+      var table = container.table;
+      expect(table.view.youHaveSeenJoker, isTrue);
+      expect(table.view.youMustPickTiplu, isTrue);
+      expect(table.pickingTiplu, isTrue);
+      expect(table.view.you.laidDown.last, [man]);
+
+      container.controller.cancelTipluPick();
+      expect(container.table.pickingTiplu, isTrue);
+
+      container.controller.pickTiplu(0);
+
+      table = container.table;
+      expect(table.pickingTiplu, isFalse);
+      expect(table.view.youMustPickTiplu, isFalse);
+      expect(table.view.yourJokers?.tiplu, c(Suit.hearts, Rank.seven));
+      expect(table.revealingJoker, isTrue);
+    });
+
     test('a refused show keeps the groups and does not use up the tiplu', () {
       final container = tableWith()
         ..controller.draw(DrawSource.stock)

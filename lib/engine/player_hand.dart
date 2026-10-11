@@ -37,6 +37,7 @@ class PlayerHand {
   final List<PlayingCard> _cards;
   final List<List<PlayingCard>> _openingTunnellas = [];
   final List<List<PlayingCard>> _shownSets = [];
+  final List<PlayingCard> _keptAside = [];
   bool _hasOpened = false;
   bool _hasMadeFirstDraw = false;
   bool _hasDrawn = false;
@@ -53,6 +54,10 @@ class PlayerHand {
   /// Sets laid down when the player saw the joker, not counting
   /// [openingTunnellas]; empty until then.
   List<List<PlayingCard>> get shownSets => _unmodifiable(_shownSets);
+
+  /// Man cards the player picked as the tiplu, kept aside: maal at the end,
+  /// never part of a set.
+  List<PlayingCard> get keptAside => List.unmodifiable(_keptAside);
 
   /// Whether the opening show has been made.
   bool get hasOpened => _hasOpened;
@@ -106,6 +111,16 @@ class PlayerHand {
       ..addAll(remaining);
     _openingTunnellas.addAll(tunnellas.map((t) => [...t]));
     _hasOpened = true;
+  }
+
+  /// Keeps [card] aside, after the player picked it as the tiplu when it
+  /// can't be one. Only the player showing first picks, so they've seen
+  /// the joker.
+  void keepAside(PlayingCard card) {
+    if (!hasSeenJoker) {
+      throw StateError('Only a player who has shown picks the tiplu');
+    }
+    _keptAside.add(card);
   }
 
   /// Starts the player's turn by adding [card] to their hand.

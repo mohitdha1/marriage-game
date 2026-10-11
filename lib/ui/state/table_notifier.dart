@@ -38,6 +38,10 @@ abstract class TableNotifier extends Notifier<TableState> {
     required int? tipluPosition,
   });
 
+  /// Picks the tiplu again at [position], after the person's first pick
+  /// was a man card.
+  void submitTipluPick(int position);
+
   /// Wins the round by discarding the hand card [winning].
   void submitWin(HandCard winning);
 
@@ -249,13 +253,23 @@ abstract class TableNotifier extends Notifier<TableState> {
   }
 
   /// Picks the stock card at [position] (0 is the top) as the tiplu, and
-  /// shows the grouped sets.
+  /// shows the grouped sets; or, after a man card was picked, just picks
+  /// again.
   void pickTiplu(int position) {
     state = state.copyWith(pickingTiplu: false);
-    _showGroups(tipluPosition: position);
+    if (state.view.youMustPickTiplu) {
+      submitTipluPick(position);
+    } else {
+      _showGroups(tipluPosition: position);
+    }
   }
 
-  void cancelTipluPick() => state = state.copyWith(pickingTiplu: false);
+  /// Closes the tiplu picker without showing, unless the sets are already
+  /// shown and a man card was picked: then the pick has to be made.
+  void cancelTipluPick() {
+    if (state.view.youMustPickTiplu) return;
+    state = state.copyWith(pickingTiplu: false);
+  }
 
   /// Closes the joker reveal.
   void dismissReveal() => state = state.copyWith(revealingJoker: false);

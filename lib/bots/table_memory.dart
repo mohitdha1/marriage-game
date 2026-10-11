@@ -35,6 +35,8 @@ class TableMemory {
           if (event.seat == _nextSeat) _takenByNext.add(card);
         case StockReshuffled():
           buried = buried.isEmpty ? [] : [buried.last];
+        case KeptAside(:final card):
+          gone.add(card);
         case DrewCard() || OpenedTunnellas() || ShowedSets():
           break;
       }

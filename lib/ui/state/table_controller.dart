@@ -416,6 +416,19 @@ class TableController extends TableNotifier {
     }, removing: ids);
     if (shown) {
       state = state.copyWith(groups: [], revealingJoker: true);
+      _offerPickAgain();
+    }
+  }
+
+  @override
+  void submitTipluPick(int position) {
+    if (_act(() => _round.pickTiplu(position))) _offerPickAgain();
+  }
+
+  /// Opens the tiplu picker again if the person's pick was a man card.
+  void _offerPickAgain() {
+    if (state.view.youMustPickTiplu) {
+      state = state.copyWith(pickingTiplu: true);
     }
   }
 
@@ -499,6 +512,8 @@ class TableController extends TableNotifier {
             case ShowKind.pureSets:
               _round.showPureSets(sets, tipluPosition: tipluPosition);
           }
+        case MovePickTiplu(:final position):
+          _round.pickTiplu(position);
         case MoveWin(:final card):
           _round.declareWin(card);
         case MoveOpenTunnellas():

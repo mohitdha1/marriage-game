@@ -41,7 +41,10 @@ class TableGuideLayer extends ConsumerWidget {
             guide.complete(GuideStep.draw);
           case DiscardedCard() || WonRound():
             guide.complete(GuideStep.discard);
-          case OpenedTunnellas() || ShowedSets() || StockReshuffled():
+          case OpenedTunnellas() ||
+              ShowedSets() ||
+              StockReshuffled() ||
+              KeptAside():
             break;
         }
       }

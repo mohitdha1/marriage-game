@@ -136,6 +136,36 @@ void main() {
       );
     }
 
+    test('a bot that picks a man card keeps it aside and picks again', () {
+      for (final difficulty in BotDifficulty.values) {
+        var keptAny = false;
+        for (var seed = 0; seed < 10; seed++) {
+          // Three of the five stock cards are man cards, so the bot often
+          // picks one and has to pick again.
+          final round = roundFor(
+            winnableRound().hands[0].cards,
+            stock: [
+              const PlayingCard.man(),
+              c(Suit.hearts, Rank.seven),
+              const PlayingCard.man(),
+              const PlayingCard.man(),
+              c(Suit.diamonds, Rank.queen),
+            ],
+          );
+
+          bot(difficulty, seed: seed).takeTurn(round);
+
+          final reason = '$difficulty, seed $seed';
+          expect(round.needsTipluPick, isFalse, reason: reason);
+          expect(round.jokersFor(0)!.tiplu.isMan, isFalse, reason: reason);
+          final aside = round.hands[0].keptAside;
+          expect(aside, everyElement(const PlayingCard.man()), reason: reason);
+          keptAny |= aside.isNotEmpty;
+        }
+        expect(keptAny, isTrue, reason: '$difficulty never picked a man card');
+      }
+    });
+
     test('easy sometimes misses a win it could have taken', () {
       final outcomes = [
         for (var seed = 0; seed < 40; seed++)

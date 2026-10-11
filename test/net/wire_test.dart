@@ -110,6 +110,7 @@ void main() {
       );
       expectRoundTrip(MoveWin(c(Suit.diamonds, Rank.two)));
       expectRoundTrip(const MoveDiscard(PlayingCard.man()));
+      expectRoundTrip(const MovePickTiplu(4));
     });
 
     test('a seat update from a real round, with every kind of event', () {
@@ -197,6 +198,7 @@ void main() {
         ]),
         WonRound(0, c(Suit.diamonds, Rank.two)),
         const StockReshuffled(1),
+        const KeptAside(0, PlayingCard.man()),
       ]) {
         final back = eventFromJson(
           jsonDecode(jsonEncode(eventToJson(event))) as Map<String, Object?>,

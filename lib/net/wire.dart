@@ -54,6 +54,7 @@ sealed class WireMessage {
           tipluPosition: json['tipluPosition'] as int?,
         ),
         'win' => MoveWin(cardFromJson(json['card'])),
+        'pick' => MovePickTiplu(json['position']! as int),
         final type => throw FormatException('unknown message type $type'),
       };
     } on FormatException {
@@ -251,6 +252,17 @@ class MoveShow extends MoveMessage {
   };
 }
 
+/// Picks the tiplu again at [position] in the stock, after the first pick
+/// was a man card.
+class MovePickTiplu extends MoveMessage {
+  const MovePickTiplu(this.position);
+
+  final int position;
+
+  @override
+  Json toJson() => {'type': 'pick', 'position': position};
+}
+
 /// Wins the round by discarding [card].
 class MoveWin extends MoveMessage {
   const MoveWin(this.card);
@@ -330,6 +342,7 @@ Json tableViewToJson(TableView view) => {
   'drawn': view.youHaveDrawn,
   'winner': view.winner == null ? null : seatViewToJson(view.winner!),
   'jokerChosen': view.isJokerChosen,
+  'pickAgain': view.youMustPickTiplu,
   'tiplu': view.yourJokers == null ? null : cardToJson(view.yourJokers!.tiplu),
   'pureSetsNeeded': view.pureSetsStillNeeded,
   'events': [for (final event in view.events) eventToJson(event)],
@@ -350,6 +363,7 @@ TableView tableViewFromJson(Json json) => TableView(
       ? null
       : seatViewFromJson(json['winner']! as Json),
   isJokerChosen: json['jokerChosen']! as bool,
+  youMustPickTiplu: json['pickAgain']! as bool,
   yourJokers: switch (_cardOrNull(json['tiplu'])) {
     final tiplu? => Jokers(tiplu),
     null => null,
@@ -389,6 +403,11 @@ Json eventToJson(TableEvent event) => switch (event) {
     'card': cardToJson(card),
   },
   StockReshuffled(:final seat) => {'type': 'reshuffled', 'seat': seat},
+  KeptAside(:final seat, :final card) => {
+    'type': 'keptAside',
+    'seat': seat,
+    'card': cardToJson(card),
+  },
 };
 
 TableEvent eventFromJson(Json json) {
@@ -408,6 +427,7 @@ TableEvent eventFromJson(Json json) {
     'discarded' => DiscardedCard(seat, cardFromJson(json['card'])),
     'won' => WonRound(seat, cardFromJson(json['card'])),
     'reshuffled' => StockReshuffled(seat),
+    'keptAside' => KeptAside(seat, cardFromJson(json['card'])),
     final type => throw FormatException('unknown event type $type'),
   };
 }

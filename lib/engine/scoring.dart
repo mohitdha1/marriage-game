@@ -104,7 +104,12 @@ MaalBreakdown _maalOf(
   }
 
   // Opening-tunnella cards are already scored, so only the rest count here.
-  final cards = [...hand.cards, ...hand.shownSets.expand((set) => set)];
+  // Cards kept aside count with the others of their kind.
+  final cards = [
+    ...hand.cards,
+    ...hand.shownSets.expand((set) => set),
+    ...hand.keptAside,
+  ];
   int countOf(PlayingCard card) => cards.where((c) => c == card).length;
   final tipluCount = countOf(jokers.tiplu);
   final jhipluCount = countOf(jokers.jhiplu);

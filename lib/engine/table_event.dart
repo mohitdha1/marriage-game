@@ -39,6 +39,14 @@ class ShowedSets extends TableEvent {
   final List<List<PlayingCard>> sets;
 }
 
+/// [seat] picked [card], a man card, as the tiplu, and kept it aside as
+/// maal; they pick again.
+class KeptAside extends TableEvent {
+  const KeptAside(super.seat, this.card);
+
+  final PlayingCard card;
+}
+
 /// [seat] discarded [card] to end their turn.
 class DiscardedCard extends TableEvent {
   const DiscardedCard(super.seat, this.card);
