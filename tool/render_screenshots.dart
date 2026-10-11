@@ -16,12 +16,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:marriage_game/data/stake_tables.dart';
 import 'package:marriage_game/engine/card.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/main.dart';
 import 'package:marriage_game/ui/haptics/haptics.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
+import 'package:marriage_game/ui/home/stake_tables_provider.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
@@ -62,6 +64,13 @@ Future<void> pumpApp(
           ),
           soundEffectsProvider.overrideWithValue(const SilentSoundEffects()),
           hapticsProvider.overrideWithValue(const SilentHaptics()),
+          // Read straight from the data file: loading through the asset
+          // bundle doesn't finish in fake time.
+          stakeTablesProvider.overrideWith(
+            (ref) => StakeTables.fromJson(
+              File(StakeTables.asset).readAsStringSync(),
+            ),
+          ),
           ...overrides,
         ],
         child: MarriageApp(home: home),

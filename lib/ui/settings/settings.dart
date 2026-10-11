@@ -15,6 +15,7 @@ class Settings {
     this.tableTheme = TableThemeId.classic,
     this.playerCount = 5,
     this.botDifficulty = BotDifficulty.medium,
+    this.stake = 5,
   });
 
   /// The fewest and most players at a table, the human player included.
@@ -54,8 +55,12 @@ class Settings {
   /// How many play in a game against bots, the human player included.
   final int playerCount;
 
-  /// How well the bots play.
+  /// How well the bots play in a hosted game's empty seats.
   final BotDifficulty botDifficulty;
+
+  /// The stake of the table last chosen for single player, which Quick
+  /// Play also uses.
+  final int stake;
 
   Settings copyWith({
     bool? sound,
@@ -66,6 +71,7 @@ class Settings {
     TableThemeId? tableTheme,
     int? playerCount,
     BotDifficulty? botDifficulty,
+    int? stake,
   }) => Settings(
     sound: sound ?? this.sound,
     vibration: vibration ?? this.vibration,
@@ -75,6 +81,7 @@ class Settings {
     tableTheme: tableTheme ?? this.tableTheme,
     playerCount: playerCount ?? this.playerCount,
     botDifficulty: botDifficulty ?? this.botDifficulty,
+    stake: stake ?? this.stake,
   );
 }
 
@@ -92,6 +99,7 @@ class SettingsController extends Notifier<Settings> {
   static const _tableTheme = 'settings.tableTheme';
   static const _playerCount = 'lobby.playerCount';
   static const _botDifficulty = 'lobby.botDifficulty';
+  static const _stake = 'lobby.stake';
 
   PreferencesStore get _store => ref.read(preferencesProvider);
 
@@ -117,6 +125,7 @@ class SettingsController extends Notifier<Settings> {
       botDifficulty:
           BotDifficulty.values.asNameMap()[store.getString(_botDifficulty)] ??
           defaults.botDifficulty,
+      stake: store.getInt(_stake) ?? defaults.stake,
     );
   }
 
@@ -164,5 +173,11 @@ class SettingsController extends Notifier<Settings> {
   void setBotDifficulty(BotDifficulty difficulty) {
     state = state.copyWith(botDifficulty: difficulty);
     _store.setString(_botDifficulty, difficulty.name);
+  }
+
+  /// Remembers the stake table chosen for single player.
+  void setStake(int stake) {
+    state = state.copyWith(stake: stake);
+    _store.setInt(_stake, stake);
   }
 }

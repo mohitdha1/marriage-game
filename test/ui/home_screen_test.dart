@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:marriage_game/data/stake_tables.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/engine/scoring.dart';
 import 'package:marriage_game/main.dart';
@@ -12,6 +14,8 @@ import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/ui/home/game_setup.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/home/pass_and_play_setup.dart';
+import 'package:marriage_game/ui/home/stake_table_picker.dart';
+import 'package:marriage_game/ui/home/stake_tables_provider.dart';
 import 'package:marriage_game/ui/settings/about.dart';
 import 'package:marriage_game/ui/settings/feedback.dart';
 import 'package:marriage_game/ui/settings/how_to_play_screen.dart';
@@ -40,6 +44,12 @@ Future<ProviderContainer> pumpHome(
         randomProvider.overrideWithValue(Random(0)),
         botThinkingTimeProvider.overrideWithValue(() => Duration.zero),
         soundEffectsProvider.overrideWithValue(const SilentSoundEffects()),
+        // The app's own stake tables, read straight from the data file:
+        // loading through the asset bundle doesn't finish in fake time.
+        stakeTablesProvider.overrideWith(
+          (ref) =>
+              StakeTables.fromJson(File(StakeTables.asset).readAsStringSync()),
+        ),
         ...overrides,
       ],
       child: const MarriageApp(),
@@ -102,66 +112,142 @@ void main() {
     expect(find.byType(TableScreen), findsOneWidget);
   });
 
-  group('Game setup', () {
-    testWidgets('Quick Play always deals the default table, whatever was '
-        'chosen for a custom game', (tester) async {
-      final container = await pumpHome(
-        tester,
-        saved: {'lobby.playerCount': 2, 'lobby.botDifficulty': 'hard'},
-      );
-      expect(find.text('4 bots · Medium'), findsOneWidget);
+  group('Stake tables', () {
+    testWidgets('Quick Play deals five at the 5 table for a new player', (
+      tester,
+    ) async {
+      final container = await pumpHome(tester);
+      expect(find.text('4 bots · Easy · 5 table'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('quick-play')));
       await tester.pumpAndSettle();
 
       expect(container.read(tableProvider).view.opponents, hasLength(4));
+      expect(container.read(botDifficultyProvider), BotDifficulty.easy);
+      expect(container.read(matchSetupProvider).stake, 5);
+    });
+
+    testWidgets('Quick Play deals the table last chosen', (tester) async {
+      final container = await pumpHome(
+        tester,
+        saved: {
+          'lobby.stake': 100,
+          'coins.balance': 50000,
+          'stakes.gamesPlayed': '{"5": 50, "10": 50, "25": 75, "50": 75}',
+        },
+      );
+      expect(find.text('4 bots · Medium · 100 table'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('quick-play')));
+      await tester.pumpAndSettle();
+
+      expect(container.read(matchSetupProvider).stake, 100);
       expect(container.read(botDifficultyProvider), BotDifficulty.medium);
     });
 
-    testWidgets('Single Player asks for the players and bots, then plays '
-        'with them', (tester) async {
-      final container = await pumpHome(tester);
+    testWidgets('Single Player shows every stake, with locks and progress', (
+      tester,
+    ) async {
+      await pumpHome(tester, saved: {'stakes.gamesPlayed': '{"5": 32}'});
 
       await tester.tap(find.byKey(const Key('single-player')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('game-setup')), findsOneWidget);
-      expect(find.byType(TableScreen), findsNothing);
 
-      await tester.tap(find.byKey(const Key('players-5')));
-      await tester.tap(find.text('Easy'));
+      expect(find.byKey(const Key('stake-5')), findsOneWidget);
+      expect(find.byKey(const Key('stake-5-lock')), findsNothing);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('stake-5-min'))).data,
+        'Open to all',
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('stake-10-lock')),
+          matching: find.text('32/50 games'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Min 1K'), findsOneWidget);
+      // The last tier is far along the row.
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('stake-100000')),
+        300,
+        scrollable: find.descendant(
+          of: find.byKey(const Key('stake-tiles')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(find.text('Min 10M'), findsOneWidget);
+    });
+
+    testWidgets('Single Player plays the chosen table with the chosen '
+        'players, its bots at the table\'s level', (tester) async {
+      final container = await pumpHome(
+        tester,
+        saved: {'stakes.gamesPlayed': '{"5": 50}'},
+      );
+
+      await tester.tap(find.byKey(const Key('single-player')));
       await tester.pumpAndSettle();
-      expect(find.text('Relaxed bots that sometimes slip up.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('stake-10')));
+      await tester.tap(find.byKey(const Key('players-3')));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Each point is worth 10 coins'),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const Key('setup-play')));
       await tester.pumpAndSettle();
 
       expect(find.byType(TableScreen), findsOneWidget);
-      final table = container.read(tableProvider);
-      expect(table.view.opponents, hasLength(4));
+      expect(container.read(tableProvider).view.opponents, hasLength(2));
+      expect(container.read(matchSetupProvider).stake, 10);
       expect(container.read(botDifficultyProvider), BotDifficulty.easy);
+      expect(container.read(settingsProvider).stake, 10);
     });
 
-    testWidgets('Cancel stays home, but keeps the choices for next time', (
+    testWidgets('a locked table can be looked at but not played', (
       tester,
     ) async {
-      final container = await pumpHome(tester);
+      await pumpHome(tester, saved: {'stakes.gamesPlayed': '{"5": 32}'});
 
       await tester.tap(find.byKey(const Key('single-player')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('players-2')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Cancel'));
+      await tester.tap(find.byKey(const Key('stake-10')));
       await tester.pumpAndSettle();
 
-      expect(find.byType(TableScreen), findsNothing);
-      expect(container.read(settingsProvider).playerCount, 2);
-
-      await tester.tap(find.byKey(const Key('single-player')));
-      await tester.pumpAndSettle();
       expect(
-        tester.widget<ChoiceChip>(find.byKey(const Key('players-2'))).selected,
-        isTrue,
+        tester
+            .widget<FilledButton>(find.byKey(const Key('setup-play')))
+            .onPressed,
+        isNull,
       );
+      expect(
+        find.text('Play 18 more games at the 5 table to unlock it.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('an unlocked table needs its minimum balance to play', (
+      tester,
+    ) async {
+      await pumpHome(
+        tester,
+        saved: {'stakes.gamesPlayed': '{"5": 50}', 'coins.balance': 999},
+      );
+
+      await tester.tap(find.byKey(const Key('single-player')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('stake-10')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('setup-play')))
+            .onPressed,
+        isNull,
+      );
+      expect(find.text('Needs 1,000 coins to join.'), findsOneWidget);
     });
 
     testWidgets('a match keeps its setup when the next game\'s changes', (
@@ -185,7 +271,7 @@ void main() {
       );
     });
 
-    testWidgets('the setup fits a small phone', (tester) async {
+    testWidgets('the table picker fits a small phone', (tester) async {
       await pumpHome(tester);
       tester.view.physicalSize = const Size(667, 375);
       await tester.pump();
@@ -195,15 +281,32 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.byKey(const Key('setup-play')).hitTestable(), findsOneWidget);
-      expect(find.text('Hard').hitTestable(), findsOneWidget);
+      expect(find.byKey(const Key('players-5')).hitTestable(), findsOneWidget);
+      expect(find.byKey(const Key('stake-5')).hitTestable(), findsOneWidget);
     });
 
-    test('the setup sums up as bots and level', () {
+    test('the setup sums up as bots, level and table', () {
       expect(describeSetup(const MatchSetup(playerCount: 2)), '1 bot · Medium');
       expect(
         describeSetup(const MatchSetup(difficulty: BotDifficulty.hard)),
         '4 bots · Hard',
       );
+      expect(
+        describeSetup(
+          const MatchSetup(difficulty: BotDifficulty.hard, stake: 25000),
+        ),
+        '4 bots · Hard · 25K table',
+      );
+    });
+
+    test('stakes and balances are written short', () {
+      expect(formatStake(5), '5');
+      expect(formatStake(250), '250');
+      expect(formatStake(1000), '1K');
+      expect(formatStake(2500), '2.5K');
+      expect(formatStake(100000), '100K');
+      expect(formatStake(10000000), '10M');
+      expect(formatStake(2500000), '2.5M');
     });
 
     test('every level has a description', () {

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ui/home/home_screen.dart';
-import 'ui/home/stake_tables_provider.dart';
 import 'ui/settings/about.dart';
 import 'ui/settings/preferences.dart';
 import 'ui/settings/settings.dart';
@@ -14,7 +13,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerArtLicence();
   final preferences = DevicePreferences(await SharedPreferences.getInstance());
-  final stakeTables = await loadStakeTables();
   // The table is designed for landscape only.
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.landscapeLeft,
@@ -22,10 +20,7 @@ Future<void> main() async {
   ]);
   runApp(
     ProviderScope(
-      overrides: [
-        preferencesProvider.overrideWithValue(preferences),
-        stakeTablesProvider.overrideWithValue(stakeTables),
-      ],
+      overrides: [preferencesProvider.overrideWithValue(preferences)],
       child: const MarriageApp(),
     ),
   );

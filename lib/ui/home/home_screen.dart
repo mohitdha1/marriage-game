@@ -16,6 +16,8 @@ import '../table/table_screen.dart';
 import '../theme/table_felt.dart';
 import 'player_data_provider.dart';
 import 'game_setup.dart';
+import 'stake_table_picker.dart';
+import 'stake_tables_provider.dart';
 import 'pass_and_play_setup.dart';
 import 'player_avatar.dart';
 
@@ -36,7 +38,14 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
-    final coins = ref.watch(playerDataProvider).value?.coins;
+    final playerData = ref.watch(playerDataProvider).value;
+    final coins = playerData?.coins;
+    final stakeTables = ref.watch(stakeTablesProvider).value;
+    // Quick Play deals the stake table last chosen, once the tables and the
+    // player's coins have loaded.
+    final quickPlay = stakeTables == null || playerData == null
+        ? null
+        : quickPlaySetupFor(stakeTables, settings, playerData);
 
     return Scaffold(
       body: TableFelt(
@@ -57,7 +66,7 @@ class HomeScreen extends ConsumerWidget {
                           onTap: () => showProfileDialog(context),
                         ),
                         const Spacer(),
-                        _CoinPill(coins: coins),
+                        CoinPill(coins: coins),
                         const SizedBox(width: 8),
                         IconButton.filledTonal(
                           key: const Key('settings-button'),
@@ -81,28 +90,29 @@ class HomeScreen extends ConsumerWidget {
                                   _ModeTile(
                                     key: const Key('single-player'),
                                     title: 'Single Player',
-                                    subtitle: 'Choose the players and bots',
+                                    subtitle: 'Choose your stake table',
                                     icon: Icons.smart_toy_outlined,
                                     colors: const [
                                       Color(0xFFFFB300),
                                       Color(0xFFF57C00),
                                     ],
-                                    onTap: () async {
-                                      if (await showGameSetup(context) &&
-                                          context.mounted) {
-                                        final chosen = ref.read(
-                                          settingsProvider,
-                                        );
-                                        _startMatch(
-                                          context,
-                                          ref,
-                                          MatchSetup(
-                                            playerCount: chosen.playerCount,
-                                            difficulty: chosen.botDifficulty,
-                                          ),
-                                        );
-                                      }
-                                    },
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (pickerContext) =>
+                                            StakeTablePickerScreen(
+                                              onPlay: (setup) {
+                                                Navigator.of(
+                                                  pickerContext,
+                                                ).pop();
+                                                _startMatch(
+                                                  context,
+                                                  ref,
+                                                  setup,
+                                                );
+                                              },
+                                            ),
+                                      ),
+                                    ),
                                   ),
                                   _ModeTile(
                                     key: const Key('friends'),
@@ -119,9 +129,13 @@ class HomeScreen extends ConsumerWidget {
                               ),
                               const SizedBox(height: 14),
                               _QuickPlayButton(
-                                setup: describeSetup(quickPlaySetup),
-                                onPressed: () =>
-                                    _startMatch(context, ref, quickPlaySetup),
+                                setup: quickPlay == null
+                                    ? ''
+                                    : describeSetup(quickPlay),
+                                onPressed: quickPlay == null
+                                    ? null
+                                    : () =>
+                                          _startMatch(context, ref, quickPlay),
                               ),
                               const SizedBox(height: 8),
                             ],
@@ -176,7 +190,9 @@ class _QuickPlayButton extends StatelessWidget {
   const _QuickPlayButton({required this.setup, required this.onPressed});
 
   final String setup;
-  final VoidCallback onPressed;
+
+  /// Starts the game, or `null` while the stake tables load.
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -269,8 +285,8 @@ class _PlayerBadge extends StatelessWidget {
 }
 
 /// The coin balance in a pill, with a drawn coin.
-class _CoinPill extends StatelessWidget {
-  const _CoinPill({required this.coins});
+class CoinPill extends StatelessWidget {
+  const CoinPill({super.key, required this.coins});
 
   /// The balance, or `null` while it loads.
   final int? coins;
