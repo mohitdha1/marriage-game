@@ -9,6 +9,7 @@ import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/main.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/scoreboard/scoreboard_screen.dart';
+import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/settings/settings.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
@@ -59,6 +60,10 @@ Future<void> pumpTable(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        // A returning player: the first-time guide's tips are done.
+        preferencesProvider.overrideWithValue(
+          InMemoryPreferences({'guide.done': 'draw,discard,sets,joker'}),
+        ),
         randomProvider.overrideWithValue(Random(0)),
         botThinkingTimeProvider.overrideWithValue(() => thinkingTime),
         soundEffectsProvider.overrideWithValue(const SilentSoundEffects()),

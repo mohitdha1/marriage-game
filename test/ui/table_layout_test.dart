@@ -11,6 +11,7 @@ import 'package:marriage_game/main.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
+import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/table/card_view.dart';
 import 'package:marriage_game/ui/table/hand_fan.dart';
 import 'package:marriage_game/ui/table/opponent_seat.dart';
@@ -49,8 +50,9 @@ void main() {
   Future<void> pumpBusyTable(
     WidgetTester tester,
     Size size,
-    int playerCount,
-  ) async {
+    int playerCount, {
+    bool guideDone = false,
+  }) async {
     tester.view
       ..physicalSize = size
       ..devicePixelRatio = 1
@@ -67,6 +69,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          if (guideDone)
+            preferencesProvider.overrideWithValue(
+              InMemoryPreferences({'guide.done': 'draw,discard,sets,joker'}),
+            ),
           randomProvider.overrideWithValue(Random(0)),
           botThinkingTimeProvider.overrideWithValue(() => Duration.zero),
           soundEffectsProvider.overrideWithValue(const SilentSoundEffects()),
@@ -160,11 +166,24 @@ void main() {
 
         // The corner badges sit over the hand by design, but must stay clear
         // of every seat and of each other.
-        final badges = [
-          tester.getRect(find.byKey(const Key('maal-badge'))),
-          tester.getRect(find.byKey(const Key('hand-helper'))),
-        ];
-        expect(badges[0].overlaps(badges[1]), isFalse);
+        // While the guide's tip shows, the hand helper waits.
+        expect(find.byKey(const Key('hand-helper')), findsNothing);
+        final badges = [tester.getRect(find.byKey(const Key('maal-badge')))];
+        // They sit above the hand, so they mustn't hide anything there.
+        for (final badge in badges) {
+          for (final MapEntry(key: what, value: finder) in {
+            'action buttons': find.byKey(const Key('action-bar')),
+            'sort button and your sets': find.byKey(const Key('hand-tools')),
+            'stock and discard pile': find.byType(TableCenter),
+            'guide tip': find.byKey(const Key('guide-sets')),
+          }.entries) {
+            expect(
+              badge.overlaps(tester.getRect(finder)),
+              isFalse,
+              reason: 'a corner badge ($badge) overlaps the $what',
+            );
+          }
+        }
         for (final badge in badges) {
           for (final seat in find.byType(OpponentSeat).evaluate()) {
             expect(
@@ -247,5 +266,57 @@ void main() {
         }
       });
     }
+  }
+
+  for (final MapEntry(key: name, value: size) in screens.entries) {
+    testWidgets('on a $name, the corner badges sit clear above the hand', (
+      tester,
+    ) async {
+      await pumpBusyTable(tester, size, 5, guideDone: true);
+
+      final cards = [
+        for (final element
+            in find
+                .descendant(
+                  of: find.byType(HandFan),
+                  matching: find.byType(CardFace),
+                )
+                .evaluate())
+          if (!(element.widget as CardFace).highlighted)
+            tester.getRect(find.byWidget(element.widget)),
+      ];
+      final badges = {
+        'maal badge': tester.getRect(find.byKey(const Key('maal-badge'))),
+        'hand helper': tester.getRect(find.byKey(const Key('hand-helper'))),
+      };
+      expect(badges['maal badge']!.overlaps(badges['hand helper']!), isFalse);
+      for (final MapEntry(key: badge, value: rect) in badges.entries) {
+        for (final card in cards) {
+          expect(
+            rect.overlaps(card),
+            isFalse,
+            reason: 'the $badge hides a card',
+          );
+        }
+        for (final MapEntry(key: what, value: finder) in {
+          'action buttons': find.byKey(const Key('action-bar')),
+          'sort button and your sets': find.byKey(const Key('hand-tools')),
+          'stock and discard pile': find.byType(TableCenter),
+        }.entries) {
+          expect(
+            rect.overlaps(tester.getRect(finder)),
+            isFalse,
+            reason: 'the $badge ($rect) overlaps the $what',
+          );
+        }
+        for (final seat in find.byType(OpponentSeat).evaluate()) {
+          expect(
+            rect.overlaps(tester.getRect(find.byWidget(seat.widget))),
+            isFalse,
+            reason: 'the $badge overlaps a seat',
+          );
+        }
+      }
+    });
   }
 }

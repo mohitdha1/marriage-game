@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/game_config.dart';
+import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/main.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
@@ -84,6 +85,46 @@ void main() {
       );
     }
   });
+
+  for (final MapEntry(key: name, value: size) in screens.entries) {
+    testWidgets('on a $name, all 22 cards fit and each shows its rank and '
+        'suit', (tester) async {
+      // Real phones have system bars; reduced motion skips the deal.
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await pumpTable(tester, size: size);
+      ProviderScope.containerOf(
+        tester.element(find.byType(TableScreen)),
+      ).read(tableProvider.notifier).draw(DrawSource.stock);
+      await tester.pump();
+      expect(currentState(tester).hand, hasLength(22));
+
+      final cards = find.descendant(
+        of: find.byType(HandFan),
+        matching: find.byType(CardFace),
+      );
+      final rects = [
+        for (final element in cards.evaluate())
+          tester.getRect(find.byWidget(element.widget)),
+      ]..sort((a, b) => a.left.compareTo(b.left));
+      expect(rects, hasLength(22));
+      final width = rects.first.width;
+      for (var i = 0; i + 1 < rects.length; i++) {
+        // The corner index takes the first quarter of a card's width.
+        expect(
+          rects[i + 1].left - rects[i].left,
+          greaterThanOrEqualTo(width * 0.27),
+          reason: 'card $i is covered past its rank and suit',
+        );
+      }
+      expect(rects.first.left, greaterThanOrEqualTo(0));
+      expect(rects.last.right, lessThanOrEqualTo(size.width));
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('the 21 cards are dealt into the hand fan, in order', (
     tester,

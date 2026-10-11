@@ -10,6 +10,7 @@ import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
 import '../../engine/scoring.dart';
 import '../../engine/table_event.dart';
+import '../guide/guide.dart';
 import '../guide/table_guide.dart';
 import '../scoreboard/scoreboard_screen.dart';
 import '../settings/settings.dart';
@@ -358,6 +359,16 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                     40.0,
                     100.0,
                   );
+                  // The hand's cards are larger, with their bottoms running
+                  // off the edge of the table.
+                  final handCardWidth = (constraints.maxHeight * 0.24).clamp(
+                    48.0,
+                    130.0,
+                  );
+                  const handHidden = 0.25;
+                  // How far up the hand's cards reach.
+                  final aboveHand =
+                      handCardWidth / cardAspectRatio * (1 - handHidden) + 4;
                   final seats = seatAlignments(table.opponents.length);
                   final choice = state.openingChoice;
                   final jokers = table.yourJokers;
@@ -510,7 +521,8 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                             selected: state.selected,
                             groupOf: state.groupOf,
                             jokers: jokers,
-                            cardWidth: cardWidth,
+                            cardWidth: handCardWidth,
+                            hiddenBelow: handHidden,
                             onCardTap: (id) {
                               sounds.play(Sfx.select);
                               controller.toggleSelected(id);
@@ -521,20 +533,26 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                             onDropMissed: _snapBack,
                           ),
                         ),
-                        // Badges over the hand's lower corners; taps go through
-                        // to the cards.
+                        // Badges just above the hand's corners, clear of the
+                        // cards; taps go through to anything underneath.
                         if (maalOf(state.handProgress) case final maal?)
-                          Align(
-                            alignment: Alignment.bottomLeft,
+                          Positioned(
+                            left: 0,
+                            bottom: aboveHand,
                             child: _CornerBadge(
                               key: const Key('maal-badge'),
                               text: 'Maal $maal',
                             ),
                           ),
+                        // The first-time guide's tips sit in the same place,
+                        // and say more; the helper waits until they're done.
                         if (state.handProgress case final progress?
-                            when settings.handHelper)
-                          Align(
-                            alignment: Alignment.bottomRight,
+                            when settings.handHelper &&
+                                guideStepFor(state, ref.watch(guideProvider)) ==
+                                    null)
+                          Positioned(
+                            right: 0,
+                            bottom: aboveHand,
                             child: _CornerBadge(
                               key: const Key('hand-helper'),
                               text: handHelperText(progress),

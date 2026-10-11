@@ -7,8 +7,12 @@ import '../../engine/round.dart';
 import '../state/table_state.dart';
 import 'card_view.dart';
 
-/// The human player's cards, overlapped and fanned along a gentle arc so a
-/// full 21–22 card hand fits across a landscape screen.
+/// The player's cards in an overlapping row, large enough to read and tap
+/// easily: each card shows its left edge, with its rank and suit, and the
+/// last shows in full. The row overlaps more as the hand grows, so a full
+/// 21–22 card hand fits across a landscape screen. The bottom
+/// [hiddenBelow] of each card may run off the screen's edge, which leaves
+/// the cards large without crowding the table.
 ///
 /// Tapping a card selects it (it lifts and gets a bright border). Dragging a
 /// card straight up and letting go over the discard pile, or flicking it
@@ -30,6 +34,7 @@ class HandFan extends StatelessWidget {
     this.onDropMissed,
     this.hiddenIds = const {},
     this.cardKey,
+    this.hiddenBelow = 0,
   });
 
   final List<HandCard> cards;
@@ -74,12 +79,13 @@ class HandFan extends StatelessWidget {
   /// where a card sits.
   final GlobalKey Function(int cardId)? cardKey;
 
+  /// The share of each card's height below the bottom of the row, left to
+  /// run off the edge of the screen.
+  final double hiddenBelow;
+
   /// Largest gap between neighbouring cards, as a share of a card's width,
   /// so small hands still overlap a little.
   static const _maxSpacing = 0.75;
-
-  /// Most a card turns relative to its neighbour, in radians.
-  static const _maxTurn = 0.02;
 
   /// How far a selected card lifts, as a share of a card's height.
   static const _lift = 0.2;
@@ -109,22 +115,6 @@ class HandFan extends StatelessWidget {
         final n = cards.length;
         if (n == 0) return SizedBox(height: cardHeight + lift);
 
-        final turn = min(_maxTurn, 0.4 / n);
-        final middle = (n - 1) / 2;
-        final outerAngle = middle * turn;
-        // A tilted card is wider and taller than an upright one. Reserve that
-        // overhang so the outermost cards stay inside the fan.
-        final overhangX =
-            (cardWidth * cos(outerAngle) +
-                cardHeight * sin(outerAngle) -
-                cardWidth) /
-            2;
-        final overhangY =
-            (cardWidth * sin(outerAngle) +
-                cardHeight * cos(outerAngle) -
-                cardHeight) /
-            2;
-
         int? group(int i) => groupOf?.call(cards[i].id);
         // A gap goes wherever one card and the next aren't in the same group,
         // as long as at least one of them is grouped.
@@ -137,8 +127,7 @@ class HandFan extends StatelessWidget {
         final gapCount = gapBefore.where((g) => g).length;
         final gap = cardWidth * _groupGap;
 
-        final usableWidth =
-            constraints.maxWidth - 2 * overhangX - gap * gapCount;
+        final usableWidth = constraints.maxWidth - gap * gapCount;
         final spacing = n == 1
             ? 0.0
             : min(cardWidth * _maxSpacing, (usableWidth - cardWidth) / (n - 1));
@@ -148,16 +137,10 @@ class HandFan extends StatelessWidget {
             i == 0 ? 0 : offsets[i - 1] + spacing + (gapBefore[i] ? gap : 0),
           );
         }
-        // Cards sit on a circle; its radius follows from the spacing and the
-        // turn between neighbours.
-        final radius = spacing / turn;
-        final drops = [
-          for (var i = 0; i < n; i++) radius * (1 - cos((i - middle) * turn)),
-        ];
         final fanWidth = offsets.last + cardWidth;
         final left = (constraints.maxWidth - fanWidth) / 2;
         // Room above the cards for a selected card to lift into.
-        final top = lift + overhangY;
+        final top = lift;
 
         // Where a card dropped on the fan should go: the slot whose centre is
         // nearest the drop.
@@ -176,7 +159,7 @@ class HandFan extends StatelessWidget {
         }
 
         final fan = SizedBox(
-          height: top + cardHeight + drops.reduce(max) + overhangY,
+          height: top + cardHeight * (1 - hiddenBelow),
           child: Stack(
             clipBehavior: Clip.none,
             children: [
@@ -184,33 +167,27 @@ class HandFan extends StatelessWidget {
                 Positioned(
                   key: ValueKey(cards[i].id),
                   left: left + offsets[i],
-                  top:
-                      top +
-                      drops[i] -
-                      (selected.contains(cards[i].id) ? lift : 0),
-                  child: Transform.rotate(
-                    angle: (i - middle) * turn,
-                    child: _HandCardView(
-                      key: cardKey?.call(cards[i].id),
-                      hidden: hiddenIds.contains(cards[i].id),
-                      handCard: cards[i],
-                      width: cardWidth,
-                      selected: selected.contains(cards[i].id),
-                      wild: jokers?.isWild(cards[i].card) ?? false,
-                      groupColor: switch (group(i)) {
-                        null => null,
-                        final g => groupColors[g % groupColors.length],
-                      },
-                      onTap: onCardTap == null
-                          ? null
-                          : () => onCardTap!(cards[i].id),
-                      onReleased: (at, {required flicked}) {
-                        final id = cards[i].id;
-                        flicked
-                            ? onFlick?.call(id, at)
-                            : onDropMissed?.call(id, at);
-                      },
-                    ),
+                  top: top - (selected.contains(cards[i].id) ? lift : 0),
+                  child: _HandCardView(
+                    key: cardKey?.call(cards[i].id),
+                    hidden: hiddenIds.contains(cards[i].id),
+                    handCard: cards[i],
+                    width: cardWidth,
+                    selected: selected.contains(cards[i].id),
+                    wild: jokers?.isWild(cards[i].card) ?? false,
+                    groupColor: switch (group(i)) {
+                      null => null,
+                      final g => groupColors[g % groupColors.length],
+                    },
+                    onTap: onCardTap == null
+                        ? null
+                        : () => onCardTap!(cards[i].id),
+                    onReleased: (at, {required flicked}) {
+                      final id = cards[i].id;
+                      flicked
+                          ? onFlick?.call(id, at)
+                          : onDropMissed?.call(id, at);
+                    },
                   ),
                 ),
             ],
