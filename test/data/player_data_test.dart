@@ -48,4 +48,27 @@ void main() {
     expect(data.withGameResult(won: true, points: 20).coins, 500);
     expect(data.withCoinsAdded(20).stats, data.stats);
   });
+
+  test('a game at a stake table counts toward that stake', () {
+    final data = const PlayerData()
+        .withGameResult(won: true, points: 10, stake: 5)
+        .withGameResult(won: false, points: -4, stake: 5)
+        .withGameResult(won: false, points: -9, stake: 10)
+        .withGameResult(won: true, points: 12);
+
+    expect(data.gamesAt(5), 2);
+    expect(data.gamesAt(10), 1);
+    expect(data.gamesAt(25), 0);
+    expect(data.stats.roundsPlayed, 4);
+  });
+
+  test('adding coins keeps the games played at each stake', () {
+    final data = const PlayerData().withGameResult(
+      won: true,
+      points: 10,
+      stake: 5,
+    );
+
+    expect(data.withCoinsAdded(50).gamesAt(5), 1);
+  });
 }

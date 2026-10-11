@@ -75,4 +75,16 @@ void main() {
       );
     },
   );
+
+  test('games at each stake are saved for the next launch', () async {
+    final store = InMemoryPreferences();
+    final repository = LocalPlayerDataRepository(store);
+    for (var i = 0; i < 3; i++) {
+      await repository.recordGameResult(won: false, points: -5, stake: 5);
+    }
+    await repository.recordGameResult(won: true, points: 20, stake: 10);
+
+    final loaded = await LocalPlayerDataRepository(store).load();
+    expect(loaded.gamesAtStake, {5: 3, 10: 1});
+  });
 }

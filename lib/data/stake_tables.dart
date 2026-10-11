@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../bots/bot_player.dart';
+import 'player_data.dart';
 
 /// One tier of stake table: what each point is worth in coins, and what it
 /// takes to sit down at it.
@@ -81,6 +82,33 @@ class StakeTables {
     final i = tiers.indexOf(tier);
     return i > 0 ? tiers[i - 1] : null;
   }
+
+  /// Whether [data]'s player has unlocked [tier]: the first tier always
+  /// is, and each one after once its unlock count of games has been played
+  /// at the tier below, itself unlocked. An unlocked tier stays unlocked.
+  bool isUnlocked(StakeTable tier, PlayerData data) =>
+      unlockProgress(tier, data) == null;
+
+  /// How far [data]'s player is toward unlocking [tier]: the games played
+  /// at the tier below, never more than needed, and the games [needed]; or
+  /// `null` once it's unlocked.
+  ({int played, int needed})? unlockProgress(StakeTable tier, PlayerData data) {
+    final previous = below(tier);
+    if (previous == null) return null;
+    final played = data.gamesAt(previous.stake);
+    if (played >= tier.gamesToUnlock && isUnlocked(previous, data)) {
+      return null;
+    }
+    return (
+      played: played.clamp(0, tier.gamesToUnlock),
+      needed: tier.gamesToUnlock,
+    );
+  }
+
+  /// Whether [data]'s player can sit down at [tier] now: it's unlocked, and
+  /// they have its minimum balance.
+  bool canJoin(StakeTable tier, PlayerData data) =>
+      isUnlocked(tier, data) && data.coins >= tier.minBalance;
 
   static StakeTable _tierFrom(Object? row, int index) {
     if (row case {

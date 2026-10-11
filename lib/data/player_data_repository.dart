@@ -19,7 +19,12 @@ abstract interface class PlayerDataRepository {
   /// the data as it now stands.
   Future<PlayerData> addCoins(int amount);
 
-  /// Counts a finished round: whether the player [won] it, and the [points]
-  /// it won or lost them. Returns the data as it now stands.
-  Future<PlayerData> recordGameResult({required bool won, required int points});
+  /// Counts a finished round: whether the player [won] it, the [points] it
+  /// won or lost them, and the [stake] of the table, if it was played at
+  /// one. Returns the data as it now stands.
+  Future<PlayerData> recordGameResult({
+    required bool won,
+    required int points,
+    int? stake,
+  });
 }

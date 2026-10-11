@@ -39,12 +39,17 @@ class PlayerDataController extends AsyncNotifier<PlayerData> {
   Future<void> addCoins(int amount) =>
       _update((repository) => repository.addCoins(amount));
 
-  /// Counts a finished round: whether the player [won] it, and the [points]
-  /// it won or lost them.
-  Future<void> recordGameResult({required bool won, required int points}) =>
-      _update(
-        (repository) => repository.recordGameResult(won: won, points: points),
-      );
+  /// Counts a finished round: whether the player [won] it, the [points] it
+  /// won or lost them, and the [stake] of the table, if it was played at
+  /// one.
+  Future<void> recordGameResult({
+    required bool won,
+    required int points,
+    int? stake,
+  }) => _update(
+    (repository) =>
+        repository.recordGameResult(won: won, points: points, stake: stake),
+  );
 
   Future<void> _update(
     Future<PlayerData> Function(PlayerDataRepository) change,

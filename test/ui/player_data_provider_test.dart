@@ -42,9 +42,12 @@ class RecordingRepository implements PlayerDataRepository {
   Future<PlayerData> recordGameResult({
     required bool won,
     required int points,
+    int? stake,
   }) async {
-    calls.add('recordGameResult $won $points');
-    return data = data.withGameResult(won: won, points: points);
+    calls.add(
+      'recordGameResult $won $points${stake == null ? '' : ' at $stake'}',
+    );
+    return data = data.withGameResult(won: won, points: points, stake: stake);
   }
 }
 

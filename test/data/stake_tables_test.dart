@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/bots/bot_player.dart';
+import 'package:marriage_game/data/player_data.dart';
 import 'package:marriage_game/data/stake_tables.dart';
 import 'package:marriage_game/ui/home/stake_tables_provider.dart';
 
@@ -152,6 +153,93 @@ void main() {
     test('a zero stake or a negative minimum balance', () {
       refuses(tablesJson([row(0, 0, 0, 'easy')]), 'above 0');
       refuses(tablesJson([row(5, -1, 0, 'easy')]), 'not negative');
+    });
+  });
+
+  group('Unlocking', () {
+    final tables = appStakeTables();
+    final five = tables.withStake(5)!;
+    final ten = tables.withStake(10)!;
+    final twentyFive = tables.withStake(25)!;
+
+    /// A player with [games] played at each stake.
+    PlayerData playerWith(Map<int, int> games, {int coins = 1000000}) =>
+        PlayerData(coins: coins, gamesAtStake: games);
+
+    test('the first tier is always open, with no progress to show', () {
+      expect(tables.isUnlocked(five, const PlayerData()), isTrue);
+      expect(tables.unlockProgress(five, const PlayerData()), isNull);
+    });
+
+    test('a new player has every other tier locked, at 0 games', () {
+      for (final tier in tables.tiers.skip(1)) {
+        expect(tables.isUnlocked(tier, const PlayerData()), isFalse);
+        expect(tables.unlockProgress(tier, const PlayerData()), (
+          played: 0,
+          needed: tier.gamesToUnlock,
+        ));
+      }
+    });
+
+    test('progress counts games at the tier below', () {
+      final player = playerWith({5: 32});
+
+      expect(tables.unlockProgress(ten, player), (played: 32, needed: 50));
+      expect(tables.isUnlocked(ten, player), isFalse);
+    });
+
+    test('the 10 tier unlocks on the 50th game at the 5 tier', () {
+      expect(tables.isUnlocked(ten, playerWith({5: 49})), isFalse);
+      expect(tables.isUnlocked(ten, playerWith({5: 50})), isTrue);
+      expect(tables.unlockProgress(ten, playerWith({5: 50})), isNull);
+    });
+
+    test('games beyond the count still show as done, not more', () {
+      // 60 games at 10, but 10 itself is still locked.
+      final player = playerWith({5: 10, 10: 60});
+
+      expect(tables.unlockProgress(twentyFive, player), (
+        played: 50,
+        needed: 50,
+      ));
+    });
+
+    test('a tier stays locked until the tier below is unlocked too', () {
+      expect(tables.isUnlocked(twentyFive, playerWith({10: 50})), isFalse);
+      expect(
+        tables.isUnlocked(twentyFive, playerWith({5: 50, 10: 50})),
+        isTrue,
+      );
+    });
+
+    test('every tier opens in turn after its games at the one below', () {
+      final games = <int, int>{};
+      for (final tier in tables.tiers.skip(1)) {
+        final previous = tables.below(tier)!;
+        games[previous.stake] = tier.gamesToUnlock - 1;
+        expect(tables.isUnlocked(tier, playerWith(games)), isFalse);
+        games[previous.stake] = tier.gamesToUnlock;
+        expect(tables.isUnlocked(tier, playerWith(games)), isTrue);
+      }
+    });
+
+    test('joining needs the tier unlocked and its minimum balance', () {
+      final unlocked = {5: 50};
+
+      expect(tables.canJoin(ten, playerWith(unlocked, coins: 1000)), isTrue);
+      expect(tables.canJoin(ten, playerWith(unlocked, coins: 999)), isFalse);
+      expect(tables.canJoin(ten, playerWith({5: 49}, coins: 5000)), isFalse);
+    });
+
+    test('the first tier can be joined even with no coins left', () {
+      expect(tables.canJoin(five, const PlayerData(coins: 0)), isTrue);
+    });
+
+    test('an unlocked tier stays unlocked when the balance drops', () {
+      final broke = playerWith({5: 50}, coins: 0);
+
+      expect(tables.isUnlocked(ten, broke), isTrue);
+      expect(tables.canJoin(ten, broke), isFalse);
     });
   });
 }

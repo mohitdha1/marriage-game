@@ -38,11 +38,12 @@ class PlayerStats {
 }
 
 /// Everything the app keeps about the player's progress: their play-money
-/// coins and their stats.
+/// coins, their stats, and how many games they've played at each stake.
 class PlayerData {
   const PlayerData({
     this.coins = startingCoins,
     this.stats = const PlayerStats(),
+    this.gamesAtStake = const {},
   });
 
   /// What a new player starts with.
@@ -54,22 +55,47 @@ class PlayerData {
   final int coins;
   final PlayerStats stats;
 
+  /// Games played at each stake table, by its stake. Stakes not played
+  /// yet are left out.
+  final Map<int, int> gamesAtStake;
+
+  /// Games played at the table with [stake].
+  int gamesAt(int stake) => gamesAtStake[stake] ?? 0;
+
   /// This data with [amount] coins added, or taken away when [amount] is
   /// negative. The balance never goes below zero.
-  PlayerData withCoinsAdded(int amount) =>
-      PlayerData(coins: (coins + amount).clamp(0, maxCoins), stats: stats);
+  PlayerData withCoinsAdded(int amount) => PlayerData(
+    coins: (coins + amount).clamp(0, maxCoins),
+    stats: stats,
+    gamesAtStake: gamesAtStake,
+  );
 
-  /// This data with a finished round counted in the stats.
-  PlayerData withGameResult({required bool won, required int points}) =>
-      PlayerData(
-        coins: coins,
-        stats: stats.withRound(won: won, points: points),
-      );
+  /// This data with a finished round counted in the stats, and, when it
+  /// was played at a stake table, as a game at that [stake].
+  PlayerData withGameResult({
+    required bool won,
+    required int points,
+    int? stake,
+  }) => PlayerData(
+    coins: coins,
+    stats: stats.withRound(won: won, points: points),
+    gamesAtStake: stake == null
+        ? gamesAtStake
+        : Map.unmodifiable({...gamesAtStake, stake: gamesAt(stake) + 1}),
+  );
 
   @override
   bool operator ==(Object other) =>
-      other is PlayerData && other.coins == coins && other.stats == stats;
+      other is PlayerData &&
+      other.coins == coins &&
+      other.stats == stats &&
+      other.gamesAtStake.length == gamesAtStake.length &&
+      gamesAtStake.entries.every((e) => other.gamesAtStake[e.key] == e.value);
 
   @override
-  int get hashCode => Object.hash(coins, stats);
+  int get hashCode => Object.hash(
+    coins,
+    stats,
+    Object.hashAllUnordered(gamesAtStake.entries.map((e) => (e.key, e.value))),
+  );
 }
