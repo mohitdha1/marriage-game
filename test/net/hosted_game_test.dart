@@ -142,6 +142,16 @@ void main() {
     expect(view.you.seat, 1);
     expect(view.you.name, 'Bina');
     expect(view.hand, binasCards);
+    // Shown sorted by suit (♠ ♥ ♣ ♦), then rank, as dealt.
+    final suits = [for (final h in game.guestState.hand) h.card.suit];
+    expect(
+      suits,
+      [...suits]..sort(
+        (a, b) => TableNotifier.sortedSuits
+            .indexOf(a)
+            .compareTo(TableNotifier.sortedSuits.indexOf(b)),
+      ),
+    );
     expect(view.opponents.single.name, 'Mohit');
     expect(game.guestState.seatNames, ['Mohit', 'Bina']);
     expect(game.hostState.view.opponents.single.name, 'Bina');

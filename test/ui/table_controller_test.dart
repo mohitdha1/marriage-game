@@ -117,10 +117,49 @@ Future<PlayerData> settledPlayerData(ProviderContainer container) async {
 
 void main() {
   group('Dealing', () {
-    test('the hand is shown in dealt order, every card with its own id', () {
+    test('the hand is dealt sorted by suit, then rank, each card with its '
+        'own id', () {
+      final table = tableWith(
+        yourHand: [
+          c(Suit.diamonds, Rank.two),
+          c(Suit.hearts, Rank.king),
+          c(Suit.spades, Rank.nine),
+          c(Suit.clubs, Rank.ace),
+          c(Suit.hearts, Rank.three),
+          c(Suit.spades, Rank.four),
+        ],
+      ).table;
+
+      expect(table.hand.map((c) => c.card), [
+        c(Suit.spades, Rank.four),
+        c(Suit.spades, Rank.nine),
+        c(Suit.hearts, Rank.three),
+        c(Suit.hearts, Rank.king),
+        c(Suit.clubs, Rank.ace),
+        c(Suit.diamonds, Rank.two),
+      ]);
+      expect(table.hand.map((c) => c.id).toSet(), hasLength(6));
+      expect(table.view.isYourTurn, isTrue);
+    });
+
+    test('a drawn card joins the sorted hand at the right-hand end', () {
+      final container = tableWith(
+        yourHand: [c(Suit.hearts, Rank.king), c(Suit.spades, Rank.nine)],
+      );
+      container.controller.draw(DrawSource.stock);
+
+      final hand = container.table.hand.map((c) => c.card).toList();
+      expect(hand.take(2), [
+        c(Suit.spades, Rank.nine),
+        c(Suit.hearts, Rank.king),
+      ]);
+      expect(hand, hasLength(3));
+    });
+
+    test('every card in the dealt hand has its own id', () {
       final table = tableWith().table;
 
-      expect(table.hand.map((c) => c.card), yourCards);
+      expect(table.hand.map((c) => c.card), unorderedEquals(yourCards));
       expect(table.hand.map((c) => c.id).toSet(), hasLength(yourCards.length));
       expect(table.view.isYourTurn, isTrue);
     });

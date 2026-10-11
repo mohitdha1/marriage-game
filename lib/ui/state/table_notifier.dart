@@ -93,13 +93,18 @@ abstract class TableNotifier extends Notifier<TableState> {
   /// Brings the on-screen hand in line with [held], the cards the game says
   /// the person holds: cards still held keep their place and id, cards that
   /// have left are dropped, and new cards are added at the right-hand end.
+  ///
+  /// A hand with nothing shown yet is a newly dealt one, and comes sorted by
+  /// suit, then rank, the order [sortHand] uses.
   List<HandCard> reconcile(List<PlayingCard> held, List<HandCard> shown) {
     final left = [...held];
     final kept = <HandCard>[];
     for (final handCard in shown) {
       if (left.remove(handCard.card)) kept.add(handCard);
     }
-    return [...kept, for (final card in left) HandCard(_nextCardId++, card)];
+    final added = [for (final card in left) HandCard(_nextCardId++, card)];
+    if (shown.isEmpty) added.sort(_bySuitThenRank);
+    return [...kept, ...added];
   }
 
   /// Starts card ids afresh, for a new round's hand.

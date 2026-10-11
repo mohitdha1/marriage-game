@@ -20,11 +20,12 @@ import 'package:marriage_game/ui/table/table_screen.dart';
 
 const c = PlayingCard.new;
 
+// In the order the hand is shown: sorted by suit (♠ before ♥), then rank.
 final ashasCards = [
+  c(Suit.spades, Rank.king),
   c(Suit.hearts, Rank.three),
   c(Suit.hearts, Rank.four),
   c(Suit.hearts, Rank.five),
-  c(Suit.spades, Rank.king),
 ];
 final binasCards = [
   c(Suit.spades, Rank.six),
