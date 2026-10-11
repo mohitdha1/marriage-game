@@ -130,6 +130,11 @@ class Round {
 
   bool get isOver => _winner != null;
 
+  /// The card the current player took from the discard pile this turn,
+  /// which they must keep until their next turn; `null` if they drew from
+  /// the stock or haven't drawn yet.
+  PlayingCard? get takenFromDiscardPile => _takenFromDiscardPile;
+
   /// The seat that won, or `null` while the round is still being played.
   int? get winner => _winner;
 

@@ -362,6 +362,73 @@ void main() {
     },
   );
 
+  group('A player whose link drops', () {
+    test('mid-turn: the host says so, and a bot finishes their turn', () async {
+      // Bina holds an ordinary hand, so the bot doesn't simply win.
+      final game = await Game.start(hands: [mohitsCards, idleBotCards]);
+      game.hostTable.draw(DrawSource.stock);
+      await game.hostTable.discard(game.hostState.hand.first.id);
+      await game.settle();
+      game.guestTable.draw(DrawSource.stock);
+      await game.settle();
+      expect(game.hostState.view.isYourTurn, isFalse);
+
+      await game.session.close();
+      await game.settle();
+      await game.hostTable.botsSettled;
+      await game.settle();
+
+      expect(
+        game.hostState.notice,
+        'Bina lost connection. A bot plays for them until they\'re back.',
+      );
+      expect(game.hostState.offlineSeats, {1});
+      // The bot finished Bina's turn without drawing again: she holds as
+      // many cards as before her draw.
+      expect(game.hostState.view.isYourTurn, isTrue);
+      expect(
+        game.hostState.view.opponents.single.cardCount,
+        idleBotCards.length,
+      );
+    });
+
+    test('between turns: the bot plays when their turn comes', () async {
+      final game = await Game.start();
+      await game.session.close();
+      await game.settle();
+
+      game.hostTable.draw(DrawSource.stock);
+      await game.hostTable.discard(game.hostState.hand.first.id);
+      await game.hostTable.botsSettled;
+      await game.settle();
+
+      expect(game.hostState.view.isYourTurn, isTrue);
+      expect(game.hostState.view.events.where((e) => e.seat == 1), isNotEmpty);
+    });
+
+    test(
+      'while choosing their opening: the bot opens with the first three',
+      () async {
+        final four = [
+          for (final rank in [Rank.two, Rank.five, Rank.nine, Rank.king]) ...[
+            c(Suit.clubs, rank),
+            c(Suit.clubs, rank),
+            c(Suit.clubs, rank),
+          ],
+        ];
+        final game = await Game.start(hands: [mohitsCards, four]);
+        expect(game.guestState.openingChoice, isNotNull);
+
+        await game.session.close();
+        await game.settle();
+
+        expect(game.hostState.view.opponents.single.laidDown, hasLength(3));
+        game.hostTable.draw(DrawSource.stock);
+        expect(game.hostState.view.youHaveDrawn, isTrue);
+      },
+    );
+  });
+
   test('a garbled or unexpected message from a guest is ignored', () async {
     final game = await Game.start();
     game.session.send(const Hello('Bina again'));

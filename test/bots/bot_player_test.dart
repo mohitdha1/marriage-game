@@ -53,6 +53,37 @@ Round roundFor(
       ..showOpeningTunnellas(1, []);
 
 void main() {
+  group('Taking over a turn already under way', () {
+    test('a bot finishes the turn without drawing again', () {
+      final round = roundFor(run(Suit.clubs, [Rank.two, Rank.five, Rank.nine]))
+        ..draw(DrawSource.stock);
+
+      final turn = bot(BotDifficulty.medium).takeTurn(round);
+
+      expect(turn.drewFrom, isNull);
+      expect(turn.drawn, isNull);
+      expect(turn.discarded, isNotNull);
+      expect(round.currentSeat, 1);
+      expect(round.hands[0].cards, hasLength(3));
+    });
+
+    test('and keeps the card the player took from the discard pile', () {
+      final kept = c(Suit.spades, Rank.ace);
+      for (final difficulty in BotDifficulty.values) {
+        for (var seed = 0; seed < 10; seed++) {
+          final round = roundFor(
+            run(Suit.clubs, [Rank.two, Rank.five, Rank.nine]),
+            topDiscard: kept,
+          )..draw(DrawSource.discardPile);
+
+          bot(difficulty, seed: seed).takeTurn(round);
+
+          expect(round.hands[0].cards, contains(kept), reason: '$difficulty');
+        }
+      }
+    });
+  });
+
   final heartsRun = run(Suit.hearts, [Rank.three, Rank.four, Rank.five]);
   final spadesRun = run(Suit.spades, [Rank.two, Rank.three, Rank.four]);
   final clubsRun = run(Suit.clubs, [Rank.nine, Rank.ten, Rank.jack]);

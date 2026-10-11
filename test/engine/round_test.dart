@@ -192,6 +192,29 @@ void main() {
   });
 
   group('Turns', () {
+    test(
+      'the card taken from the discard pile is known until the turn ends',
+      () {
+        final round = table();
+        expect(round.takenFromDiscardPile, isNull);
+
+        round.draw(DrawSource.discardPile);
+        expect(round.takenFromDiscardPile, firstDiscard);
+
+        round.discard(
+          round.hands[0].cards.firstWhere((c) => c != firstDiscard),
+        );
+        expect(round.takenFromDiscardPile, isNull);
+
+        round.draw(DrawSource.stock);
+        expect(
+          round.takenFromDiscardPile,
+          isNull,
+          reason: 'drew from the stock',
+        );
+      },
+    );
+
     test('drawing from the stock takes its top card', () {
       final round = table();
 

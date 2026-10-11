@@ -122,6 +122,7 @@ class SeatUpdate extends WireMessage {
     required this.jokerPenalty,
     this.choosingOpening = false,
     this.match = 0,
+    this.offline = const [],
   });
 
   factory SeatUpdate.fromJson(Json json) => SeatUpdate(
@@ -138,6 +139,7 @@ class SeatUpdate extends WireMessage {
     jokerPenalty: json['jokerPenalty']! as bool,
     choosingOpening: json['choosingOpening']! as bool,
     match: json['match']! as int,
+    offline: _ints(json['offline']),
   );
 
   final TableView view;
@@ -163,6 +165,10 @@ class SeatUpdate extends WireMessage {
   /// from 1 again.
   final int match;
 
+  /// Seats whose players have lost their link to the game, played by a bot
+  /// until they're back.
+  final List<int> offline;
+
   @override
   Json toJson() => {
     'type': 'update',
@@ -176,6 +182,7 @@ class SeatUpdate extends WireMessage {
     'jokerPenalty': jokerPenalty,
     'choosingOpening': choosingOpening,
     'match': match,
+    'offline': offline,
   };
 }
 

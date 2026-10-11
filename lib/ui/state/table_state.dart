@@ -45,6 +45,7 @@ class TableState {
     this.notice,
     this.noticeId = 0,
     this.passingTo,
+    this.offlineSeats = const {},
   });
 
   final TableView view;
@@ -102,6 +103,10 @@ class TableState {
   /// they say they have it. `null` when nothing is being passed.
   final int? passingTo;
 
+  /// Seats whose players' devices have lost their link to the game, played
+  /// by a bot until they're back.
+  final Set<int> offlineSeats;
+
   /// The selected card, if exactly one is selected.
   HandCard? get singleSelected => selected.length == 1
       ? hand.firstWhere((c) => c.id == selected.single)
@@ -129,6 +134,7 @@ class TableState {
     HandProgress? handProgress,
     String? notice,
     int? Function()? passingTo,
+    Set<int>? offlineSeats,
   }) => TableState(
     view: view ?? this.view,
     hand: hand ?? this.hand,
@@ -146,5 +152,6 @@ class TableState {
     notice: notice ?? this.notice,
     noticeId: notice != null ? noticeId + 1 : noticeId,
     passingTo: passingTo != null ? passingTo() : this.passingTo,
+    offlineSeats: offlineSeats ?? this.offlineSeats,
   );
 }

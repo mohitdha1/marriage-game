@@ -372,6 +372,9 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                               key: _anchors.seat(table.opponents[i].seat),
                               child: OpponentSeat(
                                 seat: table.opponents[i],
+                                offline: state.offlineSeats.contains(
+                                  table.opponents[i].seat,
+                                ),
                                 isCurrentTurn:
                                     table.winner == null &&
                                     table.currentSeat ==

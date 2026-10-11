@@ -109,6 +109,7 @@ class RemoteTableController extends TableNotifier {
       roundScores: update.roundScores,
       totals: update.totals,
       handProgress: update.handProgress,
+      offlineSeats: update.offline.toSet(),
       notice: notice ?? previous?.notice,
       noticeId: (previous?.noticeId ?? 0) + (notice != null ? 1 : 0),
     );

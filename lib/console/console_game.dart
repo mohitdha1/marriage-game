@@ -163,9 +163,12 @@ class ConsoleGame {
     final turn = _bots[round.currentSeat]!.takeTurn(round);
 
     final parts = [
-      turn.drewFrom == DrawSource.stock
-          ? '$name draws from the stock'
-          : '$name takes ${turn.drawn} from the discard pile',
+      ?switch (turn.drewFrom) {
+        DrawSource.stock => '$name draws from the stock',
+        DrawSource.discardPile =>
+          '$name takes ${turn.drawn} from the discard pile',
+        null => null,
+      },
       if (turn.shown.isNotEmpty)
         'shows ${_sets(turn.shown)} and sees the joker'
             '${turn.pickedTiplu ? ' (picking the tiplu from the stock)' : ''}',

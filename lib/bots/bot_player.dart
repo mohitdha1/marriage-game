@@ -39,10 +39,12 @@ class BotTurn {
     this.won = false,
   });
 
-  final DrawSource drewFrom;
+  /// Where the bot drew from, or `null` if the turn was already under way
+  /// when the bot took it over (the player had drawn before leaving).
+  final DrawSource? drewFrom;
 
   /// The card drawn. Only public when [drewFrom] is the discard pile.
-  final PlayingCard drawn;
+  final PlayingCard? drawn;
   final List<List<PlayingCard>> shown;
   final bool pickedTiplu;
   final PlayingCard? discarded;
@@ -84,9 +86,20 @@ class BotPlayer {
         ? TableMemory.read(round, seat)
         : null;
 
-    final source = _chooseDrawSource(round, seat, memory);
-    final drawn = round.draw(source);
-    final mustKeep = source == DrawSource.discardPile ? drawn : null;
+    // A turn may already be under way: a player who left after drawing,
+    // whose seat a bot has taken over. It finishes the turn from there.
+    final DrawSource? source;
+    final PlayingCard? drawn;
+    final PlayingCard? mustKeep;
+    if (hand.hasDrawn) {
+      source = null;
+      drawn = null;
+      mustKeep = round.takenFromDiscardPile;
+    } else {
+      source = _chooseDrawSource(round, seat, memory);
+      drawn = round.draw(source);
+      mustKeep = source == DrawSource.discardPile ? drawn : null;
+    }
 
     var shown = <List<PlayingCard>>[];
     var pickedTiplu = false;

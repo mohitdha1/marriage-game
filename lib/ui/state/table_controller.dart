@@ -172,6 +172,12 @@ class TableController extends TableNotifier {
 
   /// Tells this match apart from the one before it, for joined devices.
   late int _matchId;
+
+  /// Players on other devices whose link has dropped, and the bots standing
+  /// in for them until they're back.
+  final _offline = <int>{};
+  final _standIns = <int, BotPlayer>{};
+  late Random _random;
   final _remoteChoosing = <int>{};
   late Duration Function() _thinkingTime;
   late MatchScore _match;
@@ -200,12 +206,13 @@ class TableController extends TableNotifier {
     for (final MapEntry(key: seat, value: player) in _remote.entries) {
       final listening = player.connection.messages.listen(
         (message) => _onRemote(seat, message),
+        onDone: () => _onRemoteGone(seat),
       );
       ref.onDispose(listening.cancel);
     }
 
     // The same bots play every round of the match.
-    final random = ref.watch(randomProvider);
+    final random = _random = ref.watch(randomProvider);
     _matchId = random.nextInt(1 << 30);
     final difficulty = ref.read(botDifficultyProvider);
     final botSeats = [
@@ -270,10 +277,17 @@ class TableController extends TableNotifier {
     _remoteChoosing.clear();
     for (final seat in _remote.keys) {
       final tunnellas = findTunnellas(_round.hands[seat].cards);
-      if (tunnellas.length > PlayerHand.maxOpeningTunnellas) {
-        _remoteChoosing.add(seat);
-      } else {
+      if (tunnellas.length <= PlayerHand.maxOpeningTunnellas) {
         _round.showOpeningTunnellas(seat, tunnellas);
+      } else if (_offline.contains(seat)) {
+        // Nobody's there to choose; the bot standing in opens with the
+        // first three.
+        _round.showOpeningTunnellas(
+          seat,
+          tunnellas.take(PlayerHand.maxOpeningTunnellas).toList(),
+        );
+      } else {
+        _remoteChoosing.add(seat);
       }
     }
     // The view opens on the first person who has to choose, or else on the
@@ -455,6 +469,49 @@ class TableController extends TableNotifier {
     if (message is MoveDiscard) unawaited(_advance());
   }
 
+  /// The bot that plays [seat]: one of the match's bots, or one standing in
+  /// for a player whose link has dropped. `null` for a person who's there.
+  BotPlayer? _botFor(int seat) =>
+      _bots[seat] ??
+      (_offline.contains(seat)
+          ? _standIns.putIfAbsent(
+              seat,
+              () => BotPlayer(
+                difficulty: BotDifficulty.medium,
+                personality: BotPersonality.pick(1, _random).single,
+                random: _random,
+              ),
+            )
+          : null);
+
+  /// The link to the player at [seat] has dropped: a bot plays for them
+  /// from now on, making any opening choice they still owed and finishing
+  /// their turn if it was theirs.
+  void _onRemoteGone(int seat) {
+    if (!ref.mounted || _offline.contains(seat)) return;
+    _offline.add(seat);
+    if (_remoteChoosing.remove(seat)) {
+      final tunnellas = findTunnellas(_round.hands[seat].cards);
+      _round.showOpeningTunnellas(
+        seat,
+        tunnellas.take(PlayerHand.maxOpeningTunnellas).toList(),
+      );
+    }
+    _publish(
+      notice:
+          '${_nameOf(seat)} lost connection. A bot plays for them until '
+          'they\'re back.',
+    );
+    final localChoosing = _people.any(
+      (s) =>
+          (s == _viewer ? state.openingChoice : _desks[s]?.openingChoice) !=
+          null,
+    );
+    if (!_round.isOver && _remoteChoosing.isEmpty && !localChoosing) {
+      unawaited(_advance());
+    }
+  }
+
   /// Sends every player on another device what they may now see.
   void _sendUpdates() {
     for (final MapEntry(key: seat, value: player) in _remote.entries) {
@@ -473,6 +530,7 @@ class TableController extends TableNotifier {
           jokerPenalty: jokerPenaltyEnabled,
           choosingOpening: _remoteChoosing.contains(seat),
           match: _matchId,
+          offline: [..._offline],
         ),
       );
     }
@@ -482,7 +540,7 @@ class TableController extends TableNotifier {
   /// next.
   Future<void> _advance() async {
     // With no bot to wait for, the table turns straight away.
-    if (_bots.containsKey(_round.currentSeat)) await _playBots();
+    if (_botFor(_round.currentSeat) != null) await _playBots();
     if (!ref.mounted || _round.isOver) return;
     final next = _round.currentSeat;
     if (_people.contains(next) && next != _viewer) _switchTo(next);
@@ -528,11 +586,11 @@ class TableController extends TableNotifier {
       _botsPlaying ??= _runBots().whenComplete(() => _botsPlaying = null);
 
   Future<void> _runBots() async {
-    while (!_round.isOver && _bots.containsKey(_round.currentSeat)) {
+    while (!_round.isOver && _botFor(_round.currentSeat) != null) {
       await Future<void>.delayed(_thinkingTime());
       if (!ref.mounted) return;
       final seat = _round.currentSeat;
-      final turn = _bots[seat]!.takeTurn(_round);
+      final turn = _botFor(seat)!.takeTurn(_round);
       _publish(notice: turn.won ? '${_nameOf(seat)} won the round.' : null);
     }
   }
@@ -577,6 +635,7 @@ class TableController extends TableNotifier {
       totals: List.unmodifiable(_match.totals),
       handProgress: _handProgress(),
       notice: notice,
+      offlineSeats: {..._offline},
     );
     _sendUpdates();
   }

@@ -15,10 +15,15 @@ class OpponentSeat extends StatelessWidget {
     super.key,
     required this.seat,
     this.isCurrentTurn = false,
+    this.offline = false,
   });
 
   final SeatView seat;
   final bool isCurrentTurn;
+
+  /// Whether this player's device has lost its link to the game, so a bot
+  /// is playing for them.
+  final bool offline;
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +83,21 @@ class OpponentSeat extends StatelessWidget {
                     key: Key('card-count-${seat.seat}'),
                     style: const TextStyle(color: Colors.white70),
                   ),
+                  if (offline) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      key: Key('offline-${seat.seat}'),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF616161),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Offline',
+                        style: TextStyle(color: Colors.white, fontSize: 11),
+                      ),
+                    ),
+                  ],
                   if (seat.hasSeenJoker) ...[
                     const SizedBox(width: 6),
                     Container(
