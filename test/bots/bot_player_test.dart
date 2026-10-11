@@ -293,6 +293,100 @@ void main() {
     });
   });
 
+  group('Easy', () {
+    test(
+      'throws away a joker more often than not, valuing it as a plain card',
+      () {
+        // K♥ is the tiplu, so K♣ is wild. As a plain card it is as useless as
+        // 4♦, and higher, so a bot blind to jokers throws it first.
+        final jokers = Jokers(c(Suit.hearts, Rank.king));
+        final wild = c(Suit.clubs, Rank.king);
+        final loner = c(Suit.diamonds, Rank.four);
+        final discards = [
+          for (var seed = 0; seed < 60; seed++)
+            bot(
+              BotDifficulty.easy,
+              seed: seed,
+            ).chooseDiscard([...heartsRun, wild, loner], jokers),
+        ];
+
+        expect(discards.where((card) => card == wild).length, greaterThan(30));
+        expect(
+          bot(
+            BotDifficulty.medium,
+          ).chooseDiscard([...heartsRun, wild, loner], jokers),
+          loner,
+        );
+      },
+    );
+
+    test('sometimes breaks up a set it was building', () {
+      final loner = c(Suit.diamonds, Rank.king);
+      final discards = [
+        for (var seed = 0; seed < 60; seed++)
+          bot(
+            BotDifficulty.easy,
+            seed: seed,
+          ).chooseDiscard([...heartsRun, ...spadesRun, loner], null),
+      ];
+
+      expect(discards, contains(loner));
+      expect(discards.where((card) => card != loner), isNotEmpty);
+    });
+
+    test('sometimes takes a useless discard without thinking', () {
+      // K♦ goes with nothing in the hand.
+      List<PlayingCard> hand() =>
+          run(Suit.clubs, [Rank.two, Rank.five, Rank.nine]);
+      final sources = [
+        for (var seed = 0; seed < 60; seed++)
+          bot(BotDifficulty.easy, seed: seed)
+              .takeTurn(
+                roundFor(hand(), topDiscard: c(Suit.diamonds, Rank.king)),
+              )
+              .drewFrom,
+      ];
+
+      expect(sources, contains(DrawSource.discardPile));
+      expect(sources, contains(DrawSource.stock));
+      expect(
+        bot(BotDifficulty.medium)
+            .takeTurn(roundFor(hand(), topDiscard: c(Suit.diamonds, Rank.king)))
+            .drewFrom,
+        DrawSource.stock,
+      );
+    });
+
+    test('only ever makes legal moves, playing whole rounds to the end', () {
+      for (var game = 0; game < 20; game++) {
+        final random = Random(game);
+        final bots = [
+          for (var seat = 0; seat < 4; seat++)
+            BotPlayer(
+              difficulty: BotDifficulty.easy,
+              personality: steady,
+              random: random,
+            ),
+        ];
+        final round = Round.deal(
+          config: GameConfig(playerCount: 4),
+          random: random,
+        );
+        for (var seat = 0; seat < 4; seat++) {
+          round.showOpeningTunnellas(
+            seat,
+            bots[seat].openingTunnellas(round.hands[seat].cards),
+          );
+        }
+        // The round itself throws on any illegal move.
+        for (var turn = 0; turn < 2000 && !round.isOver; turn++) {
+          bots[round.currentSeat].takeTurn(round);
+        }
+        expect(round.isOver, isTrue, reason: 'game $game never ended');
+      }
+    });
+  });
+
   group('Strength', () {
     /// Wins for [a] and [b] over [games] 2-player rounds, swapping seats
     /// every round so going first evens out.
