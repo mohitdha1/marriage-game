@@ -1,5 +1,7 @@
 # Marriage
 
+[![CI](https://github.com/mohitdha1/marriage-game/actions/workflows/ci.yml/badge.svg)](https://github.com/mohitdha1/marriage-game/actions/workflows/ci.yml)
+
 A Flutter version of **Marriage**, the 3-deck rummy-style card game popular
 in Nepal, built as a portfolio project while learning Dart and Flutter.
 
