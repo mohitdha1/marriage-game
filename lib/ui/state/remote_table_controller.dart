@@ -23,6 +23,9 @@ class RemoteTableController extends TableNotifier {
   late RemoteSession _host;
   late SeatUpdate _last;
 
+  /// The match the table shows, from the host's latest update.
+  int? _match;
+
   @override
   TableState build() {
     _host = ref.watch(remoteSessionProvider)!;
@@ -61,7 +64,10 @@ class RemoteTableController extends TableNotifier {
   TableState _stateFor(SeatUpdate update, {required TableState? previous}) {
     final view = update.view;
     final sameRound =
-        previous != null && previous.roundNumber == update.roundNumber;
+        previous != null &&
+        update.match == _match &&
+        previous.roundNumber == update.roundNumber;
+    _match = update.match;
     if (!sameRound) resetCardIds();
     final hand = reconcile(view.hand, sameRound ? previous.hand : const []);
     final ids = {for (final c in hand) c.id};

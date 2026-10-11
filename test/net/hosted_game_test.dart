@@ -339,15 +339,26 @@ void main() {
 
       // Only the host deals the next round.
       expect(game.guestTable.dealsRounds, isFalse);
-      // Nobody restarts a networked match from here, for now.
+      // Only the host can start the match again.
       expect(game.guestTable.canStartNewMatch, isFalse);
-      expect(game.hostTable.canStartNewMatch, isFalse);
+      expect(game.hostTable.canStartNewMatch, isTrue);
       game.guestTable.startNextRound();
       expect(game.guestState.notice, 'The host deals the next round.');
       game.hostTable.startNextRound();
       await game.settle();
       expect(game.guestState.roundNumber, 2);
       expect(game.guestState.groups, isEmpty);
+
+      // A new match: the joined device starts afresh too, though the
+      // rounds count from 1 again.
+      game.guestTable.toggleSelected(game.guestState.hand.first.id);
+      game.hostTable.startNewMatch();
+      game.host.read(tableProvider);
+      await game.settle();
+      expect(game.guestState.roundNumber, 1);
+      expect(game.guestState.roundScores, isEmpty);
+      expect(game.guestState.totals, everyElement(0));
+      expect(game.guestState.selected, isEmpty);
     },
   );
 

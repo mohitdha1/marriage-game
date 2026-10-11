@@ -169,6 +169,9 @@ class TableController extends TableNotifier {
   /// Players on other devices, by seat, and those of them still to choose
   /// their opening tunnellas this round.
   late Map<int, RemotePlayer> _remote;
+
+  /// Tells this match apart from the one before it, for joined devices.
+  late int _matchId;
   final _remoteChoosing = <int>{};
   late Duration Function() _thinkingTime;
   late MatchScore _match;
@@ -203,6 +206,7 @@ class TableController extends TableNotifier {
 
     // The same bots play every round of the match.
     final random = ref.watch(randomProvider);
+    _matchId = random.nextInt(1 << 30);
     final difficulty = ref.read(botDifficultyProvider);
     final botSeats = [
       for (final seat in seats)
@@ -340,11 +344,6 @@ class TableController extends TableNotifier {
   @override
   bool get jokerPenaltyEnabled => _round.config.jokerDiscardPenaltyEnabled;
 
-  /// Not while hosting: the joined devices would need telling that the
-  /// rounds count again from 1.
-  @override
-  bool get canStartNewMatch => _remote.isEmpty;
-
   @override
   void submitShow({
     required ShowKind kind,
@@ -473,6 +472,7 @@ class TableController extends TableNotifier {
           totals: _match.totals,
           jokerPenalty: jokerPenaltyEnabled,
           choosingOpening: _remoteChoosing.contains(seat),
+          match: _matchId,
         ),
       );
     }

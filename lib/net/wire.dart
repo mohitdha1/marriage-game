@@ -121,6 +121,7 @@ class SeatUpdate extends WireMessage {
     required this.totals,
     required this.jokerPenalty,
     this.choosingOpening = false,
+    this.match = 0,
   });
 
   factory SeatUpdate.fromJson(Json json) => SeatUpdate(
@@ -136,6 +137,7 @@ class SeatUpdate extends WireMessage {
     totals: _ints(json['totals']),
     jokerPenalty: json['jokerPenalty']! as bool,
     choosingOpening: json['choosingOpening']! as bool,
+    match: json['match']! as int,
   );
 
   final TableView view;
@@ -156,6 +158,11 @@ class SeatUpdate extends WireMessage {
   /// which to open with before play can start.
   final bool choosingOpening;
 
+  /// Which match this is, changing when the host starts a new one, so the
+  /// player's device knows to start afresh even though the rounds count
+  /// from 1 again.
+  final int match;
+
   @override
   Json toJson() => {
     'type': 'update',
@@ -168,6 +175,7 @@ class SeatUpdate extends WireMessage {
     'totals': totals,
     'jokerPenalty': jokerPenalty,
     'choosingOpening': choosingOpening,
+    'match': match,
   };
 }
 

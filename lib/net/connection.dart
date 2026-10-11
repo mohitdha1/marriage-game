@@ -21,8 +21,10 @@ class InMemoryConnection implements Connection {
 
   /// A pair of linked ends: what one sends, the other receives.
   static (InMemoryConnection, InMemoryConnection) pair() {
-    final aToB = StreamController<WireMessage>();
-    final bToA = StreamController<WireMessage>();
+    // Broadcast, like a real link's, so a new listener can take over (as
+    // the host's table does when a new match starts).
+    final aToB = StreamController<WireMessage>.broadcast();
+    final bToA = StreamController<WireMessage>.broadcast();
     return (InMemoryConnection._(bToA, aToB), InMemoryConnection._(aToB, bToA));
   }
 
