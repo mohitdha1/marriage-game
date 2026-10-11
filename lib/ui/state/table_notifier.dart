@@ -124,15 +124,22 @@ abstract class TableNotifier extends Notifier<TableState> {
   }
 
   /// Moves the card with [cardId] to [newIndex] in the hand, where it stays
-  /// until it's moved again or the hand is sorted.
+  /// until it's moved again or the hand is sorted. A card in a grouped set
+  /// takes its whole set with it.
   void moveCard(int cardId, int newIndex) {
-    final hand = [...state.hand];
-    final from = hand.indexWhere((c) => c.id == cardId);
-    if (from < 0) return;
-    final card = hand.removeAt(from);
-    hand.insert(newIndex.clamp(0, hand.length), card);
-    state = state.copyWith(hand: hand);
+    state = state.copyWith(
+      hand: withCardsMoved(state.hand, movingWith(cardId), newIndex),
+    );
   }
+
+  /// The cards that move when [cardId] is moved: its grouped set, or just
+  /// the card.
+  Set<int> movingWith(int cardId) => {
+    ...state.groups.firstWhere(
+      (group) => group.contains(cardId),
+      orElse: () => [cardId],
+    ),
+  };
 
   /// The order Sort puts suits in: alternating black and red, so
   /// neighbouring suits are easy to tell apart.

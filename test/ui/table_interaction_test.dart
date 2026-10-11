@@ -251,6 +251,173 @@ void main() {
     expect(stateOf(tester).view.youHaveDrawn, isFalse, reason: 'not a draw');
   });
 
+  group('Moving cards in the hand', () {
+    Finder cardWidget(HandCard card) => find.byKey(ValueKey(card.id));
+
+    /// Picks up [card] the way a finger would and carries it to [to],
+    /// leaving the finger down. With [driftUp], the finger slips upward
+    /// before the long press completes, as real fingers do.
+    Future<TestGesture> pickUpAndCarry(
+      WidgetTester tester,
+      Offset from,
+      Offset to, {
+      bool driftUp = false,
+    }) async {
+      final gesture = await tester.startGesture(from);
+      if (driftUp) {
+        await gesture.moveBy(const Offset(0, -30));
+        await tester.pump();
+      } else {
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+      final start = driftUp ? from + const Offset(0, -30) : from;
+      // Straight sideways, in small steps.
+      for (var step = 1; step <= 8; step++) {
+        await gesture.moveTo(Offset.lerp(start, to, step / 8)!);
+        await tester.pump();
+      }
+      return gesture;
+    }
+
+    testWidgets('long-press a card and drag it straight sideways to any '
+        'spot in the hand', (tester) async {
+      await pumpTable(tester);
+      final before = stateOf(tester).hand;
+      final moved = before.last;
+
+      final gesture = await pickUpAndCarry(
+        tester,
+        tester.getCenter(cardWidget(moved)),
+        tester.getCenter(cardWidget(before[2])),
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      final after = stateOf(tester).hand;
+      expect(after[2], moved);
+      expect(after.toSet(), before.toSet());
+      expect(stateOf(tester).view.youHaveDrawn, isFalse, reason: 'not a draw');
+    });
+
+    testWidgets('a card picked up with the finger slipping upward still '
+        'moves where it is let go over the hand', (tester) async {
+      await pumpTable(tester);
+      final before = stateOf(tester).hand;
+      final moved = before.last;
+
+      final gesture = await pickUpAndCarry(
+        tester,
+        tester.getCenter(cardWidget(moved)),
+        tester.getCenter(cardWidget(before.first)) + const Offset(0, -30),
+        driftUp: true,
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(stateOf(tester).hand.first, moved);
+      expect(stateOf(tester).hand, hasLength(before.length));
+    });
+
+    testWidgets('while a card is held, the others slide aside to make room', (
+      tester,
+    ) async {
+      await pumpTable(tester);
+      final before = stateOf(tester).hand;
+      final firstLeft = tester.getTopLeft(cardWidget(before.first)).dx;
+
+      final gesture = await pickUpAndCarry(
+        tester,
+        tester.getCenter(cardWidget(before.last)),
+        tester.getCenter(cardWidget(before.first)),
+      );
+
+      // Nothing has moved in the game yet, but the first card has made room.
+      expect(stateOf(tester).hand, before);
+      expect(
+        tester.getTopLeft(cardWidget(before.first)).dx,
+        greaterThan(firstLeft),
+      );
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(stateOf(tester).hand.first, before.last);
+    });
+
+    testWidgets('a grouped set moves together', (tester) async {
+      await pumpTable(tester);
+      final controller = ProviderScope.containerOf(
+        tester.element(find.byType(TableScreen)),
+      ).read(tableProvider.notifier);
+      HandCard held(PlayingCard card) =>
+          stateOf(tester).hand.firstWhere((h) => h.card == card);
+      final three = held(c(Suit.hearts, Rank.three));
+      final four = held(c(Suit.hearts, Rank.four));
+      controller
+        ..toggleSelected(three.id)
+        ..toggleSelected(four.id)
+        ..groupSelected();
+      await tester.pumpAndSettle();
+      expect(stateOf(tester).hand.take(2), [three, four]);
+      final last = stateOf(tester).hand.last;
+
+      // Pick the set up by its first card's visible edge and carry it to
+      // the far end.
+      final gesture = await pickUpAndCarry(
+        tester,
+        tester.getTopLeft(cardWidget(three)) + const Offset(12, 50),
+        tester.getCenter(cardWidget(last)),
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      final after = stateOf(tester).hand;
+      expect(after.sublist(after.length - 2), [three, four]);
+      expect(stateOf(tester).groups, [
+        [three.id, four.id],
+      ]);
+    });
+
+    testWidgets('a drawn card joins at the right-hand end, and the hand is '
+        'never re-sorted', (tester) async {
+      await pumpTable(tester);
+      final before = stateOf(tester).hand;
+      final gesture = await pickUpAndCarry(
+        tester,
+        tester.getCenter(cardWidget(before.last)),
+        tester.getCenter(cardWidget(before.first)),
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+      final arranged = stateOf(tester).hand;
+      expect(arranged.first, before.last);
+
+      await tester.tap(find.byKey(const Key('stock')));
+      await tester.pumpAndSettle();
+
+      final after = stateOf(tester).hand;
+      expect(after.take(arranged.length), arranged);
+      expect(after.last.card, queenOfDiamonds);
+    });
+
+    testWidgets('a quick drag sideways, without the long press, moves '
+        'nothing', (tester) async {
+      await pumpTable(tester);
+      final before = stateOf(tester).hand;
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(cardWidget(before.last)),
+      );
+      for (var step = 0; step < 6; step++) {
+        await gesture.moveBy(const Offset(-40, 0));
+        await tester.pump();
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(stateOf(tester).hand, before);
+    });
+  });
+
   group('Discarding by gesture', () {
     /// The card that was drawn: the last one in the hand.
     PlayingCard drawn(WidgetTester tester) => stateOf(tester).hand.last.card;

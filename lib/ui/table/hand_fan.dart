@@ -17,9 +17,12 @@ import 'card_view.dart';
 /// Tapping a card selects it (it lifts and gets a bright border). Dragging a
 /// card straight up and letting go over the discard pile, or flicking it
 /// upwards, discards it. Long-pressing a card picks it up to move it within
-/// the hand (or onto the pile). Dropping the stock or the discard pile onto
+/// the hand (or onto the pile): while it's held over the hand, the other
+/// cards slide aside to show where it will go, and a card in a grouped set
+/// brings its whole set. Any card let go over the hand moves to that spot,
+/// however it was picked up. Dropping the stock or the discard pile onto
 /// the fan draws from it.
-class HandFan extends StatelessWidget {
+class HandFan extends StatefulWidget {
   const HandFan({
     super.key,
     required this.cards,
@@ -105,88 +108,168 @@ class HandFan extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) => _fan();
+  State<HandFan> createState() => _HandFanState();
+}
 
-  Widget _fan() {
+class _HandFanState extends State<HandFan> {
+  /// The card being dragged, if any.
+  int? _dragging;
+
+  /// The slot the dragged card is held over in the hand, if it is.
+  int? _hoverSlot;
+
+  /// How long the other cards take to slide aside for a held card.
+  static const _slide = Duration(milliseconds: 120);
+
+  /// The cards that move with [cardId]: its grouped set, or just the card.
+  Set<int> _movingWith(int cardId) {
+    final group = widget.groupOf?.call(cardId);
+    if (group == null) return {cardId};
+    return {
+      for (final c in widget.cards)
+        if (widget.groupOf!(c.id) == group) c.id,
+    };
+  }
+
+  void _dragStarted(int cardId) => setState(() => _dragging = cardId);
+
+  @override
+  void didUpdateWidget(HandFan oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A card that left the hand mid-drag (discarded onto the pile) is no
+    // longer being held over it.
+    if (_dragging case final id? when !widget.cards.any((c) => c.id == id)) {
+      _dragging = null;
+      _hoverSlot = null;
+    }
+  }
+
+  void _dragEnded() => setState(() {
+    _dragging = null;
+    _hoverSlot = null;
+  });
+
+  /// The id of the hand card a drag carries, if it carries one.
+  static int? _cardIdIn(Object? data) => switch (data) {
+    HandCard(:final id) => id,
+    QuickDiscard(card: HandCard(:final id)) => id,
+    _ => null,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final cardWidth = widget.cardWidth;
     final cardHeight = cardWidth / cardAspectRatio;
-    final lift = cardHeight * _lift;
+    final lift = cardHeight * HandFan._lift;
+    final selected = widget.selected;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final n = cards.length;
+        final n = widget.cards.length;
         if (n == 0) return SizedBox(height: cardHeight + lift);
 
-        int? group(int i) => groupOf?.call(cards[i].id);
-        // A gap goes wherever one card and the next aren't in the same group,
-        // as long as at least one of them is grouped.
-        final gapBefore = [
-          for (var i = 0; i < n; i++)
-            i > 0 &&
-                group(i) != group(i - 1) &&
-                (group(i) != null || group(i - 1) != null),
-        ];
-        final gapCount = gapBefore.where((g) => g).length;
-        final gap = cardWidth * _groupGap;
+        final gap = cardWidth * HandFan._groupGap;
+        int? groupOfCard(HandCard c) => widget.groupOf?.call(c.id);
 
-        final usableWidth = constraints.maxWidth - gap * gapCount;
-        final spacing = n == 1
-            ? 0.0
-            : min(cardWidth * _maxSpacing, (usableWidth - cardWidth) / (n - 1));
-        final offsets = <double>[];
-        for (var i = 0; i < n; i++) {
-          offsets.add(
-            i == 0 ? 0 : offsets[i - 1] + spacing + (gapBefore[i] ? gap : 0),
-          );
+        // Each card's distance from the fan's left edge, for [cards] in
+        // that order. A gap goes wherever one card and the next aren't in
+        // the same group, as long as at least one of them is grouped.
+        List<double> offsetsFor(List<HandCard> cards) {
+          final gapBefore = [
+            for (var i = 0; i < n; i++)
+              i > 0 &&
+                  groupOfCard(cards[i]) != groupOfCard(cards[i - 1]) &&
+                  (groupOfCard(cards[i]) != null ||
+                      groupOfCard(cards[i - 1]) != null),
+          ];
+          final gapCount = gapBefore.where((g) => g).length;
+          final usableWidth = constraints.maxWidth - gap * gapCount;
+          final spacing = n == 1
+              ? 0.0
+              : min(
+                  cardWidth * HandFan._maxSpacing,
+                  (usableWidth - cardWidth) / (n - 1),
+                );
+          final offsets = <double>[];
+          for (var i = 0; i < n; i++) {
+            offsets.add(
+              i == 0 ? 0 : offsets[i - 1] + spacing + (gapBefore[i] ? gap : 0),
+            );
+          }
+          return offsets;
         }
-        final fanWidth = offsets.last + cardWidth;
-        final left = (constraints.maxWidth - fanWidth) / 2;
-        // Room above the cards for a selected card to lift into.
-        final top = lift;
 
-        // Where a card dropped on the fan should go: the slot whose centre is
-        // nearest the drop.
-        int slotAt(Offset globalDropTopLeft) {
+        double leftFor(List<double> offsets) =>
+            (constraints.maxWidth - (offsets.last + cardWidth)) / 2;
+
+        // Slots are measured on the hand as it stands, so they don't shift
+        // under the finger while the other cards slide aside.
+        final standing = offsetsFor(widget.cards);
+        final standingLeft = leftFor(standing);
+
+        // Where a card held at [globalTopLeft] would go: the slot whose
+        // centre is nearest the card's centre.
+        int slotAt(Offset globalTopLeft) {
           final box = context.findRenderObject()! as RenderBox;
-          final dropCentre =
-              box.globalToLocal(globalDropTopLeft).dx + cardWidth / 2;
+          final centre = box.globalToLocal(globalTopLeft).dx + cardWidth / 2;
+          double distance(int i) =>
+              (standingLeft + standing[i] + cardWidth / 2 - centre).abs();
           var nearest = 0;
           for (var i = 1; i < n; i++) {
-            final here = (left + offsets[i] + cardWidth / 2 - dropCentre).abs();
-            final best = (left + offsets[nearest] + cardWidth / 2 - dropCentre)
-                .abs();
-            if (here < best) nearest = i;
+            if (distance(i) < distance(nearest)) nearest = i;
           }
           return nearest;
         }
 
+        // While a card is held over the hand, the hand is shown as it would
+        // be with the card (and its set) dropped there.
+        final dragging = _dragging;
+        final hoverSlot = _hoverSlot;
+        final cards = dragging != null && hoverSlot != null
+            ? withCardsMoved(widget.cards, _movingWith(dragging), hoverSlot)
+            : widget.cards;
+        final offsets = offsetsFor(cards);
+        final left = leftFor(offsets);
+        // Room above the cards for a selected card to lift into.
+        final top = lift;
+        final slide =
+            dragging == null || MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : _slide;
+
         final fan = SizedBox(
-          height: top + cardHeight * (1 - hiddenBelow),
+          height: top + cardHeight * (1 - widget.hiddenBelow),
           child: Stack(
             clipBehavior: Clip.none,
             children: [
               for (var i = 0; i < n; i++)
-                Positioned(
+                AnimatedPositioned(
                   key: ValueKey(cards[i].id),
+                  duration: slide,
+                  curve: Curves.easeOut,
                   left: left + offsets[i],
                   top: top - (selected.contains(cards[i].id) ? lift : 0),
                   child: _HandCardView(
-                    key: cardKey?.call(cards[i].id),
-                    hidden: hiddenIds.contains(cards[i].id),
+                    key: widget.cardKey?.call(cards[i].id),
+                    hidden: widget.hiddenIds.contains(cards[i].id),
                     handCard: cards[i],
                     width: cardWidth,
                     selected: selected.contains(cards[i].id),
-                    wild: jokers?.isWild(cards[i].card) ?? false,
-                    groupColor: switch (group(i)) {
+                    wild: widget.jokers?.isWild(cards[i].card) ?? false,
+                    groupColor: switch (groupOfCard(cards[i])) {
                       null => null,
-                      final g => groupColors[g % groupColors.length],
+                      final g =>
+                        HandFan.groupColors[g % HandFan.groupColors.length],
                     },
-                    onTap: onCardTap == null
+                    onTap: widget.onCardTap == null
                         ? null
-                        : () => onCardTap!(cards[i].id),
+                        : () => widget.onCardTap!(cards[i].id),
+                    onDragStarted: () => _dragStarted(cards[i].id),
+                    onDragEnded: _dragEnded,
                     onReleased: (at, {required flicked}) {
                       final id = cards[i].id;
                       flicked
-                          ? onFlick?.call(id, at)
-                          : onDropMissed?.call(id, at);
+                          ? widget.onFlick?.call(id, at)
+                          : widget.onDropMissed?.call(id, at);
                     },
                   ),
                 ),
@@ -194,13 +277,24 @@ class HandFan extends StatelessWidget {
           ),
         );
 
-        // A pile dropped on the fan draws from it; a hand card dropped on
-        // the fan moves to where it was dropped.
+        // A pile dropped on the fan draws from it. A hand card let go over
+        // the fan moves to where it was let go, whether it was picked up
+        // with a long press or started off upwards.
         return DragTarget<DrawSource>(
-          onAcceptWithDetails: (details) => onDraw?.call(details.data),
-          builder: (context, candidates, rejected) => DragTarget<HandCard>(
-            onAcceptWithDetails: (details) =>
-                onReorder?.call(details.data.id, slotAt(details.offset)),
+          onAcceptWithDetails: (details) => widget.onDraw?.call(details.data),
+          builder: (context, candidates, rejected) => DragTarget<Object>(
+            onWillAcceptWithDetails: (details) =>
+                _cardIdIn(details.data) != null,
+            onMove: (details) {
+              if (_cardIdIn(details.data) == null) return;
+              final slot = slotAt(details.offset);
+              if (slot != _hoverSlot) setState(() => _hoverSlot = slot);
+            },
+            onLeave: (_) => setState(() => _hoverSlot = null),
+            onAcceptWithDetails: (details) {
+              final id = _cardIdIn(details.data)!;
+              widget.onReorder?.call(id, slotAt(details.offset));
+            },
             builder: (context, candidates, rejected) => fan,
           ),
         );
@@ -231,6 +325,8 @@ class _HandCardView extends StatelessWidget {
     required this.groupColor,
     required this.onTap,
     required this.onReleased,
+    required this.onDragStarted,
+    required this.onDragEnded,
     this.hidden = false,
   });
 
@@ -244,6 +340,11 @@ class _HandCardView extends StatelessWidget {
   /// Called when a drag ends without anything taking the card, with the
   /// card's centre where it was let go and whether it was flicked upwards.
   final void Function(Offset at, {required bool flicked}) onReleased;
+
+  /// Called when the card is picked up, and when it's let go, whatever
+  /// happens to it.
+  final VoidCallback onDragStarted;
+  final VoidCallback onDragEnded;
 
   /// Keeps the card's space but draws nothing there.
   final bool hidden;
@@ -268,6 +369,7 @@ class _HandCardView extends StatelessWidget {
     final centre = Offset(width / 2, width / cardAspectRatio / 2);
 
     void ended(DraggableDetails details, {required bool canFlick}) {
+      onDragEnded();
       if (details.wasAccepted) return;
       final upward = -details.velocity.pixelsPerSecond.dy;
       onReleased(
@@ -285,14 +387,22 @@ class _HandCardView extends StatelessWidget {
       affinity: Axis.vertical,
       feedback: lifted,
       childWhenDragging: dimmed,
+      onDragStarted: onDragStarted,
       onDragEnd: (details) => ended(details, canFlick: true),
       child: LongPressDraggable<HandCard>(
         data: handCard,
         delay: const Duration(milliseconds: 250),
         feedback: lifted,
         childWhenDragging: dimmed,
+        onDragStarted: onDragStarted,
         onDragEnd: (details) => ended(details, canFlick: false),
-        child: GestureDetector(onTap: onTap, child: face),
+        // A quick sideways swipe is claimed here and does nothing, so it
+        // never turns into a drag; moving a card takes the long press.
+        child: GestureDetector(
+          onTap: onTap,
+          onHorizontalDragStart: (_) {},
+          child: face,
+        ),
       ),
     );
   }

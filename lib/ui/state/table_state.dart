@@ -23,6 +23,22 @@ class HandCard {
   String toString() => '$card#$id';
 }
 
+/// [hand] with the cards whose ids are in [ids] taken out and put back
+/// together, in their order, starting at [newIndex]. Moves a single card,
+/// or a grouped set as one block.
+List<HandCard> withCardsMoved(List<HandCard> hand, Set<int> ids, int newIndex) {
+  final moving = [
+    for (final c in hand)
+      if (ids.contains(c.id)) c,
+  ];
+  if (moving.isEmpty) return hand;
+  final rest = [
+    for (final c in hand)
+      if (!ids.contains(c.id)) c,
+  ];
+  return rest..insertAll(newIndex.clamp(0, rest.length), moving);
+}
+
 /// Everything the table screen draws: the engine's [view] of the round, plus
 /// state that only matters to this screen — the order the human player has
 /// arranged their hand in, which cards they've selected, and any message to
