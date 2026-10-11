@@ -25,9 +25,10 @@ void main() {
     final store = InMemoryPreferences();
     final repository = LocalPlayerDataRepository(store);
 
-    expect((await repository.addCoins(59)).coins, 1059);
-    expect((await repository.addCoins(-9)).coins, 1050);
-    expect((await LocalPlayerDataRepository(store).load()).coins, 1050);
+    const start = PlayerData.startingCoins;
+    expect((await repository.addCoins(59)).coins, start + 59);
+    expect((await repository.addCoins(-9)).coins, start + 50);
+    expect((await LocalPlayerDataRepository(store).load()).coins, start + 50);
   });
 
   test('a game result is saved, and the new stats returned', () async {
@@ -51,7 +52,7 @@ void main() {
     ]);
 
     final data = await repository.load();
-    expect(data.coins, 1030);
+    expect(data.coins, PlayerData.startingCoins + 30);
     expect(data.stats.roundsWon, 1);
   });
 

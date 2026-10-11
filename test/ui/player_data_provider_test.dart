@@ -97,7 +97,10 @@ void main() {
     repository.loadGate!.complete();
     await adding;
     expect(repository.calls, ['load', 'addCoins 10']);
-    expect(container.read(playerDataProvider).value?.coins, 1010);
+    expect(
+      container.read(playerDataProvider).value?.coins,
+      PlayerData.startingCoins + 10,
+    );
   });
 
   test('changes asked for together are made in order', () async {
@@ -133,7 +136,10 @@ void main() {
       overrides: [preferencesProvider.overrideWithValue(store)],
     );
     addTearDown(next.dispose);
-    expect((await next.read(playerDataProvider.future)).coins, 1050);
+    expect(
+      (await next.read(playerDataProvider.future)).coins,
+      PlayerData.startingCoins + 50,
+    );
   });
 
   group('describeStats', () {

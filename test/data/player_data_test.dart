@@ -2,10 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/data/player_data.dart';
 
 void main() {
-  test('a new player starts with 1,000 coins and no record', () {
+  test('a new player starts with 10,000 coins and no record', () {
     const data = PlayerData();
 
-    expect(data.coins, 1000);
+    expect(data.coins, 10000);
     expect(data.stats.roundsPlayed, 0);
     expect(data.stats.winRate, 0);
     expect(data.stats.bestRound, isNull);
@@ -14,7 +14,7 @@ void main() {
   test('coins are added and taken away', () {
     expect(
       const PlayerData().withCoinsAdded(59).withCoinsAdded(-9).coins,
-      1050,
+      PlayerData.startingCoins + 50,
     );
   });
 

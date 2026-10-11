@@ -46,7 +46,7 @@ class PlayerData {
   });
 
   /// What a new player starts with.
-  static const startingCoins = 1000;
+  static const startingCoins = 10000;
 
   /// The most coins a player can hold.
   static const maxCoins = 1 << 31;
