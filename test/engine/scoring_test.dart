@@ -515,6 +515,60 @@ void main() {
     });
   });
 
+  group('scoreRound: Murder', () {
+    test('unseen players pay 10 plus the winner\'s maal', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(held: [jhiplu, tiplu, poplu]), // maal 10, winner
+          seenHand(held: [tiplu]), // maal 3
+          unseenHand(held: [alter]), // maal counts for nothing
+        ],
+        winner: 0,
+        jokers: jokers,
+        mode: GameMode.murder,
+      );
+
+      // Shares as in Standard: 17, −4, −13. Seat 1 (seen) pays 3; seat 2
+      // (unseen) pays 10 + the winner's 10 maal.
+      expect(result.maalShares, [17, -4, -13]);
+      expect(result.winnerPayments, [23, -3, -20]);
+      expect(result.net, [17 + 23, -4 - 3, -13 - 20]);
+    });
+
+    test('the extra is whatever maal the winner has', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(held: [alter]), // maal 5
+          unseenHand(),
+        ],
+        winner: 0,
+        jokers: jokers,
+        mode: GameMode.murder,
+      );
+      // The unseen player pays 10 + the winner's 5 (one alter).
+      expect(result.winnerPayments, [15, -15]);
+    });
+
+    test('net points always sum to zero', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(held: [alter, alter]),
+          seenHand(held: [tiplu, jhiplu]),
+          unseenHand(held: [jhiplu, tiplu, poplu]),
+          seenHand(opening: [tunnellaOf(poplu)], shown: [spadesRun, clubsRun]),
+          unseenHand(opening: [tunnellaOf(alter)], held: [tiplu]),
+        ],
+        winner: 1,
+        jokers: jokers,
+        mode: GameMode.murder,
+        jokerDiscards: [1, 0, 0, 2, 0],
+      );
+
+      expect(result.winnerPayments, [-3, 3 + 15 + 3 + 15, -15, -3, -15]);
+      expect(result.net.fold(0, (sum, n) => sum + n), 0);
+    });
+  });
+
   group('MatchScore', () {
     RoundScore round(List<int> net) =>
         RoundScore(winner: 0, maal: const [], net: net);

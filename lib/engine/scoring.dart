@@ -221,7 +221,8 @@ class RoundScore {
 /// maal of each player who hasn't seen the joker (see [kidnappedMaal]) is
 /// counted for the winner. On top of that, every other
 /// player pays the winner 3 if they saw the joker or 10 if they didn't, plus
-/// 5 more if the winner showed doublees.
+/// 5 more if the winner showed doublees. In [GameMode.murder], each player
+/// who didn't see it also pays the winner's maal.
 ///
 /// [jokerDiscards] is how many wild cards each seat discarded after seeing
 /// the joker; each one costs [ScoringTable.jokerDiscardPenalty], paid to the
@@ -276,7 +277,8 @@ RoundScore scoreRound({
     if (seat == winner) continue;
     var payment = hands[seat].hasSeenJoker
         ? ScoringTable.winnerFromSeen
-        : ScoringTable.winnerFromUnseen;
+        : ScoringTable.winnerFromUnseen +
+              (mode == GameMode.murder ? maal[winner].total : 0);
     if (dubleeWin) payment += ScoringTable.dubleeWinBonus;
     net[seat] -= payment;
     net[winner] += payment;
