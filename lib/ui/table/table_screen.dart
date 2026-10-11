@@ -58,6 +58,9 @@ class _TableScreenState extends ConsumerState<TableScreen> {
   /// lower down, the laid-down sets and action buttons.
   static const _sideClearance = 200.0;
 
+  /// Room kept at each end of the row above the hand for the corner badges.
+  static const _cornerBadgeRoom = 160.0;
+
   final _anchors = TableAnchors();
   final _statusLine = LayerLink();
   final _flights = GlobalKey<CardFlightLayerState>();
@@ -366,6 +369,10 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                     130.0,
                   );
                   const handHidden = 0.25;
+                  // Whether a first-time guide tip is showing above the
+                  // hand.
+                  final guiding =
+                      guideStepFor(state, ref.watch(guideProvider)) != null;
                   // How far up the hand's cards reach.
                   final aboveHand =
                       handCardWidth / cardAspectRatio * (1 - handHidden) + 4;
@@ -497,10 +504,6 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                                 icon: Icons.sort,
                                 onPressed: controller.sortHand,
                               ),
-                              if (table.you.laidDown.isNotEmpty) ...[
-                                const SizedBox(width: 6),
-                                _LaidDownSets(sets: table.you.laidDown),
-                              ],
                             ],
                           ),
                         ),
@@ -533,6 +536,19 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                             onDropMissed: _snapBack,
                           ),
                         ),
+                        // The sets the player has shown, as chips centred just
+                        // above the hand, between the corner badges. A
+                        // first-time guide tip borrows the space while it
+                        // shows.
+                        if (table.you.laidDown.isNotEmpty && !guiding)
+                          Positioned(
+                            left: _cornerBadgeRoom,
+                            right: _cornerBadgeRoom,
+                            bottom: aboveHand,
+                            child: Center(
+                              child: _LaidDownSets(sets: table.you.laidDown),
+                            ),
+                          ),
                         // Badges just above the hand's corners, clear of the
                         // cards; taps go through to anything underneath.
                         if (maalOf(state.handProgress) case final maal?)
@@ -544,12 +560,8 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                               text: 'Maal $maal',
                             ),
                           ),
-                        // The first-time guide's tips sit in the same place,
-                        // and say more; the helper waits until they're done.
                         if (state.handProgress case final progress?
-                            when settings.handHelper &&
-                                guideStepFor(state, ref.watch(guideProvider)) ==
-                                    null)
+                            when settings.handHelper && !guiding)
                           Positioned(
                             right: 0,
                             bottom: aboveHand,
@@ -867,7 +879,8 @@ class _JokerChip extends StatelessWidget {
   }
 }
 
-/// The human player's laid-down sets, as chips above their hand.
+/// The player's laid-down sets, as chips in a row (wrapping if there are
+/// many) above their hand.
 class _LaidDownSets extends StatelessWidget {
   const _LaidDownSets({required this.sets});
 
@@ -875,10 +888,10 @@ class _LaidDownSets extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
+    return SetChips(
+      sets,
       key: const Key('your-laid-down-sets'),
-      constraints: const BoxConstraints(maxWidth: 220),
-      child: SetChips(sets, direction: Axis.horizontal),
+      direction: Axis.horizontal,
     );
   }
 }

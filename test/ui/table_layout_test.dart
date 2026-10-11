@@ -214,6 +214,8 @@ void main() {
             reason: 'the guide tip ($tipRect) overlaps a seat',
           );
         }
+        // The tip borrows the space above the hand from your shown sets.
+        expect(find.byKey(const Key('your-laid-down-sets')), findsNothing);
         // Nor does it hide the corners of the cards in hand (a selected card
         // lifts into the room the tip uses).
         for (final element
@@ -269,9 +271,8 @@ void main() {
   }
 
   for (final MapEntry(key: name, value: size) in screens.entries) {
-    testWidgets('on a $name, the corner badges sit clear above the hand', (
-      tester,
-    ) async {
+    testWidgets('on a $name, the badges and shown sets sit clear above the '
+        'hand', (tester) async {
       await pumpBusyTable(tester, size, 5, guideDone: true);
 
       final cards = [
@@ -288,8 +289,20 @@ void main() {
       final badges = {
         'maal badge': tester.getRect(find.byKey(const Key('maal-badge'))),
         'hand helper': tester.getRect(find.byKey(const Key('hand-helper'))),
+        'your shown sets': tester.getRect(
+          find.byKey(const Key('your-laid-down-sets')),
+        ),
       };
-      expect(badges['maal badge']!.overlaps(badges['hand helper']!), isFalse);
+      for (final a in badges.entries) {
+        for (final b in badges.entries) {
+          if (a.key.compareTo(b.key) >= 0) continue;
+          expect(
+            a.value.overlaps(b.value),
+            isFalse,
+            reason: 'the ${a.key} overlaps the ${b.key}',
+          );
+        }
+      }
       for (final MapEntry(key: badge, value: rect) in badges.entries) {
         for (final card in cards) {
           expect(
