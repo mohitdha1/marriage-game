@@ -477,6 +477,7 @@ Json _roundScoreToJson(RoundScore score) => {
   'maalShares': score.maalShares,
   'winnerPayments': score.winnerPayments,
   'sawJoker': score.sawJoker,
+  'kidnapped': score.kidnapped,
   'doublees': score.wonWithDoublees,
 };
 
@@ -488,5 +489,6 @@ RoundScore _roundScoreFromJson(Json json) => RoundScore(
   maalShares: _ints(json['maalShares']),
   winnerPayments: _ints(json['winnerPayments']),
   sawJoker: [for (final saw in json['sawJoker']! as List) saw as bool],
+  kidnapped: _ints(json['kidnapped']),
   wonWithDoublees: json['doublees']! as bool,
 );

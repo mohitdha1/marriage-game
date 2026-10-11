@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/card.dart';
+import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/joker.dart';
 import 'package:marriage_game/engine/player_hand.dart';
 import 'package:marriage_game/engine/scoring.dart';
@@ -441,6 +442,76 @@ void main() {
         ),
         throwsArgumentError,
       );
+    });
+  });
+
+  group('scoreRound: Kidnap', () {
+    test('the winner takes the maal of players who haven\'t seen', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(held: [jhiplu, tiplu, poplu]), // maal 10, winner
+          seenHand(held: [tiplu]), // maal 3, keeps it
+          unseenHand(held: [alter]), // 5 taken by the winner
+        ],
+        winner: 0,
+        jokers: jokers,
+        mode: GameMode.kidnap,
+      );
+
+      // Counted maal 15, 3, 0; total 18: 45 − 18 = 27, 9 − 18 = −9, −18.
+      // Then seat 1 (seen) pays 3 and seat 2 (unseen) pays 10.
+      expect(result.kidnapped, [0, 0, 5]);
+      expect(result.maal.map((m) => m.total), [10, 3, 0]);
+      expect(result.maalShares, [27, -9, -18]);
+      expect(result.net, [27 + 13, -9 - 3, -18 - 10]);
+    });
+
+    test('opening tunnellas are not taken', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(),
+          unseenHand(opening: [tunnellaOf(alter)], held: [tiplu]),
+        ],
+        winner: 0,
+        jokers: jokers,
+        mode: GameMode.kidnap,
+      );
+
+      // Only the tiplu (3) goes; the alter tunnella counts for nobody.
+      expect(result.kidnapped, [0, 3]);
+    });
+
+    test('in Standard, unseen maal counts for nobody', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(),
+          unseenHand(held: [alter]),
+        ],
+        winner: 0,
+        jokers: jokers,
+      );
+
+      expect(result.kidnapped, [0, 0]);
+      expect(result.net, [10, -10]);
+    });
+
+    test('net points always sum to zero', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(held: [alter, alter]),
+          seenHand(held: [tiplu, jhiplu]),
+          unseenHand(held: [jhiplu, tiplu, poplu]),
+          seenHand(opening: [tunnellaOf(poplu)], shown: [spadesRun, clubsRun]),
+          unseenHand(opening: [tunnellaOf(alter)], held: [tiplu]),
+        ],
+        winner: 1,
+        jokers: jokers,
+        mode: GameMode.kidnap,
+        jokerDiscards: [1, 0, 0, 2, 0],
+      );
+
+      expect(result.kidnapped, [0, 0, 10, 0, 3]);
+      expect(result.net.fold(0, (sum, n) => sum + n), 0);
     });
   });
 

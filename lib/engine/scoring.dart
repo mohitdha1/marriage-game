@@ -67,11 +67,23 @@ class MaalBreakdown {
 
 /// Works out a player's maal points. Players who haven't seen the joker score
 /// nothing at all, opening tunnellas included.
-MaalBreakdown scoreMaal(PlayerHand hand, Jokers jokers) {
-  if (!hand.hasSeenJoker) return const MaalBreakdown();
+MaalBreakdown scoreMaal(PlayerHand hand, Jokers jokers) => hand.hasSeenJoker
+    ? _maalOf(hand, jokers, withTunnellas: true)
+    : const MaalBreakdown();
 
+/// The maal a player who hasn't seen the joker loses to the winner in
+/// [GameMode.kidnap]: what their cards would score had they seen it, leaving
+/// out their opening tunnellas.
+MaalBreakdown kidnappedMaal(PlayerHand hand, Jokers jokers) =>
+    _maalOf(hand, jokers, withTunnellas: false);
+
+MaalBreakdown _maalOf(
+  PlayerHand hand,
+  Jokers jokers, {
+  required bool withTunnellas,
+}) {
   var tunnellaPoints = 0;
-  for (final tunnella in hand.openingTunnellas) {
+  for (final tunnella in withTunnellas ? hand.openingTunnellas : const []) {
     tunnellaPoints += switch (jokers.kindOf(tunnella.first)) {
       JokerKind.alter => ScoringTable.alterTunnella,
       JokerKind.jhiplu || JokerKind.poplu => ScoringTable.jhipluOrPopluTunnella,
@@ -149,8 +161,10 @@ class RoundScore {
     List<int>? maalShares,
     List<int>? winnerPayments,
     List<bool>? sawJoker,
+    List<int>? kidnapped,
     this.wonWithDoublees = false,
   }) : penalties = penalties ?? List.filled(net.length, 0),
+       kidnapped = kidnapped ?? List.filled(net.length, 0),
        maalShares = maalShares ?? List.filled(net.length, 0),
        winnerPayments = winnerPayments ?? List.filled(net.length, 0),
        sawJoker = sawJoker ?? List.filled(net.length, false);
@@ -169,9 +183,14 @@ class RoundScore {
   /// already included in [net].
   final List<int> penalties;
 
-  /// Each player's zero-sum share of the maal: their own maal × the number
-  /// of players, minus everyone's maal combined. Part of [net].
+  /// Each player's zero-sum share of the maal: the maal counted for them ×
+  /// the number of players, minus all the maal counted. Part of [net].
   final List<int> maalShares;
+
+  /// In [GameMode.kidnap], the maal points the winner took from each player
+  /// who hadn't seen the joker, by seat; counted for the winner in
+  /// [maalShares]. All zeros in other modes.
+  final List<int> kidnapped;
 
   /// What each player paid the winner (negative) for losing the round, and
   /// what the winner collected (positive), by seat. Part of [net].
@@ -197,8 +216,10 @@ class RoundScore {
 
 /// Settles a round won by the player at seat [winner].
 ///
-/// Maal is zero-sum: each player's share is their own maal × the number of
-/// players, minus everyone's maal combined. On top of that, every other
+/// Maal is zero-sum: each player's share is the maal counted for them × the
+/// number of players, minus all the maal counted. In [GameMode.kidnap], the
+/// maal of each player who hasn't seen the joker (see [kidnappedMaal]) is
+/// counted for the winner. On top of that, every other
 /// player pays the winner 3 if they saw the joker or 10 if they didn't, plus
 /// 5 more if the winner showed doublees.
 ///
@@ -212,6 +233,7 @@ RoundScore scoreRound({
   required int winner,
   required Jokers jokers,
   List<int>? jokerDiscards,
+  GameMode mode = GameMode.standard,
 }) {
   if (jokerDiscards != null && jokerDiscards.length != hands.length) {
     throw ArgumentError.value(
@@ -232,10 +254,19 @@ RoundScore scoreRound({
   }
 
   final maal = [for (final hand in hands) scoreMaal(hand, jokers)];
-  final totalMaal = maal.fold(0, (sum, m) => sum + m.total);
-  final maalShares = [
-    for (final m in maal) m.total * hands.length - totalMaal,
+  final kidnapped = [
+    for (final hand in hands)
+      mode == GameMode.kidnap && !hand.hasSeenJoker
+          ? kidnappedMaal(hand, jokers).total
+          : 0,
   ];
+  final taken = kidnapped.fold(0, (sum, k) => sum + k);
+  final counted = [
+    for (var seat = 0; seat < hands.length; seat++)
+      maal[seat].total + (seat == winner ? taken : 0),
+  ];
+  final totalMaal = counted.fold(0, (sum, m) => sum + m);
+  final maalShares = [for (final m in counted) m * hands.length - totalMaal];
   final net = [...maalShares];
 
   final dubleeWin = hands[winner].showKind == ShowKind.doublees;
@@ -267,6 +298,7 @@ RoundScore scoreRound({
     maalShares: maalShares,
     winnerPayments: winnerPayments,
     sawJoker: [for (final hand in hands) hand.hasSeenJoker],
+    kidnapped: kidnapped,
     wonWithDoublees: dubleeWin,
   );
 }

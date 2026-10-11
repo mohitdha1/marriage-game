@@ -136,6 +136,7 @@ void main() {
             maalShares: const [3, -3],
             winnerPayments: const [-10, 10],
             sawJoker: const [true, false],
+            kidnapped: const [0, 4],
             wonWithDoublees: true,
           ),
         ],
@@ -158,6 +159,7 @@ void main() {
       ]);
       expect(back.handProgress, isA<WinProgress>());
       expect(back.roundScores.single.maal.first.shownMarriages, 1);
+      expect(back.roundScores.single.kidnapped, [0, 4]);
     });
 
     test('every kind of hand progress', () {

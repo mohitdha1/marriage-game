@@ -268,6 +268,7 @@ class Round {
       winner: winner,
       jokers: _jokers!,
       jokerDiscards: _jokerDiscards,
+      mode: config.mode,
     );
   }
 
