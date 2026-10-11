@@ -35,6 +35,12 @@ class RemoteTableController extends TableNotifier {
       onDone: () => postNotice('Lost the connection to the host.'),
     );
     ref.onDispose(listening.cancel);
+    final reconnecting = _host.connectionChanges.listen(
+      (connected) => postNotice(
+        connected ? 'Reconnected.' : 'Connection lost. Reconnecting…',
+      ),
+    );
+    ref.onDispose(reconnecting.cancel);
     return _stateFor(_last, previous: null);
   }
 

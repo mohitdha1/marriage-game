@@ -72,7 +72,8 @@ void main() {
   group('Every message reads back as sent', () {
     test('joining', () {
       expectRoundTrip(const Hello('Asha'));
-      expectRoundTrip(const Welcome(2));
+      expectRoundTrip(const Hello('Asha', token: '9f3a'));
+      expectRoundTrip(const Welcome(2, token: '9f3a'));
       expectRoundTrip(const LobbyUpdate(names: ['Asha', 'Bina'], seats: 4));
       expectRoundTrip(const Rejected('The game is full.'));
       expectRoundTrip(const Refused('Wait for Bina to play.'));

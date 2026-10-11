@@ -8,6 +8,7 @@ import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/net/game_host.dart';
 import 'package:marriage_game/net/remote_session.dart';
+import 'package:marriage_game/net/websocket_connection.dart';
 import 'package:marriage_game/net/wire.dart';
 import 'package:marriage_game/ui/state/remote_table_controller.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
@@ -111,6 +112,46 @@ void main() {
 
     final (_, late) = await join(host, 'Chandra');
     expect((late as Rejected).reason, 'The game has already started.');
+  });
+
+  test('once started, a guest whose link dropped can come back with their '
+      'token, and nobody else can', () async {
+    final host = await openLobby();
+    final (bina, welcome) = await join(host, 'Bina');
+    final token = (welcome as Welcome).token;
+    host.start();
+    final rejoined = host.rejoins.first;
+    await bina.close();
+
+    final socket = await WebSocket.connect('ws://127.0.0.1:${host.port}');
+    addTearDown(socket.close);
+    final back = WebSocketConnection(socket);
+    final answer = back.messages
+        .firstWhere((m) => m is Welcome || m is Rejected)
+        .timeout(const Duration(seconds: 5));
+    back.send(Hello('Bina', token: token));
+
+    expect((await answer as Welcome).seat, 1);
+    expect((await rejoined.timeout(const Duration(seconds: 5))).seat, 1);
+
+    final (_, stranger) = await join(host, 'Chandra');
+    expect(stranger, isA<Rejected>());
+  });
+
+  test('a made-up token is turned away', () async {
+    final host = await openLobby();
+    await join(host, 'Bina');
+    host.start();
+
+    final socket = await WebSocket.connect('ws://127.0.0.1:${host.port}');
+    addTearDown(socket.close);
+    final connection = WebSocketConnection(socket);
+    final answer = connection.messages
+        .firstWhere((m) => m is Welcome || m is Rejected)
+        .timeout(const Duration(seconds: 5));
+    connection.send(const Hello('Bina', token: 'guess'));
+
+    expect(await answer, isA<Rejected>());
   });
 
   test('a whole turn is played over real sockets', () async {

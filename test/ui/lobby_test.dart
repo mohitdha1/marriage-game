@@ -113,7 +113,7 @@ class FakeLobby implements Lobby {
 
   void join(String name) {
     final (hostEnd, guestEnd) = InMemoryConnection.pair();
-    _guests.add(Guest(name, hostEnd));
+    _guests.add(Guest(name, hostEnd, 'token-$name'));
     farEnds.add(guestEnd);
     _changes.add(names);
   }
@@ -139,6 +139,9 @@ class FakeLobby implements Lobby {
     started = true;
     return {for (final (i, g) in _guests.indexed) i + 1: g};
   }
+
+  @override
+  Stream<Rejoin> get rejoins => const Stream.empty();
 
   @override
   Future<void> close() async => closed = true;
@@ -267,7 +270,7 @@ void main() {
       expect((heard.single as Hello).name, 'Mohit');
 
       host
-        ..send(const Welcome(1))
+        ..send(const Welcome(1, token: 't'))
         ..send(const LobbyUpdate(names: ['Asha', 'Mohit'], seats: 3));
       await tester.pump();
       await tester.pump();

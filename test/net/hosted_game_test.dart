@@ -8,6 +8,7 @@ import 'package:marriage_game/engine/card.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/net/connection.dart';
+import 'package:marriage_game/net/game_host.dart' show Rejoin;
 import 'package:marriage_game/net/remote_session.dart';
 import 'package:marriage_game/net/wire.dart';
 import 'package:marriage_game/ui/home/coins.dart';
@@ -64,6 +65,7 @@ class Game {
   static Future<Game> start({
     List<List<PlayingCard>>? hands,
     List<PlayingCard>? stock,
+    Stream<Rejoin>? rejoins,
   }) async {
     final (hostEnd, guestEnd) = InMemoryConnection.pair();
     final dealt = hands ?? [mohitsCards, binasCards];
@@ -98,6 +100,7 @@ class Game {
             hostName: 'Mohit',
             playerCount: dealt.length,
             remote: {1: RemotePlayer(name: 'Bina', connection: hostEnd)},
+            rejoins: rejoins,
           ),
         );
 
@@ -392,6 +395,48 @@ void main() {
       );
     });
 
+    test(
+      'they can come back: the bot steps aside and the table knows',
+      () async {
+        final rejoins = StreamController<Rejoin>.broadcast(sync: true);
+        addTearDown(rejoins.close);
+        final game = await Game.start(
+          hands: [mohitsCards, idleBotCards],
+          rejoins: rejoins.stream,
+        );
+        await game.session.close();
+        await game.settle();
+        expect(game.hostState.offlineSeats, {1});
+
+        // Bina's phone reconnects on a new link.
+        final (hostEnd, guestEnd) = InMemoryConnection.pair();
+        final back = RemoteSession(guestEnd);
+        addTearDown(back.close);
+        rejoins.add((seat: 1, connection: hostEnd));
+        await game.settle();
+
+        expect(game.hostState.notice, 'Bina is back.');
+        expect(game.hostState.offlineSeats, isEmpty);
+        expect(back.latest!.view.you.seat, 1);
+        expect(back.latest!.offline, isEmpty);
+
+        // It's her turn after Mohit's, and no bot takes it.
+        game.hostTable.draw(DrawSource.stock);
+        await game.hostTable.discard(game.hostState.hand.first.id);
+        await game.hostTable.botsSettled;
+        await game.settle();
+        expect(game.hostState.view.currentSeat, 1);
+        expect(back.latest!.view.isYourTurn, isTrue);
+
+        // A new match reaches her on the new link.
+        final firstMatch = back.latest!.match;
+        game.hostTable.startNewMatch();
+        game.host.read(tableProvider);
+        await game.settle();
+        expect(back.latest!.match, isNot(firstMatch));
+      },
+    );
+
     test('between turns: the bot plays when their turn comes', () async {
       final game = await Game.start();
       await game.session.close();
@@ -432,7 +477,7 @@ void main() {
   test('a garbled or unexpected message from a guest is ignored', () async {
     final game = await Game.start();
     game.session.send(const Hello('Bina again'));
-    game.session.send(const Welcome(3));
+    game.session.send(const Welcome(3, token: 'nope'));
     await game.settle();
 
     expect(game.hostState.view.isYourTurn, isTrue);

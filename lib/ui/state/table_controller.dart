@@ -15,6 +15,7 @@ import '../../engine/round.dart';
 import '../../engine/scoring.dart';
 import '../../engine/win_check.dart';
 import '../../net/connection.dart';
+import '../../net/game_host.dart' show Rejoin;
 import '../../net/wire.dart';
 import '../home/coins.dart';
 import '../home/stats.dart';
@@ -32,14 +33,16 @@ class MatchSetup {
     this.playerCount = 5,
     this.difficulty = BotDifficulty.medium,
   }) : people = const [],
-       remote = const {};
+       remote = const {},
+       rejoins = null;
 
   /// [people], named in seat order, taking turns on this device; no bots.
   MatchSetup.passAndPlay(List<String> people)
     : playerCount = people.length,
       difficulty = BotDifficulty.medium,
       people = List.unmodifiable(people),
-      remote = const {};
+      remote = const {},
+      rejoins = null;
 
   /// A game hosted on this device: its player at seat 0, [remote] players
   /// at their seats on other devices, and bots at [difficulty] in any other
@@ -49,8 +52,12 @@ class MatchSetup {
     required this.playerCount,
     required Map<int, RemotePlayer> remote,
     this.difficulty = BotDifficulty.medium,
+    this.rejoins,
   }) : people = [hostName],
        remote = Map.unmodifiable(remote);
+
+  /// Players on other devices coming back after their link dropped.
+  final Stream<Rejoin>? rejoins;
 
   /// Players on other devices, by seat.
   final Map<int, RemotePlayer> remote;
@@ -71,10 +78,13 @@ class MatchSetup {
 
 /// A player on another device, and the link to it.
 class RemotePlayer {
-  const RemotePlayer({required this.name, required this.connection});
+  RemotePlayer({required this.name, required this.connection});
 
   final String name;
-  final Connection connection;
+
+  /// The link to their device: replaced if they come back after it drops,
+  /// so a new match still reaches them.
+  Connection connection;
 }
 
 /// Quick Play's setup: a full table of five against Medium bots.
@@ -177,6 +187,9 @@ class TableController extends TableNotifier {
   /// in for them until they're back.
   final _offline = <int>{};
   final _standIns = <int, BotPlayer>{};
+
+  /// What's listening to each player on another device.
+  final _listening = <int, StreamSubscription<WireMessage>>{};
   late Random _random;
   final _remoteChoosing = <int>{};
   late Duration Function() _thinkingTime;
@@ -203,10 +216,16 @@ class TableController extends TableNotifier {
     _passAndPlay = setup.isPassAndPlay;
     _people = setup.isPassAndPlay ? seats.toSet() : {humanSeat};
     _remote = setup.remote;
-    for (final MapEntry(key: seat, value: player) in _remote.entries) {
-      final listening = player.connection.messages.listen(
-        (message) => _onRemote(seat, message),
-        onDone: () => _onRemoteGone(seat),
+    _listening.clear();
+    _remote.keys.forEach(_listenTo);
+    ref.onDispose(() {
+      for (final listening in _listening.values) {
+        unawaited(listening.cancel());
+      }
+    });
+    if (setup.rejoins case final rejoins?) {
+      final listening = rejoins.listen(
+        (rejoin) => _onRejoin(rejoin.seat, rejoin.connection),
       );
       ref.onDispose(listening.cancel);
     }
@@ -469,6 +488,27 @@ class TableController extends TableNotifier {
     if (message is MoveDiscard) unawaited(_advance());
   }
 
+  /// Listens to the player at [seat] on their device's current link.
+  void _listenTo(int seat) {
+    _listening[seat] = _remote[seat]!.connection.messages.listen(
+      (message) => _onRemote(seat, message),
+      onDone: () => _onRemoteGone(seat),
+    );
+  }
+
+  /// The player at [seat] is back on [connection] after their link dropped:
+  /// they take their seat again from the bot that stood in.
+  void _onRejoin(int seat, Connection connection) {
+    final player = _remote[seat];
+    if (player == null || !ref.mounted) return;
+    unawaited(_listening[seat]?.cancel());
+    player.connection = connection;
+    _listenTo(seat);
+    _offline.remove(seat);
+    _standIns.remove(seat);
+    _publish(notice: '${_nameOf(seat)} is back.');
+  }
+
   /// The bot that plays [seat]: one of the match's bots, or one standing in
   /// for a player whose link has dropped. `null` for a person who's there.
   BotPlayer? _botFor(int seat) =>
@@ -590,7 +630,10 @@ class TableController extends TableNotifier {
       await Future<void>.delayed(_thinkingTime());
       if (!ref.mounted) return;
       final seat = _round.currentSeat;
-      final turn = _botFor(seat)!.takeTurn(_round);
+      // The player may have come back while the bot was thinking.
+      final bot = _botFor(seat);
+      if (bot == null) return;
+      final turn = bot.takeTurn(_round);
       _publish(notice: turn.won ? '${_nameOf(seat)} won the round.' : null);
     }
   }

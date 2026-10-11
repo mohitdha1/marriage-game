@@ -30,8 +30,14 @@ sealed class WireMessage {
   static WireMessage fromJson(Json json) {
     try {
       return switch (json['type']) {
-        'hello' => Hello(json['name']! as String),
-        'welcome' => Welcome(json['seat']! as int),
+        'hello' => Hello(
+          json['name']! as String,
+          token: json['token'] as String?,
+        ),
+        'welcome' => Welcome(
+          json['seat']! as int,
+          token: json['token']! as String,
+        ),
         'lobby' => LobbyUpdate(
           names: _strings(json['names']),
           seats: json['seats']! as int,
@@ -60,22 +66,31 @@ sealed class WireMessage {
 
 /// A joining phone introduces its player.
 class Hello extends WireMessage {
-  const Hello(this.name);
+  const Hello(this.name, {this.token});
 
   final String name;
 
+  /// The token from an earlier [Welcome], when coming back after the link
+  /// dropped; `null` when joining for the first time.
+  final String? token;
+
   @override
-  Json toJson() => {'type': 'hello', 'name': name};
+  Json toJson() => {'type': 'hello', 'name': name, 'token': token};
 }
 
-/// The host has given the joining player [seat].
+/// The host has given the joining player [seat], and a [token] to come back
+/// with if their link drops.
 class Welcome extends WireMessage {
-  const Welcome(this.seat);
+  const Welcome(this.seat, {required this.token});
 
   final int seat;
 
+  /// Private to this player: presented in a later [Hello] to take the seat
+  /// back.
+  final String token;
+
   @override
-  Json toJson() => {'type': 'welcome', 'seat': seat};
+  Json toJson() => {'type': 'welcome', 'seat': seat, 'token': token};
 }
 
 /// Who has joined so far, by seat, out of [seats] at the table.

@@ -107,6 +107,7 @@ class _HostLobbyScreenState extends ConsumerState<HostLobbyScreen> {
             hostName: host.hostName,
             playerCount: host.seats,
             difficulty: _difficulty,
+            rejoins: host.rejoins,
             remote: {
               for (final MapEntry(key: seat, value: guest) in guests.entries)
                 seat: RemotePlayer(
