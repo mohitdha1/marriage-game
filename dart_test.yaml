@@ -1,0 +1,6 @@
+tags:
+  # Long bot match-ups, skipped in the normal run. Run them with:
+  #   flutter test --tags strength --run-skipped
+  strength:
+    skip: "Long bot match-up; run with --tags strength --run-skipped"
+    timeout: 5m

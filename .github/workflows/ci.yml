@@ -20,3 +20,5 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test --timeout 60s
+      # Long bot match-ups, skipped in the run above.
+      - run: flutter test --tags strength --run-skipped
