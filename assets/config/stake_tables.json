@@ -1,0 +1,18 @@
+{
+  "tables": [
+    {"stake": 5, "minBalance": 0, "gamesToUnlock": 0, "difficulty": "easy"},
+    {"stake": 10, "minBalance": 1000, "gamesToUnlock": 50, "difficulty": "easy"},
+    {"stake": 25, "minBalance": 2500, "gamesToUnlock": 50, "difficulty": "easy"},
+    {"stake": 50, "minBalance": 5000, "gamesToUnlock": 75, "difficulty": "easy"},
+    {"stake": 100, "minBalance": 10000, "gamesToUnlock": 75, "difficulty": "medium"},
+    {"stake": 250, "minBalance": 25000, "gamesToUnlock": 100, "difficulty": "medium"},
+    {"stake": 500, "minBalance": 50000, "gamesToUnlock": 100, "difficulty": "medium"},
+    {"stake": 1000, "minBalance": 100000, "gamesToUnlock": 125, "difficulty": "medium"},
+    {"stake": 2500, "minBalance": 250000, "gamesToUnlock": 125, "difficulty": "medium"},
+    {"stake": 5000, "minBalance": 500000, "gamesToUnlock": 150, "difficulty": "hard"},
+    {"stake": 10000, "minBalance": 1000000, "gamesToUnlock": 150, "difficulty": "hard"},
+    {"stake": 25000, "minBalance": 2500000, "gamesToUnlock": 175, "difficulty": "hard"},
+    {"stake": 50000, "minBalance": 5000000, "gamesToUnlock": 200, "difficulty": "hard"},
+    {"stake": 100000, "minBalance": 10000000, "gamesToUnlock": 250, "difficulty": "hard"}
+  ]
+}

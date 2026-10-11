@@ -70,6 +70,9 @@ flutter:
   assets:
     - assets/sounds/
     - assets/cards/court/
+    # Stake tables: each tier's stake, minimum balance, unlock count and
+    # bot difficulty, tunable without code changes.
+    - assets/config/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
