@@ -74,6 +74,17 @@ Everything the app itself should include, in build order. No study plan — this
 - Leaderboards and friend lists (arrives with online multiplayer)
 - Keep it simple — coins and stats first, everything else later
 
+### Sign-in and cloud save
+
+Planned for right after the MVP.
+
+- Optional Google sign-in through Firebase Auth. Guest play stays available
+  at all times, and nothing in the game requires an account.
+- For signed-in players, coins and stats are stored in Firestore and synced
+  across their devices. Guests keep them on the device only.
+- An option to delete the account and its cloud data from inside the app,
+  which Google Play requires for any app that lets players create an account.
+
 ## 9. Monetization — play-money only
 
 - No real-money wagering, ever — stores will reject it
