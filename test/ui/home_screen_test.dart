@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/engine/scoring.dart';
@@ -12,6 +13,7 @@ import 'package:marriage_game/ui/home/game_setup.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/home/pass_and_play_setup.dart';
 import 'package:marriage_game/ui/settings/about.dart';
+import 'package:marriage_game/ui/settings/feedback.dart';
 import 'package:marriage_game/ui/settings/how_to_play_screen.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/settings/settings.dart';
@@ -24,6 +26,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 Future<ProviderContainer> pumpHome(
   WidgetTester tester, {
   Map<String, Object>? saved,
+  List<Override> overrides = const [],
 }) async {
   tester.view
     ..physicalSize = const Size(844, 390)
@@ -37,6 +40,7 @@ Future<ProviderContainer> pumpHome(
         randomProvider.overrideWithValue(Random(0)),
         botThinkingTimeProvider.overrideWithValue(() => Duration.zero),
         soundEffectsProvider.overrideWithValue(const SilentSoundEffects()),
+        ...overrides,
       ],
       child: const MarriageApp(),
     ),
@@ -380,6 +384,64 @@ void main() {
     expect(find.byType(AboutDialog), findsOneWidget);
     expect(find.text('1.0.0 (7)'), findsOneWidget);
     expect(find.textContaining('Byron Knoll'), findsOneWidget);
+  });
+
+  testWidgets('Feedback opens a new issue, with the version filled in', (
+    tester,
+  ) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'Marriage',
+      packageName: 'io.github.mohitdha1.marriage',
+      version: '1.0.0',
+      buildNumber: '7',
+      buildSignature: '',
+    );
+    final opened = <Uri>[];
+    await pumpHome(
+      tester,
+      overrides: [
+        openLinkProvider.overrideWithValue((link) async {
+          opened.add(link);
+          return true;
+        }),
+      ],
+    );
+
+    await tester.tap(find.byKey(const Key('settings-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('setting-feedback')));
+    await tester.pumpAndSettle();
+
+    final link = opened.single;
+    expect(link.host, 'github.com');
+    expect(link.path, '/mohitdha1/marriage-game/issues/new');
+    expect(link.queryParameters['body'], contains('Marriage 1.0.0 (7)'));
+  });
+
+  testWidgets('if the browser won\'t open, Feedback says where to go', (
+    tester,
+  ) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'Marriage',
+      packageName: 'io.github.mohitdha1.marriage',
+      version: '1.0.0',
+      buildNumber: '7',
+      buildSignature: '',
+    );
+    await pumpHome(
+      tester,
+      overrides: [openLinkProvider.overrideWithValue((link) async => false)],
+    );
+
+    await tester.tap(find.byKey(const Key('settings-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('setting-feedback')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('github.com/mohitdha1/marriage-game'),
+      findsOneWidget,
+    );
   });
 
   test('the court art\'s licence is listed with the others', () async {

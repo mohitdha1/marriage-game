@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../table/card_view.dart';
 import '../theme/table_theme.dart';
 import 'about.dart';
+import 'feedback.dart';
 import 'how_to_play_screen.dart';
 import 'profile_dialog.dart';
 import 'settings.dart';
@@ -97,6 +98,17 @@ class _SettingsPopover extends ConsumerWidget {
                           builder: (_) => const HowToPlayScreen(),
                         ),
                       );
+                    },
+                  ),
+                  _SettingTile(
+                    key: const Key('setting-feedback'),
+                    label: 'Feedback',
+                    icon: Icons.feedback_outlined,
+                    onTap: () {
+                      // Read before the popover, and its ref, are gone.
+                      final open = ref.read(openLinkProvider);
+                      final navigator = Navigator.of(context)..pop();
+                      sendFeedback(navigator.context, open);
                     },
                   ),
                   _SettingTile(
