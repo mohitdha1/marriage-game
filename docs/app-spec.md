@@ -20,6 +20,7 @@ Everything the app itself should include, in build order. No study plan — this
 3. **Pass-and-play** — one device, hidden hands between turns (v2)
 4. **Hotspot/LAN** — host on one phone, friends join over Wi-Fi/hotspot (v2)
 5. **Online** — rooms, matchmaking, friend invites (later, needs backend)
+   - Private rooms: host creates a room and shares a PIN; friends join from anywhere with the PIN.
 
 ## 3. Screens
 
