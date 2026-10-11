@@ -441,6 +441,90 @@ void main() {
     });
   });
 
+  group('Hard: the dublee route', () {
+    List<PlayingCard> pairsOf(Suit suit, List<Rank> ranks) => [
+      for (final rank in ranks) ...[c(suit, rank), c(suit, rank)],
+    ];
+    // Four doublees and nothing close to a pure set.
+    final pairs = pairsOf(Suit.clubs, [
+      Rank.two,
+      Rank.five,
+      Rank.eight,
+      Rank.jack,
+    ]);
+    final singles = [
+      c(Suit.hearts, Rank.ace),
+      c(Suit.diamonds, Rank.six),
+      c(Suit.spades, Rank.ten),
+    ];
+
+    PlayerHand handOf(List<PlayingCard> cards) => roundFor(cards).hands[0];
+
+    test('a hand rich in pairs and far from pure sets plays for doublees', () {
+      expect(
+        bot(
+          BotDifficulty.hard,
+        ).playsForDoublees(handOf([...pairs, ...singles])),
+        isTrue,
+      );
+    });
+
+    test('a hand close to its pure sets does not', () {
+      expect(
+        bot(
+          BotDifficulty.hard,
+        ).playsForDoublees(handOf([...pairs, ...heartsRun, ...spadesRun])),
+        isFalse,
+      );
+    });
+
+    test('Medium never chooses the route', () {
+      expect(
+        bot(
+          BotDifficulty.medium,
+        ).playsForDoublees(handOf([...pairs, ...singles])),
+        isFalse,
+      );
+    });
+
+    test('keeps its pairs and throws a single', () {
+      final discard = bot(
+        BotDifficulty.hard,
+      ).chooseDiscard([...pairs, ...singles], null, keepPairs: true);
+
+      expect(singles, contains(discard));
+    });
+
+    test('takes a discard that makes a pair, and only that', () {
+      final pairing = bot(BotDifficulty.hard).takeTurn(
+        roundFor([...pairs, ...singles], topDiscard: c(Suit.spades, Rank.ten)),
+      );
+      expect(pairing.drewFrom, DrawSource.discardPile);
+
+      // 7♦ sits next to 6♦, which would tempt a bot building runs.
+      final near = bot(BotDifficulty.hard).takeTurn(
+        roundFor([
+          ...pairs,
+          ...singles,
+        ], topDiscard: c(Suit.diamonds, Rank.seven)),
+      );
+      expect(near.drewFrom, DrawSource.stock);
+    });
+
+    test('shows 7 doublees once it has them', () {
+      final turn = bot(BotDifficulty.hard).takeTurn(
+        roundFor([
+          ...pairs,
+          ...pairsOf(Suit.hearts, [Rank.four, Rank.nine, Rank.king]),
+          c(Suit.spades, Rank.ten),
+        ]),
+      );
+
+      expect(turn.shown, hasLength(PlayerHand.doubleesToShow));
+      expect(turn.shown, everyElement(hasLength(2)));
+    });
+  });
+
   group('Strength', () {
     /// Wins for [a] and [b] over [games] 2-player rounds, swapping seats
     /// every round so going first evens out.

@@ -23,8 +23,9 @@ enum BotDifficulty {
   medium,
 
   /// Careful: plays like Medium, but also counts which cards are gone, avoids
-  /// discarding what the next player has been collecting, and chooses which
-  /// sets to show to keep its hand flexible.
+  /// discarding what the next player has been collecting, chooses which
+  /// sets to show to keep its hand flexible, and plays for doublees when
+  /// the hand suits them better than pure sets.
   hard,
 }
 
@@ -74,6 +75,10 @@ class BotPlayer {
   /// Chance an Easy bot doesn't notice it could win this turn.
   static const _easyMissedWin = 0.25;
 
+  /// How many doublees a Hard bot needs, with few pure sets, before it
+  /// plays for doublees instead.
+  static const dubleeRouteAt = 4;
+
   /// Every tunnella in [cards], up to 3 — the opening show.
   List<List<PlayingCard>> openingTunnellas(List<PlayingCard> cards) =>
       findTunnellas(cards).take(PlayerHand.maxOpeningTunnellas).toList();
@@ -86,6 +91,7 @@ class BotPlayer {
     final memory = difficulty == BotDifficulty.hard
         ? TableMemory.read(round, seat)
         : null;
+    final forDoublees = playsForDoublees(hand);
 
     // A turn may already be under way: a player who left after drawing,
     // whose seat a bot has taken over. It finishes the turn from there.
@@ -97,7 +103,7 @@ class BotPlayer {
       drawn = null;
       mustKeep = round.takenFromDiscardPile;
     } else {
-      source = _chooseDrawSource(round, seat, memory);
+      source = _chooseDrawSource(round, seat, memory, forDoublees);
       drawn = round.draw(source);
       mustKeep = source == DrawSource.discardPile ? drawn : null;
     }
@@ -105,7 +111,7 @@ class BotPlayer {
     var shown = <List<PlayingCard>>[];
     var pickedTiplu = false;
     if (!hand.hasSeenJoker) {
-      final show = _chooseShow(hand);
+      final show = _chooseShow(hand, forDoublees);
       if (show != null) {
         pickedTiplu = !round.isJokerChosen;
         final position = pickedTiplu ? _pickTipluPosition(round) : null;
@@ -136,6 +142,7 @@ class BotPlayer {
       round.jokersFor(seat),
       mustKeep: mustKeep,
       memory: memory,
+      keepPairs: forDoublees,
     );
     round.discard(discard);
     return BotTurn(
@@ -154,6 +161,7 @@ class BotPlayer {
     Jokers? jokers, {
     PlayingCard? mustKeep,
     TableMemory? memory,
+    bool keepPairs = false,
   }) {
     var candidates = cards.where((card) => card != mustKeep).toList()
       ..sort((a, b) => b.rank.order.compareTo(a.rank.order));
@@ -190,9 +198,20 @@ class BotPlayer {
       return value + danger;
     }
 
+    // A bot playing for doublees throws a single card while it has one.
+    if (keepPairs) {
+      final copies = countCopies(cards);
+      final singles = [
+        for (final card in candidates)
+          if (copies[card] == 1 && !(jokers?.isWild(card) ?? false)) card,
+      ];
+      if (singles.isNotEmpty) candidates = singles;
+    }
+
     // A Hard bot first keeps whatever leaves the most cards in sets; the
     // usual cost only breaks ties.
-    int coverageWithout(PlayingCard card) => difficulty == BotDifficulty.hard
+    int coverageWithout(PlayingCard card) =>
+        difficulty == BotDifficulty.hard && !keepPairs
         ? maxCoverage([...cards]..remove(card), jokers)
         : 0;
 
@@ -212,9 +231,35 @@ class BotPlayer {
     return best;
   }
 
-  DrawSource _chooseDrawSource(Round round, int seat, TableMemory? memory) {
+  /// Whether a Hard bot plays [hand] for doublees: once it has shown them,
+  /// or while it hasn't seen the joker and holds at least [dubleeRouteAt]
+  /// doublees but is further from its pure sets.
+  bool playsForDoublees(PlayerHand hand) {
+    if (difficulty != BotDifficulty.hard) return false;
+    if (hand.showKind == ShowKind.doublees) return true;
+    if (hand.hasSeenJoker) return false;
+    final pairs = countDoublees(hand.cards);
+    return pairs >= dubleeRouteAt &&
+        PlayerHand.doubleesToShow - pairs <
+            2 * (hand.pureSetsStillNeeded - maxPureSets(hand.cards));
+  }
+
+  DrawSource _chooseDrawSource(
+    Round round,
+    int seat,
+    TableMemory? memory,
+    bool forDoublees,
+  ) {
     final top = round.topDiscard;
     if (top == null) return DrawSource.stock;
+
+    // Playing for doublees, a discard is worth taking if it makes a pair.
+    if (forDoublees) {
+      final cards = round.hands[seat].cards;
+      return cards.where((card) => card == top).length == 1
+          ? DrawSource.discardPile
+          : DrawSource.stock;
+    }
 
     if (difficulty == BotDifficulty.easy) {
       return _random.nextDouble() < _easyBlindPickup
@@ -246,8 +291,13 @@ class BotPlayer {
   /// yet. Easy bots only look for pure sets; the others also try doublees.
   ({List<List<PlayingCard>> sets, bool doublees})? _chooseShow(
     PlayerHand hand,
+    bool forDoublees,
   ) {
     final cards = hand.cards;
+    if (forDoublees) {
+      final pairs = findDoublees(cards, PlayerHand.doubleesToShow);
+      if (pairs != null) return (sets: pairs, doublees: true);
+    }
     final choices = allPureSetChoices(cards, hand.pureSetsStillNeeded);
     if (choices.isNotEmpty) {
       final sets = difficulty == BotDifficulty.hard
