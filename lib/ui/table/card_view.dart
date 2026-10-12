@@ -14,11 +14,14 @@ const cardAspectRatio = 2.5 / 3.5;
 /// Ink colour of a man card, unlike either suit colour.
 const manCardColor = Color(0xFF6A1B9A);
 
+/// Ink colour of the Superman, unlike either suit colour or a man card.
+const supermanCardColor = Color(0xFF1565C0);
+
 /// A face-up card, laid out like a printed one: rank and suit in the top
 /// left corner and, upside down, the bottom right; the pips of a number
 /// card in their usual pattern; one large pip on an ace; and the court
 /// figure on a jack, queen or king. A man card shows "M" in its corners and
-/// a figure in the middle.
+/// a figure in the middle; the Superman shows "S" and a bolt.
 ///
 /// The corner rank is large, because in an overlapping hand the top left
 /// corner is often all that shows of a card.
@@ -48,7 +51,9 @@ class CardFace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = card.isMan
+    final color = card.isSuperman
+        ? supermanCardColor
+        : card.isMan
         ? manCardColor
         : _isRed
         ? redSuitColor
@@ -91,8 +96,8 @@ class CardFace extends StatelessWidget {
     if (suit == null || rank == null) {
       return Center(
         child: Icon(
-          Icons.person,
-          key: const Key('man-art'),
+          card.isSuperman ? Icons.bolt : Icons.person,
+          key: Key(card.isSuperman ? 'superman-art' : 'man-art'),
           size: width * 0.55,
           color: color,
         ),
@@ -160,7 +165,7 @@ class _CornerIndex extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              card.rank?.label ?? 'M',
+              card.rank?.label ?? (card.isSuperman ? 'S' : 'M'),
               maxLines: 1,
               style: TextStyle(
                 color: color,

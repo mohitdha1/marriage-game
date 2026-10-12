@@ -26,8 +26,9 @@ enum DrawSource { stock, discardPile }
 /// The joker isn't chosen at the deal. The first player to show picks any
 /// card from the stock (`tipluPosition`, counted from the top) to be the
 /// tiplu. It goes face down under the stock and is never drawn, so this
-/// class simply takes it out of the stock. A man card can't be the tiplu:
-/// the picker keeps it aside as maal and picks again ([pickTiplu]).
+/// class simply takes it out of the stock. A printed joker (a man card or
+/// the Superman) can't be the tiplu: the picker keeps it aside as maal and
+/// picks again ([pickTiplu]).
 ///
 /// Read state from here and act through this class's methods, not through
 /// the [PlayerHand]s directly, so the table rules are always applied.
@@ -116,7 +117,7 @@ class Round {
   /// Whether the tiplu has been picked yet (by the first player to show).
   bool get isJokerChosen => _jokers != null;
 
-  /// Whether the current player picked a man card as the tiplu and must
+  /// Whether the current player picked a printed joker as the tiplu and must
   /// pick again with [pickTiplu] before anything else happens.
   bool get needsTipluPick => _needsTipluPick;
 
@@ -127,8 +128,8 @@ class Round {
     return jokers == null ? null : _hands[seat].visibleJokers(jokers);
   }
 
-  /// How many wild cards each seat has discarded after seeing the joker
-  /// (always 0 when [GameConfig.jokerDiscardPenaltyEnabled] is off).
+  /// How many wild cards each seat has discarded after seeing the joker,
+  /// counting the Superman whenever it was discarded (always 0 when [GameConfig.jokerDiscardPenaltyEnabled] is off).
   List<int> get jokerDiscards => List.unmodifiable(_jokerDiscards);
 
   /// Everything every player has seen happen so far, oldest first.
@@ -217,8 +218,8 @@ class Round {
   }
 
   /// The current player picks the tiplu again, at [position] in the stock
-  /// counted from the top, after their first pick was a man card. Another
-  /// man card is kept aside too, and the pick goes on.
+  /// counted from the top, after their first pick was a printed joker.
+  /// Another printed joker is kept aside too, and the pick goes on.
   void pickTiplu(int position) {
     _checkNotOver();
     if (!_needsTipluPick) throw StateError('There is no tiplu to pick');
@@ -336,11 +337,11 @@ class Round {
   }
 
   /// Takes the card at [position] as the tiplu, or keeps it aside for the
-  /// current player if it's a man card, who then picks again.
+  /// current player if it's a printed joker, who then picks again.
   void _takeTiplu(int position) {
     final card = _stock.removeAt(_stock.length - 1 - position);
-    _needsTipluPick = card.isMan;
-    if (card.isMan) {
+    _needsTipluPick = card.isPrinted;
+    if (card.isPrinted) {
       _currentHand.keepAside(card);
       _events.add(KeptAside(_currentSeat, card));
     } else {
@@ -356,10 +357,8 @@ class Round {
     _takenFromDiscardPile = null;
 
     final jokers = _jokers;
-    if (config.jokerDiscardPenaltyEnabled &&
-        hand.hasSeenJoker &&
-        jokers != null &&
-        jokers.isWild(card)) {
+    final seenWild = hand.hasSeenJoker && jokers != null && jokers.isWild(card);
+    if (config.jokerDiscardPenaltyEnabled && (card.isSuperman || seenWild)) {
       _jokerDiscards[_currentSeat]++;
     }
   }

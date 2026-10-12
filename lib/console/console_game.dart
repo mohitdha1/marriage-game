@@ -292,7 +292,8 @@ class ConsoleGame {
     }
     while (round.needsTipluPick) {
       writeLine(
-        'That was a man card, kept aside as your maal. Pick again, from 1 '
+        'That card can\'t be the joker, so it\'s kept aside as your maal. '
+        'Pick again, from 1 '
         '(top) to ${round.stockCount}:',
       );
       final picked = _parseNumbers(_read());
@@ -448,7 +449,7 @@ class ConsoleGame {
       sortForDisplay(round.hands[seat].cards);
 }
 
-/// Cards sorted by suit, then rank, with man cards last — the order the
+/// Cards sorted by suit, then rank, with printed jokers last — the order the
 /// console numbers them in.
 List<PlayingCard> sortForDisplay(List<PlayingCard> cards) =>
     [...cards]..sort((a, b) => cardIndex(a).compareTo(cardIndex(b)));

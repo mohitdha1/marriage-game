@@ -136,6 +136,29 @@ void main() {
       );
     }
 
+    test('every bot shows a pure set the Superman completes', () {
+      for (final difficulty in BotDifficulty.values) {
+        final round = roundFor([
+          ...run(Suit.spades, [Rank.two, Rank.three, Rank.four]),
+          ...run(Suit.clubs, [Rank.nine, Rank.ten, Rank.jack]),
+          c(Suit.diamonds, Rank.five),
+          const PlayingCard.superman(),
+          c(Suit.diamonds, Rank.seven),
+          c(Suit.hearts, Rank.king),
+          c(Suit.clubs, Rank.four),
+        ]);
+
+        final turn = bot(difficulty).takeTurn(round);
+
+        expect(turn.shown, hasLength(3), reason: '$difficulty');
+        expect(
+          turn.shown.expand((set) => set),
+          contains(const PlayingCard.superman()),
+          reason: '$difficulty',
+        );
+      }
+    });
+
     test('a bot that picks a man card keeps it aside and picks again', () {
       for (final difficulty in BotDifficulty.values) {
         var keptAny = false;
@@ -232,6 +255,20 @@ void main() {
     final jokers = Jokers(c(Suit.hearts, Rank.seven));
     final wild = c(Suit.clubs, Rank.seven);
     final loner = c(Suit.diamonds, Rank.king);
+
+    test('every bot keeps the Superman, even before seeing the joker', () {
+      for (final difficulty in [BotDifficulty.medium, BotDifficulty.hard]) {
+        expect(
+          bot(difficulty).chooseDiscard([
+            ...heartsRun,
+            const PlayingCard.superman(),
+            loner,
+          ], null),
+          loner,
+          reason: '$difficulty',
+        );
+      }
+    });
 
     test('medium throws away the least useful card and keeps jokers', () {
       expect(

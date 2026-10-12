@@ -39,7 +39,7 @@ abstract class TableNotifier extends Notifier<TableState> {
   });
 
   /// Picks the tiplu again at [position], after the person's first pick
-  /// was a man card.
+  /// was a printed joker.
   void submitTipluPick(int position);
 
   /// Wins the round by discarding the hand card [winning].
@@ -169,10 +169,13 @@ abstract class TableNotifier extends Notifier<TableState> {
     state = state.copyWith(hand: [...groupedCards, ...loose]);
   }
 
-  /// Man cards go after every suit.
+  /// Man cards go after every suit, and the Superman after them.
   static int _bySuitThenRank(HandCard a, HandCard b) {
-    int suitOrder(PlayingCard card) =>
-        card.isMan ? sortedSuits.length : sortedSuits.indexOf(card.suit!);
+    int suitOrder(PlayingCard card) => card.isSuperman
+        ? sortedSuits.length + 1
+        : card.isMan
+        ? sortedSuits.length
+        : sortedSuits.indexOf(card.suit!);
     final bySuit = suitOrder(a.card).compareTo(suitOrder(b.card));
     return bySuit != 0
         ? bySuit
@@ -253,7 +256,7 @@ abstract class TableNotifier extends Notifier<TableState> {
   }
 
   /// Picks the stock card at [position] (0 is the top) as the tiplu, and
-  /// shows the grouped sets; or, after a man card was picked, just picks
+  /// shows the grouped sets; or, after a printed joker was picked, just picks
   /// again.
   void pickTiplu(int position) {
     state = state.copyWith(pickingTiplu: false);
@@ -265,7 +268,7 @@ abstract class TableNotifier extends Notifier<TableState> {
   }
 
   /// Closes the tiplu picker without showing, unless the sets are already
-  /// shown and a man card was picked: then the pick has to be made.
+  /// shown and a printed joker was picked: then the pick has to be made.
   void cancelTipluPick() {
     if (state.view.youMustPickTiplu) return;
     state = state.copyWith(pickingTiplu: false);
@@ -320,17 +323,18 @@ abstract class TableNotifier extends Notifier<TableState> {
 
   /// Whether discarding the card with [cardId] now would cost the person
   /// the joker-discard penalty: it's their turn to discard, the penalty is
-  /// in play, they've seen the joker, and the card is wild.
+  /// in play, and the card is the Superman, or wild once they've seen the
+  /// joker.
   bool discardCostsPenalty(int cardId) {
     final view = state.view;
     final jokers = view.yourJokers;
     final card = cardWithId(cardId);
+    if (card == null) return false;
+    final seenWild =
+        view.youHaveSeenJoker && jokers != null && jokers.isWild(card);
     return jokerPenaltyEnabled &&
         view.isYourTurn &&
         view.youHaveDrawn &&
-        view.youHaveSeenJoker &&
-        jokers != null &&
-        card != null &&
-        jokers.isWild(card);
+        (card.isSuperman || seenWild);
   }
 }

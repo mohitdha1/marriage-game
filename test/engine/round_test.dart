@@ -628,6 +628,61 @@ void main() {
     });
   });
 
+  group('The Superman', () {
+    const superman = PlayingCard.superman();
+    final withSuperman = [
+      for (final card in seat0Cards)
+        card == c(Suit.diamonds, Rank.two) ? superman : card,
+    ];
+
+    test('discarding it costs the penalty even before seeing', () {
+      final round = table(seat0: withSuperman)
+        ..draw(DrawSource.stock)
+        ..discard(superman);
+
+      expect(round.hands[0].hasSeenJoker, isFalse);
+      expect(round.jokerDiscards, [1, 0]);
+    });
+
+    test('discarding it costs nothing when the house rule is off', () {
+      final round =
+          table(
+              seat0: withSuperman,
+              config: GameConfig(
+                playerCount: 2,
+                jokerDiscardPenaltyEnabled: false,
+              ),
+            )
+            ..draw(DrawSource.stock)
+            ..discard(superman);
+
+      expect(round.jokerDiscards, [0, 0]);
+    });
+
+    test('picked as the tiplu, it is kept aside and the picker picks '
+        'again', () {
+      // From the top after drawing Q♦: 2♣ (0), the Superman (1), 5♣ (2).
+      final round =
+          table(
+              stockCards: [
+                c(Suit.clubs, Rank.five),
+                superman,
+                c(Suit.clubs, Rank.two),
+                c(Suit.diamonds, Rank.queen),
+              ],
+            )
+            ..draw(DrawSource.stock)
+            ..showPureSets([runA, runB, runC], tipluPosition: 1);
+
+      expect(round.hands[0].keptAside, [superman]);
+      expect(round.needsTipluPick, isTrue);
+      expect(round.events.last, isA<KeptAside>());
+
+      round.pickTiplu(0);
+      expect(round.jokersFor(0)!.tiplu, c(Suit.clubs, Rank.two));
+    });
+  });
+
   group('Round.score', () {
     test('cannot score a round that is still being played', () {
       expect(() => table().score(), throwsStateError);

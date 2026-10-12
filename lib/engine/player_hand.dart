@@ -55,8 +55,8 @@ class PlayerHand {
   /// [openingTunnellas]; empty until then.
   List<List<PlayingCard>> get shownSets => _unmodifiable(_shownSets);
 
-  /// Man cards the player picked as the tiplu, kept aside: maal at the end,
-  /// never part of a set.
+  /// Printed jokers the player picked as the tiplu, kept aside: maal at the
+  /// end, never part of a set.
   List<PlayingCard> get keptAside => List.unmodifiable(_keptAside);
 
   /// Whether the opening show has been made.
@@ -114,7 +114,7 @@ class PlayerHand {
   }
 
   /// Keeps [card] aside, after the player picked it as the tiplu when it
-  /// can't be one. Only the player showing first picks, so they've seen
+  /// can't be one (a printed joker). Only the player showing first picks, so they've seen
   /// the joker.
   void keepAside(PlayingCard card) {
     if (!hasSeenJoker) {
@@ -148,7 +148,8 @@ class PlayerHand {
   }
 
   /// Shows [pureSetsStillNeeded] pure sets — each a pure sequence (3 or more
-  /// cards) or a tunnella — to see the joker. Allowed after drawing, or
+  /// cards) or a tunnella, one of which may use the Superman for a card
+  /// (see [isShowPureSet]) — to see the joker. Allowed after drawing, or
   /// before the player's first draw if the sets came straight from the deal.
   /// If 3 opening tunnellas were shown, pass an empty list.
   void showPureSets(List<List<PlayingCard>> sets) {
@@ -156,18 +157,19 @@ class PlayerHand {
       sets,
       kind: ShowKind.pureSets,
       requiredCount: pureSetsStillNeeded,
-      isValidSet: (set) => isPureSequence(set) || isTunnella(set),
+      isValidSet: isShowPureSet,
       allowedBeforeFirstDraw: true,
     );
   }
 
-  /// Shows exactly 7 doublees, after drawing, to see the joker.
+  /// Shows exactly 7 doublees, after drawing, to see the joker. The
+  /// Superman pairs with any card (see [isShowDoublee]).
   void showDoublees(List<List<PlayingCard>> pairs) {
     _show(
       pairs,
       kind: ShowKind.doublees,
       requiredCount: doubleesToShow,
-      isValidSet: isDoublee,
+      isValidSet: isShowDoublee,
       allowedBeforeFirstDraw: false,
     );
   }

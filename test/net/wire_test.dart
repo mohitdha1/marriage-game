@@ -110,6 +110,7 @@ void main() {
       );
       expectRoundTrip(MoveWin(c(Suit.diamonds, Rank.two)));
       expectRoundTrip(const MoveDiscard(PlayingCard.man()));
+      expectRoundTrip(const MoveDiscard(PlayingCard.superman()));
       expectRoundTrip(const MovePickTiplu(4));
     });
 
@@ -131,7 +132,7 @@ void main() {
           RoundScore(
             winner: 1,
             maal: const [
-              MaalBreakdown(tiplu: 3, shownMarriages: 1),
+              MaalBreakdown(tiplu: 3, shownMarriages: 1, man: 5, superman: 5),
               MaalBreakdown(),
             ],
             net: const [-7, 7],
@@ -161,6 +162,8 @@ void main() {
       ]);
       expect(back.handProgress, isA<WinProgress>());
       expect(back.roundScores.single.maal.first.shownMarriages, 1);
+      expect(back.roundScores.single.maal.first.man, 5);
+      expect(back.roundScores.single.maal.first.superman, 5);
       expect(back.roundScores.single.kidnapped, [0, 4]);
     });
 

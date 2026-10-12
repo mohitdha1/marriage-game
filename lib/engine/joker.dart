@@ -20,18 +20,22 @@ enum JokerKind {
 
   /// A printed joker ([PlayingCard.man]), when man cards are in play.
   man,
+
+  /// The Superman ([PlayingCard.superman]), when it's in play.
+  superman,
 }
 
 /// The jokers for one round, all derived from the [tiplu]: the card the
 /// first player to show picks from the stock.
 ///
 /// Every [JokerKind] is wild: any card of the tiplu's rank (whatever the
-/// suit), the jhiplu and poplu, and man cards. Jhiplu/poplu wrap around the ace, so a
-/// tiplu of A gives poplu 2, and a tiplu of 2 gives jhiplu A.
+/// suit), the jhiplu and poplu, man cards and the Superman. Jhiplu/poplu
+/// wrap around the ace, so a tiplu of A gives poplu 2, and a tiplu of 2
+/// gives jhiplu A.
 class Jokers {
   Jokers(this.tiplu) {
-    if (tiplu.isMan) {
-      throw ArgumentError.value(tiplu, 'tiplu', 'cannot be a man card');
+    if (tiplu.isPrinted) {
+      throw ArgumentError.value(tiplu, 'tiplu', 'cannot be a printed joker');
     }
   }
 
@@ -48,6 +52,7 @@ class Jokers {
 
   /// What kind of joker [card] is this round, or `null` if it's a normal card.
   JokerKind? kindOf(PlayingCard card) {
+    if (card.isSuperman) return JokerKind.superman;
     if (card.isMan) return JokerKind.man;
     if (card == tiplu) return JokerKind.tiplu;
     if (card == jhiplu) return JokerKind.jhiplu;

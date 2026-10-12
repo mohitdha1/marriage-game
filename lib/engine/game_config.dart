@@ -41,9 +41,13 @@ class GameConfig {
 
   /// House rule: one man card ([PlayingCard.man]) per deck in the shoe.
   final bool manCardsEnabled;
+
+  /// House rule: one Superman ([PlayingCard.superman]) in the shoe.
   final bool supermanCardEnabled;
 
   /// House rule: a player who has seen the joker and then discards a wild
   /// card pays [ScoringTable.jokerDiscardPenalty] to the round's winner.
+  /// Discarding the Superman costs it whether or not they've seen the
+  /// joker.
   final bool jokerDiscardPenaltyEnabled;
 }

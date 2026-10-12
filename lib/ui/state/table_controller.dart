@@ -425,7 +425,7 @@ class TableController extends TableNotifier {
     if (_act(() => _round.pickTiplu(position))) _offerPickAgain();
   }
 
-  /// Opens the tiplu picker again if the person's pick was a man card.
+  /// Opens the tiplu picker again if the person's pick was a printed joker.
   void _offerPickAgain() {
     if (state.view.youMustPickTiplu) {
       state = state.copyWith(pickingTiplu: true);

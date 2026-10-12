@@ -23,9 +23,9 @@ String describeEvent(TableEvent event, String Function(int seat) nameOf) {
     DiscardedCard(:final card) => '$who discarded $card',
     WonRound(:final card) => '$who discarded $card and won the round',
     StockReshuffled() => 'The stock ran out and the discards were shuffled',
-    KeptAside() =>
-      '$who picked a man card as the joker, kept it as maal, and picks '
-          'again',
+    KeptAside(:final card) =>
+      '$who picked ${card.isSuperman ? 'the Superman' : 'a man card'} as '
+          'the joker, kept it as maal, and picks again',
   };
 }
 

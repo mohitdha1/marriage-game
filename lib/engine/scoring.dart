@@ -17,6 +17,9 @@ abstract final class ScoringTable {
   /// Man cards, when they're in play: one per deck, so up to 3.
   static const manByCount = [0, 5, 15, 25];
 
+  /// The Superman, when it's in play: there's only one.
+  static const superman = 5;
+
   /// Opening-show tunnellas.
   static const alterTunnella = 30;
   static const jhipluOrPopluTunnella = 15;
@@ -33,7 +36,7 @@ abstract final class ScoringTable {
   static const dubleeWinBonus = 5;
 
   /// Paid to the winner for each wild card a player discarded after seeing
-  /// the joker, when [GameConfig.jokerDiscardPenaltyEnabled] is on.
+  /// the joker, or Superman discarded at any time, when [GameConfig.jokerDiscardPenaltyEnabled] is on.
   static const jokerDiscardPenalty = 15;
 }
 
@@ -48,6 +51,7 @@ class MaalBreakdown {
     this.poplu = 0,
     this.alter = 0,
     this.man = 0,
+    this.superman = 0,
   });
 
   /// Points from opening-show tunnellas.
@@ -66,11 +70,15 @@ class MaalBreakdown {
   /// Points from man cards not in an opening tunnella.
   final int man;
 
+  /// Points from the Superman.
+  final int superman;
+
   int get marriages =>
       shownMarriages * ScoringTable.shownMarriage +
       handMarriages * ScoringTable.handMarriage;
 
-  int get total => tunnellas + marriages + tiplu + jhiplu + poplu + alter + man;
+  int get total =>
+      tunnellas + marriages + tiplu + jhiplu + poplu + alter + man + superman;
 }
 
 /// Works out a player's maal points. Players who haven't seen the joker score
@@ -99,6 +107,9 @@ MaalBreakdown _maalOf(
         'A tiplu tunnella is impossible: only 2 tiplus are in play',
       ),
       JokerKind.man => ScoringTable.manTunnella,
+      JokerKind.superman => throw StateError(
+        'A Superman tunnella is impossible: there is only one',
+      ),
       JokerKind.ordinary || null => ScoringTable.plainTunnella,
     };
   }
@@ -116,6 +127,7 @@ MaalBreakdown _maalOf(
   final popluCount = countOf(jokers.poplu);
   final alterCount = countOf(jokers.alter);
   final manCount = countOf(const PlayingCard.man());
+  final hasSuperman = cards.any((c) => c.isSuperman);
 
   final shownTrios = hand.shownSets
       .where(
@@ -153,6 +165,7 @@ MaalBreakdown _maalOf(
         ),
         alter: _lookup(ScoringTable.alterByCount, alterCount, 'alter'),
         man: _lookup(ScoringTable.manByCount, manCount, 'man card'),
+        superman: hasSuperman ? ScoringTable.superman : 0,
       );
       if (best == null || candidate.total > best.total) best = candidate;
     }
@@ -241,7 +254,7 @@ class RoundScore {
 /// who didn't see it also pays the winner's maal.
 ///
 /// [jokerDiscards] is how many wild cards each seat discarded after seeing
-/// the joker; each one costs [ScoringTable.jokerDiscardPenalty], paid to the
+/// the joker, counting the Superman whenever it was discarded; each one costs [ScoringTable.jokerDiscardPenalty], paid to the
 /// winner. The round passes all zeros when that house rule is off. The
 /// winner's own joker discards cost nothing, since they'd be paying
 /// themselves.

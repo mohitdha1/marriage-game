@@ -205,7 +205,10 @@ class BotPlayer {
       final copies = countCopies(cards);
       final singles = [
         for (final card in candidates)
-          if (copies[card] == 1 && !(jokers?.isWild(card) ?? false)) card,
+          if (copies[card] == 1 &&
+              !card.isSuperman &&
+              !(jokers?.isWild(card) ?? false))
+            card,
       ];
       if (singles.isNotEmpty) candidates = singles;
     }
@@ -368,8 +371,8 @@ class BotPlayer {
     return null;
   }
 
-  /// Picks again for as long as the picks are man cards, which are kept
-  /// aside.
+  /// Picks again for as long as the picks are printed jokers, which are
+  /// kept aside.
   void _pickTipluAgain(Round round) {
     while (round.needsTipluPick) {
       round.pickTiplu(_pickTipluPosition(round));

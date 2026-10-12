@@ -4,7 +4,7 @@ import 'joker.dart';
 /// A tunnella is exactly 3 physically-identical cards (same suit AND rank) —
 /// the maximum possible with a 3-deck shoe.
 bool isTunnella(List<PlayingCard> cards) {
-  if (cards.length != 3 || cards.first.isMan) return false;
+  if (cards.length != 3 || cards.first.isPrinted) return false;
   return cards[0] == cards[1] && cards[1] == cards[2];
 }
 
@@ -17,8 +17,42 @@ bool isOpeningTunnella(List<PlayingCard> cards) =>
 /// Man cards never pair: they're dead until their holder sees the joker,
 /// and doublees are shown before that.
 bool isDoublee(List<PlayingCard> cards) {
-  if (cards.length != 2 || cards.first.isMan) return false;
+  if (cards.length != 2 || cards.first.isPrinted) return false;
   return cards[0] == cards[1];
+}
+
+/// A doublee that can be shown to see the joker: an [isDoublee], or the
+/// Superman paired with any other card.
+bool isShowDoublee(List<PlayingCard> cards) =>
+    isDoublee(cards) ||
+    (cards.length == 2 && cards.where((c) => c.isSuperman).length == 1);
+
+/// A pure set that can be shown to see the joker: an [isPureSequence], an
+/// [isTunnella], or either of those with the Superman standing in for one
+/// card ([isPureSetWithSuperman]).
+bool isShowPureSet(List<PlayingCard> cards) =>
+    isPureSequence(cards) || isTunnella(cards) || isPureSetWithSuperman(cards);
+
+/// The Superman plus natural cards that would be a pure sequence or a
+/// tunnella if the Superman were the one card missing, such as
+/// 5♥ Superman 7♥, or K♠ K♠ Superman.
+bool isPureSetWithSuperman(List<PlayingCard> cards) {
+  final naturals = [
+    for (final card in cards)
+      if (!card.isSuperman) card,
+  ];
+  if (cards.length < 3 ||
+      cards.length > Rank.values.length ||
+      naturals.length != cards.length - 1 ||
+      naturals.any((c) => c.isPrinted)) {
+    return false;
+  }
+  if (cards.length == 3 && naturals[0] == naturals[1]) return true;
+
+  final suit = naturals.first.suit;
+  if (!naturals.every((c) => c.suit == suit)) return false;
+  return _fitsInRun([for (final c in naturals) c.rank!.order], cards.length) ||
+      _fitsInRun(naturals.map(_aceLowOrder).toList(), cards.length);
 }
 
 /// Every separate [isOpeningTunnella] in [cards]: one for each 3 copies of
@@ -36,7 +70,7 @@ List<List<PlayingCard>> findTunnellas(List<PlayingCard> cards) {
 
 /// A trial is 3 cards of the same rank across 3 strictly different suits.
 bool isTrial(List<PlayingCard> cards) {
-  if (cards.length != 3 || cards.any((c) => c.isMan)) return false;
+  if (cards.length != 3 || cards.any((c) => c.isPrinted)) return false;
 
   final rank = cards.first.rank;
   if (!cards.every((c) => c.rank == rank)) return false;
@@ -49,7 +83,7 @@ bool isTrial(List<PlayingCard> cards) {
 /// involved. Ace can act as high (Q-K-A) or low (A-2-3), but never wraps
 /// (K-A-2 is not valid either way), so the longest possible run is 13 cards.
 bool isPureSequence(List<PlayingCard> cards) {
-  if (cards.length < 3 || cards.any((c) => c.isMan)) return false;
+  if (cards.length < 3 || cards.any((c) => c.isPrinted)) return false;
 
   final suit = cards.first.suit;
   if (!cards.every((c) => c.suit == suit)) return false;

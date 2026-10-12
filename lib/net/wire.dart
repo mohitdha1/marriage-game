@@ -253,7 +253,7 @@ class MoveShow extends MoveMessage {
 }
 
 /// Picks the tiplu again at [position] in the stock, after the first pick
-/// was a man card.
+/// was a printed joker.
 class MovePickTiplu extends MoveMessage {
   const MovePickTiplu(this.position);
 
@@ -273,14 +273,18 @@ class MoveWin extends MoveMessage {
   Json toJson() => {'type': 'win', 'card': cardToJson(card)};
 }
 
-// Cards are written as "rank.suit", such as "queen.diamonds", and a man
-// card as "man".
+// Cards are written as "rank.suit", such as "queen.diamonds", a man card
+// as "man", and the Superman as "superman".
 
-String cardToJson(PlayingCard card) =>
-    card.isMan ? 'man' : '${card.rank!.name}.${card.suit!.name}';
+String cardToJson(PlayingCard card) => card.isSuperman
+    ? 'superman'
+    : card.isMan
+    ? 'man'
+    : '${card.rank!.name}.${card.suit!.name}';
 
 PlayingCard cardFromJson(Object? json) {
   if (json == 'man') return const PlayingCard.man();
+  if (json == 'superman') return const PlayingCard.superman();
   final [rank, suit] = (json! as String).split('.');
   return PlayingCard(Suit.values.byName(suit), Rank.values.byName(rank));
 }
@@ -480,6 +484,8 @@ Json _maalToJson(MaalBreakdown maal) => {
   'jhiplu': maal.jhiplu,
   'poplu': maal.poplu,
   'alter': maal.alter,
+  'man': maal.man,
+  'superman': maal.superman,
 };
 
 MaalBreakdown _maalFromJson(Json json) => MaalBreakdown(
@@ -490,6 +496,8 @@ MaalBreakdown _maalFromJson(Json json) => MaalBreakdown(
   jhiplu: json['jhiplu']! as int,
   poplu: json['poplu']! as int,
   alter: json['alter']! as int,
+  man: json['man']! as int,
+  superman: json['superman']! as int,
 );
 
 Json _roundScoreToJson(RoundScore score) => {

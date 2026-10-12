@@ -70,7 +70,7 @@ class TableMemory {
     for (final taken in _takenByNext) {
       if (taken == card) {
         score += 2;
-      } else if (taken.isMan || card.isMan) {
+      } else if (taken.isPrinted || card.isPrinted) {
         continue;
       } else if (taken.suit == card.suit) {
         final gap = rankGap(taken.rank!, card.rank!);

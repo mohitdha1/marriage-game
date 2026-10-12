@@ -28,12 +28,12 @@ void main() {
     expect(picks, [3]);
   });
 
-  testWidgets('after a man card, it says so and cannot be cancelled', (
+  testWidgets('after a printed joker, it says so and cannot be cancelled', (
     tester,
   ) async {
     await pumpPicker(tester, again: true);
 
-    expect(find.textContaining('That was a man card'), findsOneWidget);
+    expect(find.textContaining('kept aside as your maal'), findsOneWidget);
     expect(find.text('Cancel'), findsNothing);
   });
 }

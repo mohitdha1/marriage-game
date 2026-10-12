@@ -26,7 +26,8 @@ class SeatView {
   final bool hasSeenJoker;
 
   /// Sets this player has laid face up: opening tunnellas, then the sets
-  /// shown to see the joker, then each man card they kept aside on its own.
+  /// shown to see the joker, then each printed joker they kept aside on its
+  /// own.
   final List<List<PlayingCard>> laidDown;
 
   /// The avatar's background colour as 0xAARRGGBB, if this player has one.
@@ -128,8 +129,8 @@ class TableView {
   /// Whether anyone has picked the tiplu yet.
   final bool isJokerChosen;
 
-  /// Whether the human player picked a man card as the tiplu and must pick
-  /// again.
+  /// Whether the human player picked a printed joker as the tiplu and must
+  /// pick again.
   final bool youMustPickTiplu;
 
   /// The jokers, once the human player has seen them; otherwise `null`.

@@ -133,6 +133,17 @@ void main() {
       expect(find.bySemanticsLabel('Man'), findsOneWidget);
     });
 
+    testWidgets('the Superman shows S in both corners and a bolt', (
+      tester,
+    ) async {
+      await pumpFace(tester, const PlayingCard.superman());
+
+      expect(find.text('S'), findsNWidgets(2));
+      expect(find.byKey(const Key('superman-art')), findsOneWidget);
+      expect(find.byKey(const Key('man-art')), findsNothing);
+      expect(find.bySemanticsLabel('Superman'), findsOneWidget);
+    });
+
     testWidgets('screen readers hear the card once, by name', (tester) async {
       await pumpFace(tester, const PlayingCard(Suit.diamonds, Rank.ten));
 

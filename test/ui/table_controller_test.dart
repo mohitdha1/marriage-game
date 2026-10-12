@@ -832,6 +832,20 @@ void main() {
       );
     });
 
+    test('the Superman costs the penalty even before the joker is seen', () {
+      const superman = PlayingCard.superman();
+      final container = tableWith(
+        yourHand: [
+          for (final card in yourCards) card == sevenOfClubs ? superman : card,
+        ],
+      )..controller.draw(DrawSource.stock);
+
+      expect(
+        container.controller.discardCostsPenalty(container.idOf(superman)),
+        isTrue,
+      );
+    });
+
     test('nothing costs a penalty when the house rule is off', () {
       final container = seenTheJoker(
         config: GameConfig(playerCount: 2, jokerDiscardPenaltyEnabled: false),

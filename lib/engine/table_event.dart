@@ -39,7 +39,7 @@ class ShowedSets extends TableEvent {
   final List<List<PlayingCard>> sets;
 }
 
-/// [seat] picked [card], a man card, as the tiplu, and kept it aside as
+/// [seat] picked [card], a printed joker, as the tiplu, and kept it aside as
 /// maal; they pick again.
 class KeptAside extends TableEvent {
   const KeptAside(super.seat, this.card);

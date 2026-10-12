@@ -254,7 +254,9 @@ class _HandFanState extends State<HandFan> {
                     handCard: cards[i],
                     width: cardWidth,
                     selected: selected.contains(cards[i].id),
-                    wild: widget.jokers?.isWild(cards[i].card) ?? false,
+                    wild:
+                        cards[i].card.isSuperman ||
+                        (widget.jokers?.isWild(cards[i].card) ?? false),
                     groupColor: switch (groupOfCard(cards[i])) {
                       null => null,
                       final g =>

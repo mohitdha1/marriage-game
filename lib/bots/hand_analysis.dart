@@ -6,9 +6,9 @@ import '../engine/joker.dart';
 /// How likely [card] is to end up in a set alongside [others]. Identical
 /// copies and close same-suit cards always help; same-rank cards only help
 /// once the joker is seen, because trials don't count toward the show.
-/// Wild cards are worth keeping above everything else. A man card, dead
-/// until the joker is seen, still beats a loose card: it becomes wild and
-/// is maal.
+/// Wild cards, the Superman included, are worth keeping above everything
+/// else. A man card, dead until the joker is seen, still beats a loose
+/// card: it becomes wild and is maal.
 ///
 /// [stillAvailable], when given, says how many more copies of a card could
 /// still turn up. Partners that can no longer be completed count for less,
@@ -20,12 +20,14 @@ int usefulness(
   int Function(PlayingCard card)? stillAvailable,
   int pairBonus = 0,
 }) {
-  if (jokers != null && jokers.isWild(card)) return 100;
+  if (card.isSuperman || (jokers != null && jokers.isWild(card))) {
+    return 100;
+  }
   if (card.isMan) return _manBeforeSeeing;
 
   var score = 0;
   for (final other in others) {
-    if (other.isMan) continue;
+    if (other.isPrinted) continue;
     if (other == card) {
       score += 2 + pairBonus;
     } else if (other.suit == card.suit) {

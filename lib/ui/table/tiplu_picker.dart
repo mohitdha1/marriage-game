@@ -4,7 +4,7 @@ import 'card_view.dart';
 
 /// Shown when the human player is the first to show: the stock is spread out
 /// face down, and they tap any card to make it the tiplu. [again] says
-/// their last pick was a man card, kept aside; there's no cancelling then,
+/// their last pick was a printed joker, kept aside; there's no cancelling then,
 /// since the sets are already shown.
 class TipluPicker extends StatelessWidget {
   const TipluPicker({
@@ -34,8 +34,8 @@ class TipluPicker extends StatelessWidget {
             children: [
               Text(
                 again
-                    ? 'That was a man card, kept aside as your maal. Pick '
-                          'another card to be the joker.'
+                    ? 'That card can\'t be the joker, so it\'s kept aside '
+                          'as your maal. Pick another card to be the joker.'
                     : 'You are the first to show. Pick any card from the '
                           'stock to be the joker.',
                 key: const Key('tiplu-picker-title'),

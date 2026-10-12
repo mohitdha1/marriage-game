@@ -49,36 +49,59 @@ enum Rank {
 /// logic (sequences, trials, tunnella) only ever cares about suit+rank, never
 /// which physical copy is which.
 ///
-/// A man card ([PlayingCard.man]) is a printed joker with no suit or rank:
-/// dead until its holder sees the joker, then wild. All man cards are equal.
+/// Two kinds of printed joker have no suit or rank ([isPrinted]):
+///
+/// * a man card ([PlayingCard.man]): dead until its holder sees the joker,
+///   then wild. All man cards are equal.
+/// * the Superman ([PlayingCard.superman]): always wild, and can fill one
+///   card of a set shown to see the joker.
 class PlayingCard {
-  const PlayingCard(Suit this.suit, Rank this.rank);
+  const PlayingCard(Suit this.suit, Rank this.rank) : isSuperman = false;
 
   /// A printed joker, added to the shoe when man cards are on.
-  const PlayingCard.man() : suit = null, rank = null;
+  const PlayingCard.man() : suit = null, rank = null, isSuperman = false;
 
-  /// `null` only for a man card.
+  /// The one extra printed joker, added to the shoe when the Superman card
+  /// is on.
+  const PlayingCard.superman() : suit = null, rank = null, isSuperman = true;
+
+  /// `null` only for a printed joker.
   final Suit? suit;
 
-  /// `null` only for a man card.
+  /// `null` only for a printed joker.
   final Rank? rank;
 
-  bool get isMan => rank == null;
+  final bool isSuperman;
+
+  /// Whether this is a printed joker, with no suit or rank.
+  bool get isPrinted => rank == null;
+
+  bool get isMan => isPrinted && !isSuperman;
 
   @override
   bool operator ==(Object other) =>
-      other is PlayingCard && other.suit == suit && other.rank == rank;
+      other is PlayingCard &&
+      other.suit == suit &&
+      other.rank == rank &&
+      other.isSuperman == isSuperman;
 
   @override
-  int get hashCode => Object.hash(suit, rank);
+  int get hashCode => Object.hash(suit, rank, isSuperman);
 
   @override
-  String toString() => isMan ? 'Man' : '${rank!.label}${suit!.symbol}';
+  String toString() => isSuperman
+      ? 'Superman'
+      : isMan
+      ? 'Man'
+      : '${rank!.label}${suit!.symbol}';
 }
 
 /// A number for [card] that is the same for equal cards and different for
-/// unequal ones: 0–51 for the natural cards, suit by suit, and 52 for a man
-/// card.
-int cardIndex(PlayingCard card) => card.isMan
-    ? Suit.values.length * Rank.values.length
-    : card.suit!.index * Rank.values.length + card.rank!.index;
+/// unequal ones: 0–51 for the natural cards, suit by suit, 52 for a man
+/// card and 53 for the Superman.
+int cardIndex(PlayingCard card) {
+  const naturals = 52;
+  if (card.isSuperman) return naturals + 1;
+  if (card.isMan) return naturals;
+  return card.suit!.index * Rank.values.length + card.rank!.index;
+}

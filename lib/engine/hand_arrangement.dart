@@ -17,7 +17,7 @@ Map<PlayingCard, int> countCopies(Iterable<PlayingCard> cards) {
 }
 
 /// Every way to pick [count] separate pure sets (3-card pure sequences or
-/// tunnellas) from [cards]. Empty if there aren't that many.
+/// tunnellas, the Superman standing in for a card of one) from [cards]. Empty if there aren't that many.
 List<List<List<PlayingCard>>> allPureSetChoices(
   List<PlayingCard> cards,
   int count,
@@ -84,18 +84,33 @@ List<List<PlayingCard>>? findDoublees(List<PlayingCard> cards, int count) {
 /// How many separate doublees (pairs of identical cards) [cards] holds.
 int countDoublees(List<PlayingCard> cards) => _allDoublees(cards).length;
 
-/// Man cards never pair (see [isDoublee]).
-List<List<PlayingCard>> _allDoublees(List<PlayingCard> cards) => [
-  for (final MapEntry(key: card, value: n) in countCopies(cards).entries)
-    if (!card.isMan)
-      for (var i = 0; i < n ~/ 2; i++) [card, card],
-];
+/// Man cards never pair (see [isDoublee]). The Superman pairs with a card
+/// left over from the real pairs, if there is one (see [isShowDoublee]).
+List<List<PlayingCard>> _allDoublees(List<PlayingCard> cards) {
+  final copies = countCopies(cards);
+  final pairs = [
+    for (final MapEntry(key: card, value: n) in copies.entries)
+      if (!card.isPrinted)
+        for (var i = 0; i < n ~/ 2; i++) [card, card],
+  ];
+  if (copies.containsKey(const PlayingCard.superman())) {
+    final leftovers = [
+      for (final MapEntry(key: card, value: n) in copies.entries)
+        if (card.isMan || (!card.isPrinted && n.isOdd)) card,
+    ]..sort((a, b) => a.isMan == b.isMan ? 0 : (a.isMan ? 1 : -1));
+    if (leftovers.isNotEmpty) {
+      pairs.add([const PlayingCard.superman(), leftovers.first]);
+    }
+  }
+  return pairs;
+}
 
 /// The best way to arrange [cards] into separate sets: the one covering the
 /// most cards, and of those, the one with the most sets.
 ///
-/// Before the joker is seen ([jokers] is `null`) only pure sequences and
-/// tunnellas count, since those are all a player can use. Afterwards, any
+/// Before the joker is seen ([jokers] is `null`) only the pure sets a show
+/// accepts count (see [isShowPureSet]), since those are all a player can
+/// use. Afterwards, any
 /// set that can finish a hand counts, jokers included (see
 /// [isFinishingSet]). Sets longer than [maxSetSize] aren't tried, which keeps
 /// the search fast and loses nothing: a long run still counts through its
@@ -105,10 +120,10 @@ List<List<PlayingCard>> bestArrangement(
   Jokers? jokers, {
   int maxSetSize = 5,
 }) {
-  bool isSet(List<PlayingCard> set) => jokers == null
-      ? isPureSequence(set) || isTunnella(set)
-      : isFinishingSet(set, jokers);
-  bool isWild(PlayingCard card) => jokers?.isWild(card) ?? false;
+  bool isSet(List<PlayingCard> set) =>
+      jokers == null ? isShowPureSet(set) : isFinishingSet(set, jokers);
+  bool isWild(PlayingCard card) =>
+      card.isSuperman || (jokers?.isWild(card) ?? false);
   int covered(List<List<PlayingCard>> sets) =>
       sets.fold(0, (total, set) => total + set.length);
   bool better(List<List<PlayingCard>> a, List<List<PlayingCard>> b) {
@@ -276,10 +291,18 @@ HandProgress handProgress(PlayerHand hand, Jokers? jokers) {
 }
 
 /// Every distinct 3-card pure sequence and tunnella that [cards] could
-/// make, ignoring overlaps between them.
+/// make, ignoring overlaps between them; with the Superman, also each one
+/// it could complete.
 List<List<PlayingCard>> _pureSetCandidates(List<PlayingCard> cards) {
   final copies = countCopies(cards);
-  final sets = <List<PlayingCard>>[...findTunnellas(cards).where(isTunnella)];
+  const superman = PlayingCard.superman();
+  final hasSuperman = copies.containsKey(superman);
+  final sets = <List<PlayingCard>>[
+    ...findTunnellas(cards).where(isTunnella),
+    if (hasSuperman)
+      for (final MapEntry(key: card, value: n) in copies.entries)
+        if (!card.isPrinted && n >= 2) [card, card, superman],
+  ];
   for (final suit in Suit.values) {
     // Ace low (A-2-3) first, then every run up to Q-K-A.
     final runs = [
@@ -289,8 +312,13 @@ List<List<PlayingCard>> _pureSetCandidates(List<PlayingCard> cards) {
     ];
     for (final ranks in runs) {
       final run = [for (final rank in ranks) PlayingCard(suit, rank)];
-      if (run.every(copies.containsKey) && isPureSequence(run)) {
+      final missing = run.where((c) => !copies.containsKey(c)).toList();
+      if (missing.isEmpty) {
         sets.add(run);
+      } else if (hasSuperman && missing.length == 1) {
+        sets.add([
+          for (final card in run) card == missing.single ? superman : card,
+        ]);
       }
     }
   }
