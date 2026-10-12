@@ -705,6 +705,34 @@ void main() {
       expect(score.penalties, [15, 0]);
       expect(score.net, [-18, 18]);
     });
+
+    test('scores alters as ordinary jokers when they are not maal', () {
+      // Seat 0 keeps an alter (7♦) in place of 2♦ and wins with it in a
+      // trial: K♠ K♦ 7♦.
+      Round wonWith(GameConfig config) {
+        final round = table(
+          config: config,
+          seat0: [
+            for (final card in seat0Cards)
+              card == c(Suit.clubs, Rank.seven)
+                  ? c(Suit.diamonds, Rank.seven)
+                  : card,
+          ],
+        )..draw(DrawSource.stock);
+        return round
+          ..showPureSets([runA, runB, runC], tipluPosition: 1)
+          ..declareWin(c(Suit.diamonds, Rank.two));
+      }
+
+      final withAlter = wonWith(GameConfig(playerCount: 2)).score();
+      final without = wonWith(
+        GameConfig(playerCount: 2, alterIsMaal: false),
+      ).score();
+
+      // The poplu (8♥) is 2 either way; the alter adds 5 only when on.
+      expect(withAlter.maal.first.total, 2 + 5);
+      expect(without.maal.first.total, 2);
+    });
   });
 
   group('Round.events', () {

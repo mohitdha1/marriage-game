@@ -23,6 +23,7 @@ class GameConfig {
     this.mode = GameMode.standard,
     this.manCardsEnabled = false,
     this.supermanCardEnabled = false,
+    this.alterIsMaal = true,
     this.jokerDiscardPenaltyEnabled = true,
   }) {
     if (playerCount < 2 || playerCount > 5) {
@@ -44,6 +45,11 @@ class GameConfig {
 
   /// House rule: one Superman ([PlayingCard.superman]) in the shoe.
   final bool supermanCardEnabled;
+
+  /// House rule: the alter is maal. When off, it is scored exactly like an
+  /// ordinary joker: still wild, but worth nothing loose, and an opening
+  /// tunnella of alters is worth [ScoringTable.ordinaryTunnella].
+  final bool alterIsMaal;
 
   /// House rule: a player who has seen the joker and then discards a wild
   /// card pays [ScoringTable.jokerDiscardPenalty] to the round's winner.

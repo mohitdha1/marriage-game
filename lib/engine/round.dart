@@ -290,6 +290,7 @@ class Round {
       jokers: _jokers!,
       jokerDiscards: _jokerDiscards,
       mode: config.mode,
+      alterIsMaal: config.alterIsMaal,
     );
   }
 

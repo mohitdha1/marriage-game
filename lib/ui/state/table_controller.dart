@@ -598,6 +598,7 @@ class TableController extends TableNotifier {
           handProgress: handProgress(
             _round.hands[seat],
             _round.jokersFor(seat),
+            alterIsMaal: _round.config.alterIsMaal,
           ),
           winningCards: _winningCardsFor(seat),
           roundNumber: _roundNumber,
@@ -767,8 +768,11 @@ class TableController extends TableNotifier {
   List<HandCard> _heldFrom(List<HandCard> shown) =>
       reconcile(_round.hands[_viewer].cards, shown);
 
-  HandProgress _handProgress() =>
-      handProgress(_round.hands[_viewer], _round.jokersFor(_viewer));
+  HandProgress _handProgress() => handProgress(
+    _round.hands[_viewer],
+    _round.jokersFor(_viewer),
+    alterIsMaal: _round.config.alterIsMaal,
+  );
 
   TableView _snapshot() => _viewFor(_viewer);
 

@@ -73,6 +73,10 @@ PlayerHand unseenHand({
 
 int maalOf(PlayerHand hand) => scoreMaal(hand, jokers).total;
 
+/// A hand that opened with a tunnella of [card] and has seen the joker.
+PlayerHand openedWith(PlayingCard card) =>
+    seenHand(opening: [tunnellaOf(card)], shown: [spadesRun, clubsRun]);
+
 void main() {
   group('scoreMaal: who scores', () {
     test('a player who has not seen the joker scores nothing', () {
@@ -142,9 +146,6 @@ void main() {
   });
 
   group('scoreMaal: opening tunnellas', () {
-    PlayerHand openedWith(PlayingCard card) =>
-        seenHand(opening: [tunnellaOf(card)], shown: [spadesRun, clubsRun]);
-
     test('alter tunnella = 30, and its cards are not counted again', () {
       final breakdown = scoreMaal(openedWith(alter), jokers);
 
@@ -162,8 +163,8 @@ void main() {
       expect(maalOf(openedWith(c(Suit.spades, Rank.king))), 5);
     });
 
-    test('ordinary-joker tunnella = 5, like a plain one', () {
-      expect(maalOf(openedWith(ordinary)), 5);
+    test('ordinary-joker tunnella = 10', () {
+      expect(maalOf(openedWith(ordinary)), 10);
     });
 
     test('a tunnella shown later, not at the opening, gets no bonus', () {
@@ -511,6 +512,55 @@ void main() {
       );
 
       expect(result.kidnapped, [0, 0, 10, 0, 3]);
+      expect(result.net.fold(0, (sum, n) => sum + n), 0);
+    });
+  });
+
+  group('Alter as maal turned off', () {
+    int maalWithoutAlter(PlayerHand hand) =>
+        scoreMaal(hand, jokers, alterIsMaal: false).total;
+
+    test('is on by default', () {
+      expect(GameConfig().alterIsMaal, isTrue);
+      expect(maalOf(seenHand(held: [alter])), 5);
+    });
+
+    test('loose alters are worth nothing, like ordinary jokers', () {
+      expect(maalWithoutAlter(seenHand(held: [alter])), 0);
+      expect(maalWithoutAlter(seenHand(held: [alter, alter])), 0);
+    });
+
+    test('an opening tunnella of alters scores as an ordinary one: 10', () {
+      expect(maalWithoutAlter(openedWith(alter)), 10);
+      expect(maalWithoutAlter(openedWith(ordinary)), 10);
+    });
+
+    test('the rest of the maal is unchanged', () {
+      final hand = seenHand(held: [alter, tiplu, jhiplu, jhiplu]);
+
+      expect(maalWithoutAlter(hand), 3 + 5);
+      expect(maalWithoutAlter(openedWith(jhiplu)), 15);
+    });
+
+    test('alters are still wild', () {
+      expect(jokers.isWild(alter), isTrue);
+    });
+
+    test('scoreRound and Kidnap leave the alter out, and stay zero-sum', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(held: [alter, tiplu]),
+          seenHand(held: [alter, alter]),
+          unseenHand(held: [alter, tiplu]),
+        ],
+        winner: 0,
+        jokers: jokers,
+        mode: GameMode.kidnap,
+        alterIsMaal: false,
+      );
+
+      expect(result.maal.map((m) => m.total), [3, 0, 0]);
+      expect(result.kidnapped, [0, 0, 3]);
       expect(result.net.fold(0, (sum, n) => sum + n), 0);
     });
   });

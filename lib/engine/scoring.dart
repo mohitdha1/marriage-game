@@ -23,6 +23,7 @@ abstract final class ScoringTable {
   /// Opening-show tunnellas.
   static const alterTunnella = 30;
   static const jhipluOrPopluTunnella = 15;
+  static const ordinaryTunnella = 10;
   static const plainTunnella = 5;
   static const manTunnella = 35;
 
@@ -83,24 +84,40 @@ class MaalBreakdown {
 
 /// Works out a player's maal points. Players who haven't seen the joker score
 /// nothing at all, opening tunnellas included.
-MaalBreakdown scoreMaal(PlayerHand hand, Jokers jokers) => hand.hasSeenJoker
-    ? _maalOf(hand, jokers, withTunnellas: true)
+///
+/// With [alterIsMaal] off (see [GameConfig.alterIsMaal]), alters score as
+/// ordinary jokers.
+MaalBreakdown scoreMaal(
+  PlayerHand hand,
+  Jokers jokers, {
+  bool alterIsMaal = true,
+}) => hand.hasSeenJoker
+    ? _maalOf(hand, jokers, withTunnellas: true, alterIsMaal: alterIsMaal)
     : const MaalBreakdown();
 
 /// The maal a player who hasn't seen the joker loses to the winner in
 /// [GameMode.kidnap]: what their cards would score had they seen it, leaving
-/// out their opening tunnellas.
-MaalBreakdown kidnappedMaal(PlayerHand hand, Jokers jokers) =>
-    _maalOf(hand, jokers, withTunnellas: false);
+/// out their opening tunnellas. [alterIsMaal] works as in [scoreMaal].
+MaalBreakdown kidnappedMaal(
+  PlayerHand hand,
+  Jokers jokers, {
+  bool alterIsMaal = true,
+}) => _maalOf(hand, jokers, withTunnellas: false, alterIsMaal: alterIsMaal);
 
 MaalBreakdown _maalOf(
   PlayerHand hand,
   Jokers jokers, {
   required bool withTunnellas,
+  required bool alterIsMaal,
 }) {
+  JokerKind? kindOf(PlayingCard card) => switch (jokers.kindOf(card)) {
+    JokerKind.alter when !alterIsMaal => JokerKind.ordinary,
+    final kind => kind,
+  };
+
   var tunnellaPoints = 0;
   for (final tunnella in withTunnellas ? hand.openingTunnellas : const []) {
-    tunnellaPoints += switch (jokers.kindOf(tunnella.first)) {
+    tunnellaPoints += switch (kindOf(tunnella.first)) {
       JokerKind.alter => ScoringTable.alterTunnella,
       JokerKind.jhiplu || JokerKind.poplu => ScoringTable.jhipluOrPopluTunnella,
       JokerKind.tiplu => throw StateError(
@@ -110,7 +127,8 @@ MaalBreakdown _maalOf(
       JokerKind.superman => throw StateError(
         'A Superman tunnella is impossible: there is only one',
       ),
-      JokerKind.ordinary || null => ScoringTable.plainTunnella,
+      JokerKind.ordinary => ScoringTable.ordinaryTunnella,
+      null => ScoringTable.plainTunnella,
     };
   }
 
@@ -125,7 +143,7 @@ MaalBreakdown _maalOf(
   final tipluCount = countOf(jokers.tiplu);
   final jhipluCount = countOf(jokers.jhiplu);
   final popluCount = countOf(jokers.poplu);
-  final alterCount = countOf(jokers.alter);
+  final alterCount = alterIsMaal ? countOf(jokers.alter) : 0;
   final manCount = countOf(const PlayingCard.man());
   final hasSuperman = cards.any((c) => c.isSuperman);
 
@@ -264,6 +282,7 @@ RoundScore scoreRound({
   required Jokers jokers,
   List<int>? jokerDiscards,
   GameMode mode = GameMode.standard,
+  bool alterIsMaal = true,
 }) {
   if (jokerDiscards != null && jokerDiscards.length != hands.length) {
     throw ArgumentError.value(
@@ -283,11 +302,13 @@ RoundScore scoreRound({
     );
   }
 
-  final maal = [for (final hand in hands) scoreMaal(hand, jokers)];
+  final maal = [
+    for (final hand in hands) scoreMaal(hand, jokers, alterIsMaal: alterIsMaal),
+  ];
   final kidnapped = [
     for (final hand in hands)
       mode == GameMode.kidnap && !hand.hasSeenJoker
-          ? kidnappedMaal(hand, jokers).total
+          ? kidnappedMaal(hand, jokers, alterIsMaal: alterIsMaal).total
           : 0,
   ];
   final taken = kidnapped.fold(0, (sum, k) => sum + k);

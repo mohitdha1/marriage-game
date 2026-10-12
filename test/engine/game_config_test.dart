@@ -12,6 +12,7 @@ void main() {
       expect(config.mode, GameMode.standard);
       expect(config.manCardsEnabled, isFalse);
       expect(config.supermanCardEnabled, isFalse);
+      expect(config.alterIsMaal, isTrue);
       expect(config.jokerDiscardPenaltyEnabled, isTrue);
     });
 
@@ -23,6 +24,7 @@ void main() {
         mode: GameMode.kidnap,
         manCardsEnabled: true,
         supermanCardEnabled: true,
+        alterIsMaal: false,
         jokerDiscardPenaltyEnabled: false,
       );
 
@@ -32,6 +34,7 @@ void main() {
       expect(config.mode, GameMode.kidnap);
       expect(config.manCardsEnabled, isTrue);
       expect(config.supermanCardEnabled, isTrue);
+      expect(config.alterIsMaal, isFalse);
       expect(config.jokerDiscardPenaltyEnabled, isFalse);
     });
   });

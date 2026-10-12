@@ -257,8 +257,12 @@ class DubleeProgress extends HandProgress {
 }
 
 /// How far [hand] has come, given the round's [jokers] (`null` until the
-/// player has seen them).
-HandProgress handProgress(PlayerHand hand, Jokers? jokers) {
+/// player has seen them). [alterIsMaal] works as in [scoreMaal].
+HandProgress handProgress(
+  PlayerHand hand,
+  Jokers? jokers, {
+  bool alterIsMaal = true,
+}) {
   final cards = hand.cards;
   if (jokers == null || !hand.hasSeenJoker) {
     return ShowProgress(
@@ -268,7 +272,7 @@ HandProgress handProgress(PlayerHand hand, Jokers? jokers) {
     );
   }
 
-  final maal = scoreMaal(hand, jokers).total;
+  final maal = scoreMaal(hand, jokers, alterIsMaal: alterIsMaal).total;
   if (hand.showKind == ShowKind.doublees) {
     return DubleeProgress(
       doublees:
