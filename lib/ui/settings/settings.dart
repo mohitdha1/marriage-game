@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../bots/bot_player.dart';
+import '../../engine/game_config.dart';
 import '../theme/table_theme.dart';
 import 'preferences.dart';
 
@@ -17,6 +18,7 @@ class Settings {
     this.botDifficulty = BotDifficulty.medium,
     this.stake = 5,
     this.jokerPenalty = true,
+    this.mode = GameMode.standard,
   });
 
   /// The fewest and most players at a table, the human player included.
@@ -67,6 +69,9 @@ class Settings {
   /// seeing it cost a penalty.
   final bool jokerPenalty;
 
+  /// The game mode last chosen, which the games this device starts play.
+  final GameMode mode;
+
   Settings copyWith({
     bool? sound,
     bool? vibration,
@@ -78,6 +83,7 @@ class Settings {
     BotDifficulty? botDifficulty,
     int? stake,
     bool? jokerPenalty,
+    GameMode? mode,
   }) => Settings(
     sound: sound ?? this.sound,
     vibration: vibration ?? this.vibration,
@@ -89,6 +95,7 @@ class Settings {
     botDifficulty: botDifficulty ?? this.botDifficulty,
     stake: stake ?? this.stake,
     jokerPenalty: jokerPenalty ?? this.jokerPenalty,
+    mode: mode ?? this.mode,
   );
 }
 
@@ -108,6 +115,7 @@ class SettingsController extends Notifier<Settings> {
   static const _botDifficulty = 'lobby.botDifficulty';
   static const _stake = 'lobby.stake';
   static const _jokerPenalty = 'rules.jokerPenalty';
+  static const _mode = 'rules.mode';
 
   PreferencesStore get _store => ref.read(preferencesProvider);
 
@@ -135,6 +143,8 @@ class SettingsController extends Notifier<Settings> {
           defaults.botDifficulty,
       stake: store.getInt(_stake) ?? defaults.stake,
       jokerPenalty: store.getBool(_jokerPenalty) ?? defaults.jokerPenalty,
+      mode:
+          GameMode.values.asNameMap()[store.getString(_mode)] ?? defaults.mode,
     );
   }
 
@@ -188,6 +198,12 @@ class SettingsController extends Notifier<Settings> {
   void setJokerPenalty(bool on) {
     state = state.copyWith(jokerPenalty: on);
     _store.setBool(_jokerPenalty, on);
+  }
+
+  /// Chooses the game mode, from the next game.
+  void setMode(GameMode mode) {
+    state = state.copyWith(mode: mode);
+    _store.setString(_mode, mode.name);
   }
 
   /// Remembers the stake table chosen for single player.

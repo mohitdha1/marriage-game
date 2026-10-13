@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../settings/settings.dart';
+import 'mode_picker.dart';
 
 /// Opens the setup for a game passed round this device: how many people
 /// play and their names, in seat order. Completes with the names when the
@@ -120,6 +121,8 @@ class _PassAndPlayState extends ConsumerState<_PassAndPlayDialog> {
                     ),
                 ],
               ),
+              const SizedBox(height: 12),
+              const Center(child: ModePicker()),
               const SizedBox(height: 10),
               Text(
                 'Playing on separate phones over Wi-Fi is coming soon.',

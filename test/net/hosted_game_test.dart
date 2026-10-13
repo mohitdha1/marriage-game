@@ -65,6 +65,7 @@ class Game {
     List<List<PlayingCard>>? hands,
     List<PlayingCard>? stock,
     Stream<Rejoin>? rejoins,
+    GameMode mode = GameMode.standard,
   }) async {
     final (hostEnd, guestEnd) = InMemoryConnection.pair();
     final dealt = hands ?? [mohitsCards, binasCards];
@@ -74,7 +75,7 @@ class Game {
         botThinkingTimeProvider.overrideWithValue(() => Duration.zero),
         roundFactoryProvider.overrideWithValue(
           (seat) => Round.fromCards(
-            config: GameConfig(playerCount: dealt.length),
+            config: GameConfig(playerCount: dealt.length, mode: mode),
             random: Random(0),
             hands: dealt,
             stock:
@@ -155,6 +156,13 @@ void main() {
     expect(view.opponents.single.name, 'Mohit');
     expect(game.guestState.seatNames, ['Mohit', 'Bina']);
     expect(game.hostState.view.opponents.single.name, 'Bina');
+  });
+
+  test('the joined device plays the host\'s mode', () async {
+    final game = await Game.start(mode: GameMode.kidnap);
+
+    expect(game.hostTable.mode, GameMode.kidnap);
+    expect(game.guestTable.mode, GameMode.kidnap);
   });
 
   test('turns pass both ways across the link', () async {

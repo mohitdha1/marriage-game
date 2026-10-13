@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/card.dart';
+import '../../engine/game_config.dart';
 import '../../engine/melds.dart';
 import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
@@ -170,4 +171,7 @@ class RemoteTableController extends TableNotifier {
 
   @override
   bool get jokerPenaltyEnabled => _last.jokerPenalty;
+
+  @override
+  GameMode get mode => _last.mode;
 }

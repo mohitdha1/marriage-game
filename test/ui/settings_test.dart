@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/settings/settings.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
@@ -33,6 +34,7 @@ void main() {
       expect(settings.vibration, isTrue);
       expect(settings.handHelper, isTrue);
       expect(settings.jokerPenalty, isTrue);
+      expect(settings.mode, GameMode.standard);
       expect(settings.playerName, 'Player');
       expect(settings.avatarColor, Settings.avatarColors.first);
     });
@@ -44,6 +46,7 @@ void main() {
         ..setVibration(false)
         ..setHandHelper(false)
         ..setJokerPenalty(false)
+        ..setMode(GameMode.kidnap)
         ..setPlayerName('  Mohit ')
         ..setAvatarColor(Settings.avatarColors[3]);
 
@@ -53,6 +56,7 @@ void main() {
       expect(reloaded.vibration, isFalse);
       expect(reloaded.handHelper, isFalse);
       expect(reloaded.jokerPenalty, isFalse);
+      expect(reloaded.mode, GameMode.kidnap);
       expect(reloaded.playerName, 'Mohit');
       expect(reloaded.avatarColor, Settings.avatarColors[3]);
     });

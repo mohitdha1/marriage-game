@@ -9,6 +9,7 @@ import '../theme/table_felt.dart';
 import '../theme/table_theme.dart';
 import 'game_setup.dart';
 import 'home_screen.dart';
+import 'mode_picker.dart';
 import 'player_data_provider.dart';
 import 'stake_tables_provider.dart';
 
@@ -23,7 +24,8 @@ String formatStake(int coins) {
 }
 
 /// The table Quick Play deals: the last one chosen, if the player can still
-/// join it, or else the highest below it they can, and five players.
+/// join it, or else the highest below it they can, and five players, in the
+/// mode last chosen.
 MatchSetup quickPlaySetupFor(
   StakeTables tables,
   Settings settings,
@@ -34,7 +36,7 @@ MatchSetup quickPlaySetupFor(
     if (tier.stake > settings.stake) break;
     if (tables.canJoin(tier, data)) table = tier;
   }
-  return MatchSetup.atTable(table);
+  return MatchSetup.atTable(table, mode: settings.mode);
 }
 
 /// Why [data]'s player can't sit down at [tier] yet, or `null` if they can.
@@ -53,7 +55,7 @@ String? whyNotJoin(StakeTables tables, StakeTable tier, PlayerData data) {
 
 /// Single player: a row of stake tables to choose from, each with its stake
 /// and minimum balance, and a lock with progress until it's unlocked; then
-/// how many play, and Play. [onPlay] starts the match.
+/// the mode, how many play, and Play, with a line on the mode beneath. [onPlay] starts the match.
 class StakeTablePickerScreen extends ConsumerWidget {
   const StakeTablePickerScreen({super.key, required this.onPlay});
 
@@ -126,32 +128,46 @@ class _Picker extends ConsumerWidget {
           onChoose: (tier) => controller.setStake(tier.stake),
         ),
         const Spacer(),
-        Text(
-          'Each point is worth ${formatCoins(chosen.stake)} coins · '
-          '${describeDifficulty(chosen.difficulty)}',
-          key: const Key('stake-summary'),
-          textAlign: TextAlign.center,
-          style: white,
+        // One line, shrinking to fit a narrow screen.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            'Each point is worth ${formatCoins(chosen.stake)} coins · '
+            '${describeDifficulty(chosen.difficulty)}',
+            key: const Key('stake-summary'),
+            maxLines: 1,
+            style: white,
+          ),
         ),
         const SizedBox(height: 10),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 6,
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.start,
+          spacing: 24,
+          runSpacing: 8,
           children: [
-            const Text('Players', style: white),
-            const SizedBox(width: 4),
-            for (
-              var count = Settings.minPlayers;
-              count <= Settings.maxPlayers;
-              count++
-            )
-              ChoiceChip(
-                key: Key('players-$count'),
-                label: Text('$count'),
-                showCheckmark: false,
-                selected: settings.playerCount == count,
-                onSelected: (_) => controller.setPlayerCount(count),
-              ),
+            const ModePicker(onDark: true, describe: false),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 6,
+              children: [
+                const Text('Players', style: white),
+                const SizedBox(width: 4),
+                for (
+                  var count = Settings.minPlayers;
+                  count <= Settings.maxPlayers;
+                  count++
+                )
+                  ChoiceChip(
+                    key: Key('players-$count'),
+                    label: Text('$count'),
+                    showCheckmark: false,
+                    visualDensity: VisualDensity.compact,
+                    selected: settings.playerCount == count,
+                    onSelected: (_) => controller.setPlayerCount(count),
+                  ),
+              ],
+            ),
           ],
         ),
         const SizedBox(height: 10),
@@ -165,7 +181,11 @@ class _Picker extends ConsumerWidget {
           onPressed: reason != null
               ? null
               : () => onPlay(
-                  MatchSetup.atTable(chosen, playerCount: settings.playerCount),
+                  MatchSetup.atTable(
+                    chosen,
+                    playerCount: settings.playerCount,
+                    mode: settings.mode,
+                  ),
                 ),
           icon: const Icon(Icons.play_arrow),
           label: const Text(
@@ -173,18 +193,22 @@ class _Picker extends ConsumerWidget {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
         ),
+        // Why the table is locked, or else what the chosen mode means.
         SizedBox(
           height: 24,
-          child: reason == null
-              ? null
-              : Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    reason,
-                    key: const Key('stake-locked-reason'),
-                    style: TextStyle(color: TableTheme.of(context).accent),
-                  ),
-                ),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: reason == null
+                  ? ModeDescription(mode: settings.mode, onDark: true)
+                  : Text(
+                      reason,
+                      key: const Key('stake-locked-reason'),
+                      style: TextStyle(color: TableTheme.of(context).accent),
+                    ),
+            ),
+          ),
         ),
         const Spacer(),
       ],

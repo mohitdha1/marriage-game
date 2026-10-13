@@ -145,6 +145,7 @@ void main() {
         ],
         totals: const [-7, 7],
         jokerPenalty: true,
+        mode: GameMode.murder,
       );
 
       expectRoundTrip(update);
@@ -165,6 +166,7 @@ void main() {
       expect(back.roundScores.single.maal.first.man, 5);
       expect(back.roundScores.single.maal.first.superman, 5);
       expect(back.roundScores.single.kidnapped, [0, 4]);
+      expect(back.mode, GameMode.murder);
     });
 
     test('every kind of hand progress', () {

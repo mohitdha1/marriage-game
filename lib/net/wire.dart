@@ -10,6 +10,7 @@
 library;
 
 import '../engine/card.dart';
+import '../engine/game_config.dart';
 import '../engine/hand_arrangement.dart';
 import '../engine/joker.dart';
 import '../engine/player_hand.dart';
@@ -136,6 +137,7 @@ class SeatUpdate extends WireMessage {
     required this.roundScores,
     required this.totals,
     required this.jokerPenalty,
+    this.mode = GameMode.standard,
     this.choosingOpening = false,
     this.match = 0,
     this.offline = const [],
@@ -153,6 +155,7 @@ class SeatUpdate extends WireMessage {
     ],
     totals: _ints(json['totals']),
     jokerPenalty: json['jokerPenalty']! as bool,
+    mode: GameMode.values.byName(json['mode']! as String),
     choosingOpening: json['choosingOpening']! as bool,
     match: json['match']! as int,
     offline: _ints(json['offline']),
@@ -171,6 +174,9 @@ class SeatUpdate extends WireMessage {
 
   /// Whether throwing away a joker after seeing it costs a penalty.
   final bool jokerPenalty;
+
+  /// How the rounds settle players who haven't seen the joker.
+  final GameMode mode;
 
   /// Whether the player was dealt more than 3 tunnellas and has to choose
   /// which to open with before play can start.
@@ -196,6 +202,7 @@ class SeatUpdate extends WireMessage {
     'scores': [for (final score in roundScores) _roundScoreToJson(score)],
     'totals': totals,
     'jokerPenalty': jokerPenalty,
+    'mode': mode.name,
     'choosingOpening': choosingOpening,
     'match': match,
     'offline': offline,

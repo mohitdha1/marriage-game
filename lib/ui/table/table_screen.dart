@@ -11,6 +11,7 @@ import '../../engine/round.dart';
 import '../../engine/scoring.dart';
 import '../../engine/table_event.dart';
 import '../guide/guide.dart';
+import '../home/game_setup.dart';
 import '../guide/table_guide.dart';
 import '../scoreboard/scoreboard_screen.dart';
 import '../settings/settings.dart';
@@ -453,6 +454,20 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                             key: const Key('table-centre'),
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              if (feltLabel(controller.mode, controller.stake)
+                                  case final label?) ...[
+                                Text(
+                                  label,
+                                  key: const Key('felt-label'),
+                                  style: const TextStyle(
+                                    color: Color(0x99FFFFFF),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 2,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                              ],
                               TableCenter(
                                 stockCount: table.stockCount,
                                 topDiscard: _discardsFlying > 0

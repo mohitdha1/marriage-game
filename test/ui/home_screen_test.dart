@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/data/stake_tables.dart';
+import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/engine/scoring.dart';
 import 'package:marriage_game/main.dart';
@@ -297,6 +298,54 @@ void main() {
         ),
         '4 bots · Hard · 25K table',
       );
+      expect(
+        describeSetup(const MatchSetup(stake: 5, mode: GameMode.kidnap)),
+        '4 bots · Medium · 5 table · Kidnap',
+      );
+    });
+
+    test('the felt names the mode and the stake', () {
+      expect(feltLabel(GameMode.kidnap, 1000), 'KIDNAP · 1K/PT');
+      expect(feltLabel(GameMode.standard, 5), 'STANDARD · 5/PT');
+      expect(feltLabel(GameMode.murder, null), 'MURDER');
+      expect(feltLabel(GameMode.standard, null), isNull);
+    });
+
+    test('every mode has a name and its own description', () {
+      expect(GameMode.values.map(modeName), ['Standard', 'Kidnap', 'Murder']);
+      expect(GameMode.values.map(describeMode).toSet(), hasLength(3));
+    });
+
+    testWidgets('Single Player plays the chosen mode, named on the felt and '
+        'on Quick Play', (tester) async {
+      final container = await pumpHome(tester);
+      await tester.tap(find.byKey(const Key('single-player')));
+      await tester.pumpAndSettle();
+      expect(find.text(describeMode(GameMode.standard)), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('mode-kidnap')));
+      await tester.pumpAndSettle();
+      expect(container.read(settingsProvider).mode, GameMode.kidnap);
+      expect(find.text(describeMode(GameMode.kidnap)), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('setup-play')));
+      await tester.pumpAndSettle();
+      expect(container.read(matchSetupProvider).mode, GameMode.kidnap);
+      expect(container.read(gameConfigProvider).mode, GameMode.kidnap);
+      expect(find.text('KIDNAP · 5/PT'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('back-button')));
+      await tester.pumpAndSettle();
+      if (find.byKey(const Key('leave-confirm')).evaluate().isNotEmpty) {
+        await tester.tap(find.byKey(const Key('leave-confirm')));
+        await tester.pumpAndSettle();
+      }
+      if (find.byType(BackButton).evaluate().isNotEmpty) {
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+      }
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.text('4 bots · Easy · 5 table · Kidnap'), findsOneWidget);
     });
 
     test('stakes and balances are written short', () {
@@ -341,6 +390,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TableScreen), findsOneWidget);
+    expect(find.byKey(const Key('felt-label')), findsNothing);
     final table = container.read(tableProvider);
     expect(table.seatNames, ['Mohit', 'Bina', 'Player 3']);
     expect(find.text('Pass the device to Mohit'), findsOneWidget);

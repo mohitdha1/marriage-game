@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/card.dart';
+import '../../engine/game_config.dart';
 import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
 import 'table_state.dart';
@@ -64,6 +65,12 @@ abstract class TableNotifier extends Notifier<TableState> {
 
   /// Whether throwing a joker away after seeing it costs a penalty.
   bool get jokerPenaltyEnabled;
+
+  /// How the rounds settle players who haven't seen the joker.
+  GameMode get mode;
+
+  /// Coins per point at a stake table; `null` for any other game.
+  int? get stake => null;
 
   // The person's own side.
 

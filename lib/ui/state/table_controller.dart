@@ -34,6 +34,7 @@ class MatchSetup {
     this.playerCount = 5,
     this.difficulty = BotDifficulty.medium,
     this.stake,
+    this.mode = GameMode.standard,
     this.jokerPenalty = true,
   }) : people = const [],
        remote = const {},
@@ -45,6 +46,7 @@ class MatchSetup {
   MatchSetup.atTable(
     StakeTable table, {
     this.playerCount = 5,
+    this.mode = GameMode.standard,
     this.jokerPenalty = true,
   }) : difficulty = table.difficulty,
        stake = table.stake,
@@ -53,13 +55,16 @@ class MatchSetup {
        rejoins = null;
 
   /// [people], named in seat order, taking turns on this device; no bots.
-  MatchSetup.passAndPlay(List<String> people, {this.jokerPenalty = true})
-    : playerCount = people.length,
-      difficulty = BotDifficulty.medium,
-      stake = null,
-      people = List.unmodifiable(people),
-      remote = const {},
-      rejoins = null;
+  MatchSetup.passAndPlay(
+    List<String> people, {
+    this.mode = GameMode.standard,
+    this.jokerPenalty = true,
+  }) : playerCount = people.length,
+       difficulty = BotDifficulty.medium,
+       stake = null,
+       people = List.unmodifiable(people),
+       remote = const {},
+       rejoins = null;
 
   /// A game hosted on this device: its player at seat 0, [remote] players
   /// at their seats on other devices, and bots at [difficulty] in any other
@@ -70,6 +75,7 @@ class MatchSetup {
     required Map<int, RemotePlayer> remote,
     this.difficulty = BotDifficulty.medium,
     this.rejoins,
+    this.mode = GameMode.standard,
     this.jokerPenalty = true,
   }) : stake = null,
        people = [hostName],
@@ -82,12 +88,15 @@ class MatchSetup {
     required this.people,
     required this.remote,
     required this.rejoins,
+    required this.mode,
     required this.jokerPenalty,
   });
 
-  /// This setup with the joker-discard penalty [on] or off; the same setup
-  /// if that's unchanged, so nothing watching it rebuilds for no reason.
-  MatchSetup withJokerPenalty(bool on) => on == jokerPenalty
+  /// This setup played as [mode], with the joker-discard penalty
+  /// [jokerPenalty]; the same setup if neither changes, so nothing watching
+  /// it rebuilds for no reason.
+  MatchSetup withRules({required GameMode mode, required bool jokerPenalty}) =>
+      mode == this.mode && jokerPenalty == this.jokerPenalty
       ? this
       : MatchSetup._(
           playerCount: playerCount,
@@ -96,7 +105,8 @@ class MatchSetup {
           people: people,
           remote: remote,
           rejoins: rejoins,
-          jokerPenalty: on,
+          mode: mode,
+          jokerPenalty: jokerPenalty,
         );
 
   /// Players on other devices coming back after their link dropped.
@@ -119,6 +129,9 @@ class MatchSetup {
   /// and play, or just the host in a hosted game. Empty against bots, where
   /// the one person is "You".
   final List<String> people;
+
+  /// How the rounds settle players who haven't seen the joker.
+  final GameMode mode;
 
   /// Whether discarding a joker after seeing it costs a penalty (see
   /// [GameConfig.jokerDiscardPenaltyEnabled]).
@@ -160,6 +173,7 @@ final gameConfigProvider = Provider<GameConfig>((ref) {
   final setup = ref.watch(matchSetupProvider);
   return GameConfig(
     playerCount: setup.playerCount,
+    mode: setup.mode,
     jokerDiscardPenaltyEnabled: setup.jokerPenalty,
   );
 });
@@ -448,6 +462,12 @@ class TableController extends TableNotifier {
   bool get jokerPenaltyEnabled => _round.config.jokerDiscardPenaltyEnabled;
 
   @override
+  GameMode get mode => _round.config.mode;
+
+  @override
+  int? get stake => _stake;
+
+  @override
   void submitShow({
     required ShowKind kind,
     required List<List<PlayingCard>> sets,
@@ -654,6 +674,7 @@ class TableController extends TableNotifier {
           roundScores: _match.rounds,
           totals: _match.totals,
           jokerPenalty: jokerPenaltyEnabled,
+          mode: mode,
           choosingOpening: _remoteChoosing.contains(seat),
           match: _matchId,
           offline: [..._offline],
