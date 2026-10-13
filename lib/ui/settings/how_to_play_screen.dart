@@ -51,7 +51,8 @@ class HowToPlayScreen extends ConsumerWidget {
           'trials. Wild cards in your hand glow gold. Once you\'ve seen '
           'the joker, throwing a wild card away costs '
           '${ScoringTable.jokerDiscardPenalty} points, paid to the round\'s '
-          'winner, so the game asks first.',
+          'winner, so the game asks first. The Joker penalty setting turns '
+          'this off for the games you start.',
     ),
     (
       'Maal',

@@ -79,6 +79,14 @@ class _SettingsPopover extends ConsumerWidget {
                     onTap: () => controller.setHandHelper(!settings.handHelper),
                   ),
                   _SettingTile(
+                    key: const Key('setting-joker-penalty'),
+                    label: 'Joker penalty',
+                    icon: Icons.gavel,
+                    on: settings.jokerPenalty,
+                    onTap: () =>
+                        controller.setJokerPenalty(!settings.jokerPenalty),
+                  ),
+                  _SettingTile(
                     key: const Key('setting-profile'),
                     label: 'Profile',
                     icon: Icons.person_outline,

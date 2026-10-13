@@ -16,6 +16,7 @@ class Settings {
     this.playerCount = 5,
     this.botDifficulty = BotDifficulty.medium,
     this.stake = 5,
+    this.jokerPenalty = true,
   });
 
   /// The fewest and most players at a table, the human player included.
@@ -62,6 +63,10 @@ class Settings {
   /// Play also uses.
   final int stake;
 
+  /// Whether the games this device starts make discarding a joker after
+  /// seeing it cost a penalty.
+  final bool jokerPenalty;
+
   Settings copyWith({
     bool? sound,
     bool? vibration,
@@ -72,6 +77,7 @@ class Settings {
     int? playerCount,
     BotDifficulty? botDifficulty,
     int? stake,
+    bool? jokerPenalty,
   }) => Settings(
     sound: sound ?? this.sound,
     vibration: vibration ?? this.vibration,
@@ -82,6 +88,7 @@ class Settings {
     playerCount: playerCount ?? this.playerCount,
     botDifficulty: botDifficulty ?? this.botDifficulty,
     stake: stake ?? this.stake,
+    jokerPenalty: jokerPenalty ?? this.jokerPenalty,
   );
 }
 
@@ -100,6 +107,7 @@ class SettingsController extends Notifier<Settings> {
   static const _playerCount = 'lobby.playerCount';
   static const _botDifficulty = 'lobby.botDifficulty';
   static const _stake = 'lobby.stake';
+  static const _jokerPenalty = 'rules.jokerPenalty';
 
   PreferencesStore get _store => ref.read(preferencesProvider);
 
@@ -126,6 +134,7 @@ class SettingsController extends Notifier<Settings> {
           BotDifficulty.values.asNameMap()[store.getString(_botDifficulty)] ??
           defaults.botDifficulty,
       stake: store.getInt(_stake) ?? defaults.stake,
+      jokerPenalty: store.getBool(_jokerPenalty) ?? defaults.jokerPenalty,
     );
   }
 
@@ -173,6 +182,12 @@ class SettingsController extends Notifier<Settings> {
   void setBotDifficulty(BotDifficulty difficulty) {
     state = state.copyWith(botDifficulty: difficulty);
     _store.setString(_botDifficulty, difficulty.name);
+  }
+
+  /// Turns the joker-discard penalty on or off, from the next game.
+  void setJokerPenalty(bool on) {
+    state = state.copyWith(jokerPenalty: on);
+    _store.setBool(_jokerPenalty, on);
   }
 
   /// Remembers the stake table chosen for single player.

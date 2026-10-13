@@ -32,6 +32,7 @@ void main() {
       expect(settings.sound, isTrue);
       expect(settings.vibration, isTrue);
       expect(settings.handHelper, isTrue);
+      expect(settings.jokerPenalty, isTrue);
       expect(settings.playerName, 'Player');
       expect(settings.avatarColor, Settings.avatarColors.first);
     });
@@ -42,6 +43,7 @@ void main() {
         ..setSound(false)
         ..setVibration(false)
         ..setHandHelper(false)
+        ..setJokerPenalty(false)
         ..setPlayerName('  Mohit ')
         ..setAvatarColor(Settings.avatarColors[3]);
 
@@ -50,6 +52,7 @@ void main() {
       expect(reloaded.sound, isFalse);
       expect(reloaded.vibration, isFalse);
       expect(reloaded.handHelper, isFalse);
+      expect(reloaded.jokerPenalty, isFalse);
       expect(reloaded.playerName, 'Mohit');
       expect(reloaded.avatarColor, Settings.avatarColors[3]);
     });

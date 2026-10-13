@@ -396,6 +396,41 @@ void main() {
     expect(find.text('Sound off'), findsOneWidget);
   });
 
+  testWidgets('the joker penalty setting applies to the next match', (
+    tester,
+  ) async {
+    final container = await pumpHome(tester);
+    await tester.tap(find.byKey(const Key('quick-play')));
+    await tester.pumpAndSettle();
+    expect(
+      container.read(gameConfigProvider).jokerDiscardPenaltyEnabled,
+      isTrue,
+    );
+    await tester.tap(find.byKey(const Key('back-button')));
+    await tester.pumpAndSettle();
+    if (find.byKey(const Key('leave-confirm')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const Key('leave-confirm')));
+      await tester.pumpAndSettle();
+    }
+
+    await tester.tap(find.byKey(const Key('settings-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('setting-joker-penalty')));
+    await tester.pump();
+    expect(container.read(settingsProvider).jokerPenalty, isFalse);
+    expect(find.text('Joker penalty off'), findsOneWidget);
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('quick-play')));
+    await tester.pumpAndSettle();
+    expect(container.read(matchSetupProvider).jokerPenalty, isFalse);
+    expect(
+      container.read(gameConfigProvider).jokerDiscardPenaltyEnabled,
+      isFalse,
+    );
+  });
+
   testWidgets('the settings popover picks the table theme, and the screen '
       'behind it changes straight away', (tester) async {
     final container = await pumpHome(tester);

@@ -34,6 +34,7 @@ class MatchSetup {
     this.playerCount = 5,
     this.difficulty = BotDifficulty.medium,
     this.stake,
+    this.jokerPenalty = true,
   }) : people = const [],
        remote = const {},
        rejoins = null;
@@ -41,15 +42,18 @@ class MatchSetup {
   /// One person against [playerCount] − 1 bots at a stake [table]: each
   /// point is worth its stake in coins, and its bots play at its
   /// difficulty.
-  MatchSetup.atTable(StakeTable table, {this.playerCount = 5})
-    : difficulty = table.difficulty,
-      stake = table.stake,
-      people = const [],
-      remote = const {},
-      rejoins = null;
+  MatchSetup.atTable(
+    StakeTable table, {
+    this.playerCount = 5,
+    this.jokerPenalty = true,
+  }) : difficulty = table.difficulty,
+       stake = table.stake,
+       people = const [],
+       remote = const {},
+       rejoins = null;
 
   /// [people], named in seat order, taking turns on this device; no bots.
-  MatchSetup.passAndPlay(List<String> people)
+  MatchSetup.passAndPlay(List<String> people, {this.jokerPenalty = true})
     : playerCount = people.length,
       difficulty = BotDifficulty.medium,
       stake = null,
@@ -66,9 +70,34 @@ class MatchSetup {
     required Map<int, RemotePlayer> remote,
     this.difficulty = BotDifficulty.medium,
     this.rejoins,
+    this.jokerPenalty = true,
   }) : stake = null,
        people = [hostName],
        remote = Map.unmodifiable(remote);
+
+  const MatchSetup._({
+    required this.playerCount,
+    required this.difficulty,
+    required this.stake,
+    required this.people,
+    required this.remote,
+    required this.rejoins,
+    required this.jokerPenalty,
+  });
+
+  /// This setup with the joker-discard penalty [on] or off; the same setup
+  /// if that's unchanged, so nothing watching it rebuilds for no reason.
+  MatchSetup withJokerPenalty(bool on) => on == jokerPenalty
+      ? this
+      : MatchSetup._(
+          playerCount: playerCount,
+          difficulty: difficulty,
+          stake: stake,
+          people: people,
+          remote: remote,
+          rejoins: rejoins,
+          jokerPenalty: on,
+        );
 
   /// Players on other devices coming back after their link dropped.
   final Stream<Rejoin>? rejoins;
@@ -90,6 +119,10 @@ class MatchSetup {
   /// and play, or just the host in a hosted game. Empty against bots, where
   /// the one person is "You".
   final List<String> people;
+
+  /// Whether discarding a joker after seeing it costs a penalty (see
+  /// [GameConfig.jokerDiscardPenaltyEnabled]).
+  final bool jokerPenalty;
 
   bool get isPassAndPlay => people.isNotEmpty && remote.isEmpty;
 }
@@ -121,11 +154,15 @@ class MatchSetupController extends Notifier<MatchSetup> {
   void choose(MatchSetup setup) => state = setup;
 }
 
-/// Settings for the current game: as many players as its setup says. Tests
-/// override it.
-final gameConfigProvider = Provider<GameConfig>(
-  (ref) => GameConfig(playerCount: ref.watch(matchSetupProvider).playerCount),
-);
+/// Settings for the current game: the players and house rules its setup
+/// says. Tests override it.
+final gameConfigProvider = Provider<GameConfig>((ref) {
+  final setup = ref.watch(matchSetupProvider);
+  return GameConfig(
+    playerCount: setup.playerCount,
+    jokerDiscardPenaltyEnabled: setup.jokerPenalty,
+  );
+});
 
 /// The random source for shuffling and bot choices. Tests override it with a
 /// seeded [Random] so games are repeatable.
@@ -158,6 +195,17 @@ const humanSeat = 0;
 final tableProvider = NotifierProvider<TableNotifier, TableState>(
   TableController.new,
 );
+
+/// Sets up a fresh match with [setup], for the table opened next.
+///
+/// What's built from the setup is brought up to date here. Left until the
+/// table is built, the update would land in the middle of a widget build,
+/// where a change can't be announced.
+void startMatchWith(WidgetRef ref, MatchSetup setup) {
+  ref.read(matchSetupProvider.notifier).choose(setup);
+  ref.read(roundFactoryProvider);
+  ref.invalidate(tableProvider);
+}
 
 /// Owns the engine's [Round], applies the human player's moves to it, and
 /// publishes a fresh [TableState] after each one. The engine stays the single

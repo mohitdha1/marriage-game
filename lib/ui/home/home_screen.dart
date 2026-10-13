@@ -174,10 +174,10 @@ class HomeScreen extends ConsumerWidget {
     }
   }
 
-  /// Opens a fresh match with [setup].
+  /// Opens a fresh match with [setup], under the house rules in settings.
   void _startMatch(BuildContext context, WidgetRef ref, MatchSetup setup) {
-    ref.read(matchSetupProvider.notifier).choose(setup);
-    ref.invalidate(tableProvider);
+    final jokerPenalty = ref.read(settingsProvider).jokerPenalty;
+    startMatchWith(ref, setup.withJokerPenalty(jokerPenalty));
     Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => singlePlayerTable));

@@ -100,24 +100,20 @@ class _HostLobbyScreenState extends ConsumerState<HostLobbyScreen> {
   void _start() {
     final host = _host!;
     final guests = host.start();
-    ref
-        .read(matchSetupProvider.notifier)
-        .choose(
-          MatchSetup.hosted(
-            hostName: host.hostName,
-            playerCount: host.seats,
-            difficulty: _difficulty,
-            rejoins: host.rejoins,
-            remote: {
-              for (final MapEntry(key: seat, value: guest) in guests.entries)
-                seat: RemotePlayer(
-                  name: guest.name,
-                  connection: guest.connection,
-                ),
-            },
-          ),
-        );
-    ref.invalidate(tableProvider);
+    startMatchWith(
+      ref,
+      MatchSetup.hosted(
+        hostName: host.hostName,
+        playerCount: host.seats,
+        difficulty: _difficulty,
+        rejoins: host.rejoins,
+        jokerPenalty: ref.read(settingsProvider).jokerPenalty,
+        remote: {
+          for (final MapEntry(key: seat, value: guest) in guests.entries)
+            seat: RemotePlayer(name: guest.name, connection: guest.connection),
+        },
+      ),
+    );
     _handedOver = true;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => HostedTable(host: host)),
