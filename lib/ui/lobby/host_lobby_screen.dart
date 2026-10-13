@@ -10,6 +10,7 @@ import '../../net/room_code.dart';
 import '../home/home_screen.dart';
 import '../home/mode_picker.dart';
 import '../home/player_avatar.dart';
+import '../settings/house_rules_screen.dart';
 import '../settings/settings.dart';
 import '../state/table_controller.dart';
 import '../theme/table_felt.dart';
@@ -108,8 +109,7 @@ class _HostLobbyScreenState extends ConsumerState<HostLobbyScreen> {
         playerCount: host.seats,
         difficulty: _difficulty,
         rejoins: host.rejoins,
-        mode: ref.read(settingsProvider).mode,
-        jokerPenalty: ref.read(settingsProvider).jokerPenalty,
+        rules: ref.read(settingsProvider).rules,
         remote: {
           for (final MapEntry(key: seat, value: guest) in guests.entries)
             seat: RemotePlayer(name: guest.name, connection: guest.connection),
@@ -186,6 +186,7 @@ class _HostLobbyScreenState extends ConsumerState<HostLobbyScreen> {
                             width: 280,
                             child: ModePicker(onDark: true),
                           ),
+                          const HouseRulesButton(onDark: true),
                         ],
                       ),
                     ),

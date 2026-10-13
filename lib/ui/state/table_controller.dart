@@ -19,6 +19,7 @@ import '../../net/game_host.dart' show Rejoin;
 import '../../net/wire.dart';
 import '../../data/stake_tables.dart';
 import '../home/player_data_provider.dart';
+import 'house_rules.dart';
 import 'table_notifier.dart';
 import 'table_state.dart';
 import 'table_view.dart';
@@ -34,8 +35,7 @@ class MatchSetup {
     this.playerCount = 5,
     this.difficulty = BotDifficulty.medium,
     this.stake,
-    this.mode = GameMode.standard,
-    this.jokerPenalty = true,
+    this.rules = const HouseRules(),
   }) : people = const [],
        remote = const {},
        rejoins = null;
@@ -46,8 +46,7 @@ class MatchSetup {
   MatchSetup.atTable(
     StakeTable table, {
     this.playerCount = 5,
-    this.mode = GameMode.standard,
-    this.jokerPenalty = true,
+    this.rules = const HouseRules(),
   }) : difficulty = table.difficulty,
        stake = table.stake,
        people = const [],
@@ -55,16 +54,13 @@ class MatchSetup {
        rejoins = null;
 
   /// [people], named in seat order, taking turns on this device; no bots.
-  MatchSetup.passAndPlay(
-    List<String> people, {
-    this.mode = GameMode.standard,
-    this.jokerPenalty = true,
-  }) : playerCount = people.length,
-       difficulty = BotDifficulty.medium,
-       stake = null,
-       people = List.unmodifiable(people),
-       remote = const {},
-       rejoins = null;
+  MatchSetup.passAndPlay(List<String> people, {this.rules = const HouseRules()})
+    : playerCount = people.length,
+      difficulty = BotDifficulty.medium,
+      stake = null,
+      people = List.unmodifiable(people),
+      remote = const {},
+      rejoins = null;
 
   /// A game hosted on this device: its player at seat 0, [remote] players
   /// at their seats on other devices, and bots at [difficulty] in any other
@@ -75,8 +71,7 @@ class MatchSetup {
     required Map<int, RemotePlayer> remote,
     this.difficulty = BotDifficulty.medium,
     this.rejoins,
-    this.mode = GameMode.standard,
-    this.jokerPenalty = true,
+    this.rules = const HouseRules(),
   }) : stake = null,
        people = [hostName],
        remote = Map.unmodifiable(remote);
@@ -88,15 +83,12 @@ class MatchSetup {
     required this.people,
     required this.remote,
     required this.rejoins,
-    required this.mode,
-    required this.jokerPenalty,
+    required this.rules,
   });
 
-  /// This setup played as [mode], with the joker-discard penalty
-  /// [jokerPenalty]; the same setup if neither changes, so nothing watching
-  /// it rebuilds for no reason.
-  MatchSetup withRules({required GameMode mode, required bool jokerPenalty}) =>
-      mode == this.mode && jokerPenalty == this.jokerPenalty
+  /// This setup played by [rules]; the same setup if they're unchanged, so
+  /// nothing watching it rebuilds for no reason.
+  MatchSetup withRules(HouseRules rules) => rules == this.rules
       ? this
       : MatchSetup._(
           playerCount: playerCount,
@@ -105,8 +97,7 @@ class MatchSetup {
           people: people,
           remote: remote,
           rejoins: rejoins,
-          mode: mode,
-          jokerPenalty: jokerPenalty,
+          rules: rules,
         );
 
   /// Players on other devices coming back after their link dropped.
@@ -130,12 +121,8 @@ class MatchSetup {
   /// the one person is "You".
   final List<String> people;
 
-  /// How the rounds settle players who haven't seen the joker.
-  final GameMode mode;
-
-  /// Whether discarding a joker after seeing it costs a penalty (see
-  /// [GameConfig.jokerDiscardPenaltyEnabled]).
-  final bool jokerPenalty;
+  /// The mode and house rules the match is played by.
+  final HouseRules rules;
 
   bool get isPassAndPlay => people.isNotEmpty && remote.isEmpty;
 }
@@ -171,11 +158,7 @@ class MatchSetupController extends Notifier<MatchSetup> {
 /// says. Tests override it.
 final gameConfigProvider = Provider<GameConfig>((ref) {
   final setup = ref.watch(matchSetupProvider);
-  return GameConfig(
-    playerCount: setup.playerCount,
-    mode: setup.mode,
-    jokerDiscardPenaltyEnabled: setup.jokerPenalty,
-  );
+  return setup.rules.configFor(setup.playerCount);
 });
 
 /// The random source for shuffling and bot choices. Tests override it with a

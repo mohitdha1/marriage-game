@@ -177,10 +177,7 @@ class HomeScreen extends ConsumerWidget {
   /// Opens a fresh match with [setup], under the house rules in settings.
   void _startMatch(BuildContext context, WidgetRef ref, MatchSetup setup) {
     final settings = ref.read(settingsProvider);
-    startMatchWith(
-      ref,
-      setup.withRules(mode: settings.mode, jokerPenalty: settings.jokerPenalty),
-    );
+    startMatchWith(ref, setup.withRules(settings.rules));
     Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => singlePlayerTable));

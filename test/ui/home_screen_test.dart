@@ -19,10 +19,12 @@ import 'package:marriage_game/ui/home/stake_table_picker.dart';
 import 'package:marriage_game/ui/home/stake_tables_provider.dart';
 import 'package:marriage_game/ui/settings/about.dart';
 import 'package:marriage_game/ui/settings/feedback.dart';
+import 'package:marriage_game/ui/settings/house_rules_screen.dart';
 import 'package:marriage_game/ui/settings/how_to_play_screen.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/settings/settings.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
+import 'package:marriage_game/ui/state/house_rules.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
 import 'package:marriage_game/ui/theme/table_theme.dart';
@@ -299,7 +301,9 @@ void main() {
         '4 bots · Hard · 25K table',
       );
       expect(
-        describeSetup(const MatchSetup(stake: 5, mode: GameMode.kidnap)),
+        describeSetup(
+          const MatchSetup(stake: 5, rules: HouseRules(mode: GameMode.kidnap)),
+        ),
         '4 bots · Medium · 5 table · Kidnap',
       );
     });
@@ -325,12 +329,12 @@ void main() {
 
       await tester.tap(find.byKey(const Key('mode-kidnap')));
       await tester.pumpAndSettle();
-      expect(container.read(settingsProvider).mode, GameMode.kidnap);
+      expect(container.read(settingsProvider).rules.mode, GameMode.kidnap);
       expect(find.text(describeMode(GameMode.kidnap)), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('setup-play')));
       await tester.pumpAndSettle();
-      expect(container.read(matchSetupProvider).mode, GameMode.kidnap);
+      expect(container.read(matchSetupProvider).rules.mode, GameMode.kidnap);
       expect(container.read(gameConfigProvider).mode, GameMode.kidnap);
       expect(find.text('KIDNAP · 5/PT'), findsOneWidget);
 
@@ -375,6 +379,10 @@ void main() {
     await tester.tap(find.byKey(const Key('friends-passAndPlay')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('pass-and-play-setup')), findsOneWidget);
+    expect(
+      find.byKey(const Key('house-rules-button')).hitTestable(),
+      findsOneWidget,
+    );
     expect(
       tester
           .widget<TextField>(find.byKey(const Key('person-name-0')))
@@ -446,16 +454,13 @@ void main() {
     expect(find.text('Sound off'), findsOneWidget);
   });
 
-  testWidgets('the joker penalty setting applies to the next match', (
+  testWidgets('house rules chosen before a game apply to the next match', (
     tester,
   ) async {
     final container = await pumpHome(tester);
     await tester.tap(find.byKey(const Key('quick-play')));
     await tester.pumpAndSettle();
-    expect(
-      container.read(gameConfigProvider).jokerDiscardPenaltyEnabled,
-      isTrue,
-    );
+    expect(container.read(matchSetupProvider).rules, const HouseRules());
     await tester.tap(find.byKey(const Key('back-button')));
     await tester.pumpAndSettle();
     if (find.byKey(const Key('leave-confirm')).evaluate().isNotEmpty) {
@@ -463,22 +468,41 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    await tester.tap(find.byKey(const Key('settings-button')));
+    await tester.tap(find.byKey(const Key('single-player')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('setting-joker-penalty')));
-    await tester.pump();
-    expect(container.read(settingsProvider).jokerPenalty, isFalse);
-    expect(find.text('Joker penalty off'), findsOneWidget);
-    await tester.tapAt(const Offset(5, 5));
+    await tester.tap(find.byKey(const Key('house-rules-button')));
+    await tester.pumpAndSettle();
+    expect(find.byType(HouseRulesScreen), findsOneWidget);
+    for (final rule in [
+      'rule-man-cards',
+      'rule-superman',
+      'rule-alter-maal',
+      'rule-joker-penalty',
+    ]) {
+      await tester.ensureVisible(find.byKey(Key(rule)));
+      await tester.tap(find.byKey(Key(rule)));
+      await tester.pump();
+    }
+    await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('quick-play')));
+    await tester.tap(find.byKey(const Key('setup-play')));
     await tester.pumpAndSettle();
-    expect(container.read(matchSetupProvider).jokerPenalty, isFalse);
-    expect(
-      container.read(gameConfigProvider).jokerDiscardPenaltyEnabled,
-      isFalse,
-    );
+    final config = container.read(gameConfigProvider);
+    expect(config.manCardsEnabled, isTrue);
+    expect(config.supermanCardEnabled, isTrue);
+    expect(config.alterIsMaal, isFalse);
+    expect(config.jokerDiscardPenaltyEnabled, isFalse);
+  });
+
+  testWidgets('the settings popover no longer holds a house rule', (
+    tester,
+  ) async {
+    await pumpHome(tester);
+    await tester.tap(find.byKey(const Key('settings-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('setting-joker-penalty')), findsNothing);
   });
 
   testWidgets('the settings popover picks the table theme, and the screen '

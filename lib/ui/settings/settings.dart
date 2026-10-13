@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../bots/bot_player.dart';
 import '../../engine/game_config.dart';
+import '../state/house_rules.dart';
 import '../theme/table_theme.dart';
 import 'preferences.dart';
 
@@ -17,8 +18,7 @@ class Settings {
     this.playerCount = 5,
     this.botDifficulty = BotDifficulty.medium,
     this.stake = 5,
-    this.jokerPenalty = true,
-    this.mode = GameMode.standard,
+    this.rules = const HouseRules(),
   });
 
   /// The fewest and most players at a table, the human player included.
@@ -65,12 +65,9 @@ class Settings {
   /// Play also uses.
   final int stake;
 
-  /// Whether the games this device starts make discarding a joker after
-  /// seeing it cost a penalty.
-  final bool jokerPenalty;
-
-  /// The game mode last chosen, which the games this device starts play.
-  final GameMode mode;
+  /// The mode and house rules last chosen, which the games this device
+  /// starts are played by.
+  final HouseRules rules;
 
   Settings copyWith({
     bool? sound,
@@ -82,8 +79,7 @@ class Settings {
     int? playerCount,
     BotDifficulty? botDifficulty,
     int? stake,
-    bool? jokerPenalty,
-    GameMode? mode,
+    HouseRules? rules,
   }) => Settings(
     sound: sound ?? this.sound,
     vibration: vibration ?? this.vibration,
@@ -94,8 +90,7 @@ class Settings {
     playerCount: playerCount ?? this.playerCount,
     botDifficulty: botDifficulty ?? this.botDifficulty,
     stake: stake ?? this.stake,
-    jokerPenalty: jokerPenalty ?? this.jokerPenalty,
-    mode: mode ?? this.mode,
+    rules: rules ?? this.rules,
   );
 }
 
@@ -116,6 +111,9 @@ class SettingsController extends Notifier<Settings> {
   static const _stake = 'lobby.stake';
   static const _jokerPenalty = 'rules.jokerPenalty';
   static const _mode = 'rules.mode';
+  static const _manCards = 'rules.manCards';
+  static const _superman = 'rules.superman';
+  static const _alterIsMaal = 'rules.alterIsMaal';
 
   PreferencesStore get _store => ref.read(preferencesProvider);
 
@@ -142,9 +140,16 @@ class SettingsController extends Notifier<Settings> {
           BotDifficulty.values.asNameMap()[store.getString(_botDifficulty)] ??
           defaults.botDifficulty,
       stake: store.getInt(_stake) ?? defaults.stake,
-      jokerPenalty: store.getBool(_jokerPenalty) ?? defaults.jokerPenalty,
-      mode:
-          GameMode.values.asNameMap()[store.getString(_mode)] ?? defaults.mode,
+      rules: HouseRules(
+        mode:
+            GameMode.values.asNameMap()[store.getString(_mode)] ??
+            defaults.rules.mode,
+        manCards: store.getBool(_manCards) ?? defaults.rules.manCards,
+        superman: store.getBool(_superman) ?? defaults.rules.superman,
+        alterIsMaal: store.getBool(_alterIsMaal) ?? defaults.rules.alterIsMaal,
+        jokerPenalty:
+            store.getBool(_jokerPenalty) ?? defaults.rules.jokerPenalty,
+      ),
     );
   }
 
@@ -194,16 +199,31 @@ class SettingsController extends Notifier<Settings> {
     _store.setString(_botDifficulty, difficulty.name);
   }
 
-  /// Turns the joker-discard penalty on or off, from the next game.
-  void setJokerPenalty(bool on) {
-    state = state.copyWith(jokerPenalty: on);
-    _store.setBool(_jokerPenalty, on);
+  // House rules apply from the next game this device starts.
+
+  void setMode(GameMode mode) {
+    state = state.copyWith(rules: state.rules.copyWith(mode: mode));
+    _store.setString(_mode, mode.name);
   }
 
-  /// Chooses the game mode, from the next game.
-  void setMode(GameMode mode) {
-    state = state.copyWith(mode: mode);
-    _store.setString(_mode, mode.name);
+  void setManCards(bool on) {
+    state = state.copyWith(rules: state.rules.copyWith(manCards: on));
+    _store.setBool(_manCards, on);
+  }
+
+  void setSuperman(bool on) {
+    state = state.copyWith(rules: state.rules.copyWith(superman: on));
+    _store.setBool(_superman, on);
+  }
+
+  void setAlterIsMaal(bool on) {
+    state = state.copyWith(rules: state.rules.copyWith(alterIsMaal: on));
+    _store.setBool(_alterIsMaal, on);
+  }
+
+  void setJokerPenalty(bool on) {
+    state = state.copyWith(rules: state.rules.copyWith(jokerPenalty: on));
+    _store.setBool(_jokerPenalty, on);
   }
 
   /// Remembers the stake table chosen for single player.

@@ -15,9 +15,12 @@ import 'package:marriage_game/net/game_host.dart';
 import 'package:marriage_game/net/remote_session.dart';
 import 'package:marriage_game/net/room_code.dart';
 import 'package:marriage_game/net/wire.dart';
+import 'package:marriage_game/ui/home/game_setup.dart';
 import 'package:marriage_game/ui/lobby/host_lobby_screen.dart';
 import 'package:marriage_game/ui/lobby/join_screen.dart';
+import 'package:marriage_game/ui/settings/house_rules_screen.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
+import 'package:marriage_game/ui/settings/settings.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_view.dart';
@@ -213,6 +216,40 @@ void main() {
       expect(find.text('Start with bots'), findsOneWidget);
     });
 
+    testWidgets('the lobby opens the house rules, and the game plays by '
+        'them', (tester) async {
+      final lobby = FakeLobby();
+      await pumpScreen(
+        tester,
+        const HostLobbyScreen(),
+        overrides: [
+          localAddressProvider.overrideWithValue(() async => '10.0.0.2'),
+          openLobbyProvider.overrideWithValue((name, seats) async => lobby),
+        ],
+      );
+      await tester.pump();
+      await tester.pump();
+      lobby.join('Bina');
+      await tester.pump();
+
+      await tester.ensureVisible(find.byKey(const Key('house-rules-button')));
+      await tester.tap(find.byKey(const Key('house-rules-button')));
+      await tester.pumpAndSettle();
+      expect(find.byType(HouseRulesScreen), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('rule-superman')));
+      await tester.tap(find.byKey(const Key('rule-superman')));
+      await tester.pump();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('lobby-start')));
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(TableScreen)),
+      );
+      expect(container.read(gameConfigProvider).supermanCardEnabled, isTrue);
+    });
+
     testWidgets('without Wi-Fi, the lobby says how to fix it', (tester) async {
       await pumpScreen(
         tester,
@@ -224,6 +261,56 @@ void main() {
       expect(find.byKey(const Key('lobby-problem')), findsOneWidget);
       expect(find.textContaining('Connect to Wi-Fi'), findsOneWidget);
       expect(find.text('Try again'), findsOneWidget);
+    });
+  });
+
+  group('House rules', () {
+    testWidgets('every rule has a switch and a line on what it does', (
+      tester,
+    ) async {
+      await pumpScreen(tester, const HouseRulesScreen());
+
+      for (final description in [
+        HouseRulesScreen.manCardsDescription,
+        HouseRulesScreen.supermanDescription,
+        HouseRulesScreen.alterDescription,
+        HouseRulesScreen.penaltyDescription,
+      ]) {
+        await tester.scrollUntilVisible(find.text(description), 50);
+        expect(find.text(description), findsOneWidget);
+      }
+      expect(HouseRulesScreen.manCardsDescription, contains('1 = 5, 2 = 15'));
+      expect(find.byKey(const Key('mode-kidnap')), findsOneWidget);
+    });
+
+    testWidgets('switching a rule saves it', (tester) async {
+      await pumpScreen(tester, const HouseRulesScreen());
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HouseRulesScreen)),
+      );
+
+      await tester.tap(find.byKey(const Key('mode-murder')));
+      await tester.tap(find.byKey(const Key('rule-man-cards')));
+      await tester.pump();
+
+      final rules = container.read(settingsProvider).rules;
+      expect(rules.mode, GameMode.murder);
+      expect(rules.manCards, isTrue);
+      expect(find.text(describeMode(GameMode.murder)), findsOneWidget);
+    });
+
+    testWidgets('fits a small phone', (tester) async {
+      await pumpScreen(tester, const HouseRulesScreen());
+      tester.view.physicalSize = const Size(667, 375);
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.byKey(const Key('rule-joker-penalty')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('rule-joker-penalty')).hitTestable(),
+        findsOneWidget,
+      );
     });
   });
 

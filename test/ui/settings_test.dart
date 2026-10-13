@@ -4,6 +4,7 @@ import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/settings/settings.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
+import 'package:marriage_game/ui/state/house_rules.dart';
 
 ProviderContainer containerWith(InMemoryPreferences store) {
   final container = ProviderContainer(
@@ -33,8 +34,7 @@ void main() {
       expect(settings.sound, isTrue);
       expect(settings.vibration, isTrue);
       expect(settings.handHelper, isTrue);
-      expect(settings.jokerPenalty, isTrue);
-      expect(settings.mode, GameMode.standard);
+      expect(settings.rules, const HouseRules());
       expect(settings.playerName, 'Player');
       expect(settings.avatarColor, Settings.avatarColors.first);
     });
@@ -45,8 +45,11 @@ void main() {
         ..setSound(false)
         ..setVibration(false)
         ..setHandHelper(false)
-        ..setJokerPenalty(false)
         ..setMode(GameMode.kidnap)
+        ..setManCards(true)
+        ..setSuperman(true)
+        ..setAlterIsMaal(false)
+        ..setJokerPenalty(false)
         ..setPlayerName('  Mohit ')
         ..setAvatarColor(Settings.avatarColors[3]);
 
@@ -55,8 +58,16 @@ void main() {
       expect(reloaded.sound, isFalse);
       expect(reloaded.vibration, isFalse);
       expect(reloaded.handHelper, isFalse);
-      expect(reloaded.jokerPenalty, isFalse);
-      expect(reloaded.mode, GameMode.kidnap);
+      expect(
+        reloaded.rules,
+        const HouseRules(
+          mode: GameMode.kidnap,
+          manCards: true,
+          superman: true,
+          alterIsMaal: false,
+          jokerPenalty: false,
+        ),
+      );
       expect(reloaded.playerName, 'Mohit');
       expect(reloaded.avatarColor, Settings.avatarColors[3]);
     });
@@ -66,6 +77,48 @@ void main() {
       container.read(settingsProvider.notifier).setPlayerName('   ');
 
       expect(container.read(settingsProvider).playerName, 'Player');
+    });
+  });
+
+  group('HouseRules', () {
+    test('defaults to Standard with only the usual rules', () {
+      final config = const HouseRules().configFor(4);
+
+      expect(config.playerCount, 4);
+      expect(config.mode, GameMode.standard);
+      expect(config.manCardsEnabled, isFalse);
+      expect(config.supermanCardEnabled, isFalse);
+      expect(config.alterIsMaal, isTrue);
+      expect(config.jokerDiscardPenaltyEnabled, isTrue);
+    });
+
+    test('carries every rule into the game\'s settings', () {
+      final config = const HouseRules(
+        mode: GameMode.murder,
+        manCards: true,
+        superman: true,
+        alterIsMaal: false,
+        jokerPenalty: false,
+      ).configFor(5);
+
+      expect(config.mode, GameMode.murder);
+      expect(config.manCardsEnabled, isTrue);
+      expect(config.supermanCardEnabled, isTrue);
+      expect(config.alterIsMaal, isFalse);
+      expect(config.jokerDiscardPenaltyEnabled, isFalse);
+    });
+
+    test('rules are equal when every rule matches', () {
+      expect(const HouseRules(), const HouseRules());
+      expect(
+        const HouseRules().copyWith(superman: true),
+        const HouseRules(superman: true),
+      );
+      expect(const HouseRules(), isNot(const HouseRules(manCards: true)));
+      expect(
+        const HouseRules(superman: true).hashCode,
+        const HouseRules(superman: true).hashCode,
+      );
     });
   });
 

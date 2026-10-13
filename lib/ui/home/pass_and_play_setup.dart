@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../settings/house_rules_screen.dart';
 import '../settings/settings.dart';
 import 'mode_picker.dart';
 
@@ -133,6 +134,7 @@ class _PassAndPlayState extends ConsumerState<_PassAndPlayDialog> {
         ),
       ),
       actions: [
+        const HouseRulesButton(),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),

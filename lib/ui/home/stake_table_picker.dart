@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/player_data.dart';
 import '../../data/stake_tables.dart';
+import '../settings/house_rules_screen.dart';
 import '../settings/settings.dart';
 import '../state/table_controller.dart';
 import '../theme/table_felt.dart';
@@ -24,8 +25,8 @@ String formatStake(int coins) {
 }
 
 /// The table Quick Play deals: the last one chosen, if the player can still
-/// join it, or else the highest below it they can, and five players, in the
-/// mode last chosen.
+/// join it, or else the highest below it they can, and five players, by the
+/// rules last chosen.
 MatchSetup quickPlaySetupFor(
   StakeTables tables,
   Settings settings,
@@ -36,7 +37,7 @@ MatchSetup quickPlaySetupFor(
     if (tier.stake > settings.stake) break;
     if (tables.canJoin(tier, data)) table = tier;
   }
-  return MatchSetup.atTable(table, mode: settings.mode);
+  return MatchSetup.atTable(table, rules: settings.rules);
 }
 
 /// Why [data]'s player can't sit down at [tier] yet, or `null` if they can.
@@ -75,6 +76,7 @@ class StakeTablePickerScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         actions: [
+          const HouseRulesButton(onDark: true),
           if (data != null)
             Padding(
               padding: const EdgeInsets.only(right: 12),
@@ -184,7 +186,7 @@ class _Picker extends ConsumerWidget {
                   MatchSetup.atTable(
                     chosen,
                     playerCount: settings.playerCount,
-                    mode: settings.mode,
+                    rules: settings.rules,
                   ),
                 ),
           icon: const Icon(Icons.play_arrow),
@@ -201,7 +203,7 @@ class _Picker extends ConsumerWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: reason == null
-                  ? ModeDescription(mode: settings.mode, onDark: true)
+                  ? ModeDescription(mode: settings.rules.mode, onDark: true)
                   : Text(
                       reason,
                       key: const Key('stake-locked-reason'),

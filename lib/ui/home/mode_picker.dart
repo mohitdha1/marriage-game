@@ -6,7 +6,7 @@ import '../settings/settings.dart';
 import 'game_setup.dart';
 
 /// Standard, Kidnap or Murder as chips, with a line on the one chosen. The choice is
-/// saved in [Settings.mode] and played in the next game this device starts.
+/// saved in [Settings.rules] and played in the next game this device starts.
 ///
 /// [onDark] draws it for a dark background, such as the felt; otherwise it
 /// suits a light dialog. Without [describe], the line on the chosen mode is
@@ -19,7 +19,7 @@ class ModePicker extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(settingsProvider.select((s) => s.mode));
+    final mode = ref.watch(settingsProvider.select((s) => s.rules.mode));
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [

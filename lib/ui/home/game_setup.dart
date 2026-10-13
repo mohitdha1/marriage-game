@@ -44,5 +44,5 @@ String describeSetup(MatchSetup setup) {
   return '$bots ${bots == 1 ? 'bot' : 'bots'} · '
       '${level[0].toUpperCase()}${level.substring(1)}'
       '${stake == null ? '' : ' · ${formatStake(stake)} table'}'
-      '${setup.mode == GameMode.standard ? '' : ' · ${modeName(setup.mode)}'}';
+      '${setup.rules.mode == GameMode.standard ? '' : ' · ${modeName(setup.rules.mode)}'}';
 }
