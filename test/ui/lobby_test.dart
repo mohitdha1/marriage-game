@@ -214,6 +214,20 @@ void main() {
       await tester.pump();
 
       expect(find.text('Start with bots'), findsOneWidget);
+
+      await tester.ensureVisible(find.byKey(const Key('lobby-start')));
+      await tester.tap(find.byKey(const Key('lobby-start')));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(TableScreen), findsOneWidget);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(TableScreen)),
+      );
+      expect(container.read(matchSetupProvider).isPassAndPlay, isFalse);
+      final table = container.read(tableProvider);
+      expect(table.seatNames.first, 'Mohit');
+      expect(table.view.opponents, hasLength(3));
+      expect(table.passingTo, isNull);
     });
 
     testWidgets('the lobby opens the house rules, and the game plays by '

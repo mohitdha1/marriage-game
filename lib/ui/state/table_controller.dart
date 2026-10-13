@@ -38,7 +38,8 @@ class MatchSetup {
     this.rules = const HouseRules(),
   }) : people = const [],
        remote = const {},
-       rejoins = null;
+       rejoins = null,
+       isHosted = false;
 
   /// One person against [playerCount] − 1 bots at a stake [table]: each
   /// point is worth its stake in coins, and its bots play at its
@@ -51,7 +52,8 @@ class MatchSetup {
        stake = table.stake,
        people = const [],
        remote = const {},
-       rejoins = null;
+       rejoins = null,
+       isHosted = false;
 
   /// [people], named in seat order, taking turns on this device; no bots.
   MatchSetup.passAndPlay(List<String> people, {this.rules = const HouseRules()})
@@ -60,7 +62,8 @@ class MatchSetup {
       stake = null,
       people = List.unmodifiable(people),
       remote = const {},
-      rejoins = null;
+      rejoins = null,
+      isHosted = false;
 
   /// A game hosted on this device: its player at seat 0, [remote] players
   /// at their seats on other devices, and bots at [difficulty] in any other
@@ -74,7 +77,8 @@ class MatchSetup {
     this.rules = const HouseRules(),
   }) : stake = null,
        people = [hostName],
-       remote = Map.unmodifiable(remote);
+       remote = Map.unmodifiable(remote),
+       isHosted = true;
 
   const MatchSetup._({
     required this.playerCount,
@@ -84,6 +88,7 @@ class MatchSetup {
     required this.remote,
     required this.rejoins,
     required this.rules,
+    required this.isHosted,
   });
 
   /// This setup played by [rules]; the same setup if they're unchanged, so
@@ -98,6 +103,7 @@ class MatchSetup {
           remote: remote,
           rejoins: rejoins,
           rules: rules,
+          isHosted: isHosted,
         );
 
   /// Players on other devices coming back after their link dropped.
@@ -124,7 +130,11 @@ class MatchSetup {
   /// The mode and house rules the match is played by.
   final HouseRules rules;
 
-  bool get isPassAndPlay => people.isNotEmpty && remote.isEmpty;
+  /// Whether this device hosts the game for players on other devices, even
+  /// if nobody has joined and the host plays bots alone.
+  final bool isHosted;
+
+  bool get isPassAndPlay => people.isNotEmpty && !isHosted;
 }
 
 /// A player on another device, and the link to it.
@@ -231,6 +241,7 @@ class TableController extends TableNotifier {
   /// Whether people pass this device between turns, so the table is
   /// covered while it changes hands.
   late bool _passAndPlay;
+  late bool _hosted;
 
   /// The stake table's coins per point, if the match is at one.
   int? _stake;
@@ -280,6 +291,7 @@ class TableController extends TableNotifier {
     final seats = [for (var seat = 0; seat < _round.hands.length; seat++) seat];
     _peopleNames = setup.people;
     _passAndPlay = setup.isPassAndPlay;
+    _hosted = setup.isHosted;
     _stake = setup.stake;
     _people = setup.isPassAndPlay ? seats.toSet() : {humanSeat};
     _remote = setup.remote;
@@ -737,7 +749,7 @@ class TableController extends TableNotifier {
       // the table's stake. A game among friends, on one device or several,
       // doesn't touch them.
       final playerData = ref.read(playerDataProvider.notifier);
-      if (!_passAndPlay && _remote.isEmpty) {
+      if (!_passAndPlay && !_hosted) {
         unawaited(playerData.addCoins(score.net[humanSeat] * (_stake ?? 1)));
       }
       // So are the stats, except when several people share the device, and
@@ -747,7 +759,7 @@ class TableController extends TableNotifier {
           playerData.recordGameResult(
             won: score.winner == humanSeat,
             points: score.net[humanSeat],
-            stake: _remote.isEmpty ? _stake : null,
+            stake: _hosted ? null : _stake,
           ),
         );
       }
