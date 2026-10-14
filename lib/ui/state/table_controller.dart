@@ -19,6 +19,7 @@ import '../../net/game_host.dart' show Rejoin;
 import '../../net/wire.dart';
 import '../../data/stake_tables.dart';
 import '../home/player_data_provider.dart';
+import '../telemetry/analytics.dart';
 import 'house_rules.dart';
 import 'table_notifier.dart';
 import 'table_state.dart';
@@ -326,6 +327,14 @@ class TableController extends TableNotifier {
           random: random,
         ),
     };
+
+    ref
+        .read(analyticsProvider)
+        .gameStarted(
+          mode: _round.config.mode,
+          stake: _stake,
+          difficulty: _bots.isEmpty ? null : difficulty,
+        );
 
     // Players on other devices see the first deal once it's in place.
     Future.microtask(_sendUpdates);
@@ -755,6 +764,12 @@ class TableController extends TableNotifier {
       // So are the stats, except when several people share the device, and
       // the round counts toward unlocking the next stake table.
       if (!_passAndPlay) {
+        ref
+            .read(analyticsProvider)
+            .roundFinished(
+              won: score.winner == humanSeat,
+              sawJoker: score.sawJoker[humanSeat],
+            );
         unawaited(
           playerData.recordGameResult(
             won: score.winner == humanSeat,

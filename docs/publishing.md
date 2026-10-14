@@ -63,8 +63,9 @@ what their phone needs.
      `store/listing.md` about coins (play money only, never bought or
      cashed out).
    - Target audience: adults and teens; not designed for children.
-   - Data safety: no data collected or shared; the network permission is
-     used only for games on the same Wi-Fi.
+   - Data safety: crash logs, app interactions and the Firebase
+     installation ID are collected (Crashlytics and Analytics), none shared;
+     the answers are in `store/listing.md`.
 5. **Play App Signing**: accept Google's management of the app signing key
    when uploading the first bundle.
 

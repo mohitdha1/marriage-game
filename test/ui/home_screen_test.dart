@@ -27,6 +27,7 @@ import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/house_rules.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
+import 'package:marriage_game/ui/telemetry/crash_reports.dart';
 import 'package:marriage_game/ui/theme/table_theme.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -664,6 +665,31 @@ void main() {
       entries.expand((entry) => entry.packages),
       contains('Vector Playing Cards (court card figures)'),
     );
+  });
+
+  testWidgets('a debug build offers a test crash where reports are sent', (
+    tester,
+  ) async {
+    var crashes = 0;
+    await pumpHome(
+      tester,
+      overrides: [testCrashProvider.overrideWithValue(() => crashes++)],
+    );
+
+    await tester.tap(find.byKey(const Key('settings-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('setting-test-crash')));
+
+    expect(crashes, 1);
+  });
+
+  testWidgets('without crash reporting there\'s no test crash', (tester) async {
+    await pumpHome(tester);
+
+    await tester.tap(find.byKey(const Key('settings-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('setting-test-crash')), findsNothing);
   });
 
   testWidgets('How to play opens the rules', (tester) async {

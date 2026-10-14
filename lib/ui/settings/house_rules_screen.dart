@@ -8,9 +8,12 @@ import '../theme/table_theme.dart';
 import 'settings.dart';
 
 /// Opens the [HouseRulesScreen].
-void openHouseRules(BuildContext context) => Navigator.of(
-  context,
-).push(MaterialPageRoute<void>(builder: (_) => const HouseRulesScreen()));
+void openHouseRules(BuildContext context) => Navigator.of(context).push(
+  MaterialPageRoute<void>(
+    settings: const RouteSettings(name: 'house_rules'),
+    builder: (_) => const HouseRulesScreen(),
+  ),
+);
 
 /// A button that opens the [HouseRulesScreen], for the screens that start
 /// a game. [onDark] draws it for the felt; otherwise it suits a dialog.

@@ -126,7 +126,10 @@ class _JoinScreenState extends ConsumerState<JoinScreen> {
     _handedOver = true;
     unawaited(_listening?.cancel());
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => JoinedTable(session: session)),
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'joined_table'),
+        builder: (_) => JoinedTable(session: session),
+      ),
     );
   }
 

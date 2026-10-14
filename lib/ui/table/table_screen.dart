@@ -20,6 +20,7 @@ import '../state/table_controller.dart';
 import '../state/table_notifier.dart';
 import '../state/table_state.dart';
 import '../state/table_view.dart';
+import '../telemetry/analytics.dart';
 import '../theme/table_felt.dart';
 import '../theme/table_theme.dart';
 import 'card_face_art.dart';
@@ -414,7 +415,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                                 key: const Key('back-button'),
                                 tooltip: 'Leave the table',
                                 icon: Icons.arrow_back,
-                                onPressed: () => _leave(context, table),
+                                onPressed: () => _leave(context, ref, table),
                               ),
                               _TopButton(
                                 key: const Key('log-button'),
@@ -664,7 +665,7 @@ class LeaveGuard extends ConsumerWidget {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _leave(context, ref.read(tableProvider).view);
+        if (!didPop) _leave(context, ref, ref.read(tableProvider).view);
       },
       child: child,
     );
@@ -673,7 +674,11 @@ class LeaveGuard extends ConsumerWidget {
 
 /// Leaves the table for the home screen, checking first if a round is
 /// still being played.
-Future<void> _leave(BuildContext context, TableView table) async {
+Future<void> _leave(
+  BuildContext context,
+  WidgetRef ref,
+  TableView table,
+) async {
   final navigator = Navigator.of(context);
   if (!navigator.canPop()) return;
   if (table.winner == null) {
@@ -699,6 +704,7 @@ Future<void> _leave(BuildContext context, TableView table) async {
       ),
     );
     if (leave != true) return;
+    ref.read(analyticsProvider).gameQuitEarly();
   }
   navigator.pop();
 }
@@ -708,9 +714,12 @@ Future<void> _leave(BuildContext context, TableView table) async {
 const scoreboardDelay = Duration(milliseconds: 1500);
 
 void _openScoreboard(BuildContext context) {
-  Navigator.of(
-    context,
-  ).push(MaterialPageRoute<void>(builder: (_) => const ScoreboardScreen()));
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      settings: const RouteSettings(name: 'scoreboard'),
+      builder: (_) => const ScoreboardScreen(),
+    ),
+  );
 }
 
 /// What the human player should do next, in a few words.

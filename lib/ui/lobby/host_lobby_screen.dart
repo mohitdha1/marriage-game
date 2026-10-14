@@ -118,7 +118,10 @@ class _HostLobbyScreenState extends ConsumerState<HostLobbyScreen> {
     );
     _handedOver = true;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => HostedTable(host: host)),
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'hosted_table'),
+        builder: (_) => HostedTable(host: host),
+      ),
     );
   }
 

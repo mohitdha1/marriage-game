@@ -98,6 +98,9 @@ class HomeScreen extends ConsumerWidget {
                                     ],
                                     onTap: () => Navigator.of(context).push(
                                       MaterialPageRoute<void>(
+                                        settings: const RouteSettings(
+                                          name: 'stake_tables',
+                                        ),
                                         builder: (pickerContext) =>
                                             StakeTablePickerScreen(
                                               onPlay: (setup) {
@@ -165,12 +168,18 @@ class HomeScreen extends ConsumerWidget {
         }
       case FriendsMode.host:
         await Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const HostLobbyScreen()),
+          MaterialPageRoute<void>(
+            settings: const RouteSettings(name: 'host_lobby'),
+            builder: (_) => const HostLobbyScreen(),
+          ),
         );
       case FriendsMode.join:
-        await Navigator.of(
-          context,
-        ).push(MaterialPageRoute<void>(builder: (_) => const JoinScreen()));
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            settings: const RouteSettings(name: 'join'),
+            builder: (_) => const JoinScreen(),
+          ),
+        );
     }
   }
 
@@ -178,9 +187,12 @@ class HomeScreen extends ConsumerWidget {
   void _startMatch(BuildContext context, WidgetRef ref, MatchSetup setup) {
     final settings = ref.read(settingsProvider);
     startMatchWith(ref, setup.withRules(settings.rules));
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => singlePlayerTable));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'table'),
+        builder: (_) => singlePlayerTable,
+      ),
+    );
   }
 }
 

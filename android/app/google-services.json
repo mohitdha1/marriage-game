@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "230030317809",
+    "project_id": "marriage-game-81ad1",
+    "storage_bucket": "marriage-game-81ad1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:230030317809:android:27832709519822e1a73150",
+        "android_client_info": {
+          "package_name": "io.github.mohitdha1.marriage"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD729jYLV34lgJEeT9kcVHZW3ePhfTpoTs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../table/card_view.dart';
+import '../telemetry/crash_reports.dart';
 import '../theme/table_theme.dart';
 import 'about.dart';
 import 'feedback.dart';
@@ -38,6 +40,7 @@ class _SettingsPopover extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final controller = ref.read(settingsProvider.notifier);
+    final testCrash = ref.watch(testCrashProvider);
     return Material(
       key: const Key('settings-popover'),
       color: const Color(0xF2263238),
@@ -95,6 +98,7 @@ class _SettingsPopover extends ConsumerWidget {
                       final navigator = Navigator.of(context)..pop();
                       navigator.push(
                         MaterialPageRoute<void>(
+                          settings: const RouteSettings(name: 'how_to_play'),
                           builder: (_) => const HowToPlayScreen(),
                         ),
                       );
@@ -122,6 +126,14 @@ class _SettingsPopover extends ConsumerWidget {
                       showAbout(navigator.context);
                     },
                   ),
+                  // A developer's check that crash reports arrive.
+                  if (kDebugMode && testCrash != null)
+                    _SettingTile(
+                      key: const Key('setting-test-crash'),
+                      label: 'Test crash',
+                      icon: Icons.bug_report_outlined,
+                      onTap: testCrash,
+                    ),
                 ],
               ),
               const SizedBox(height: 12),

@@ -100,14 +100,25 @@ For the IARC questionnaire in Play Console:
 
 ## Data safety
 
-The release build asks for one permission, network access, used only to play
-with friends' phones on the same Wi-Fi or hotspot; nothing goes to the
-internet or any server. It collects and shares no data. The player's name,
-settings and coin balance stay on the device, in the app's own storage, and a
-player's name is shown only to the friends at their table.
+The release build asks for one permission, network access. It's used to play
+with friends' phones on the same Wi-Fi or hotspot, and to send crash reports
+(Firebase Crashlytics) and a few anonymous game events (Google Analytics for
+Firebase). The player's name, settings and coin balance stay on the device,
+in the app's own storage, and a player's name is shown only to the friends at
+their table; none of them is in the reports or events.
 
-- Data collected: none
-- Data shared: none
+For the form:
+
+- Data collected:
+  - App info and performance → Crash logs, Diagnostics (Crashlytics)
+  - App activity → App interactions (Analytics: screens and game events)
+  - Device or other IDs → the Firebase installation ID
+- Purpose: Analytics; App functionality (crash reports)
+- Collection is required (no in-app switch), processed ephemerally: no
+- Data shared: none (Google processes it as a service provider)
+- Encrypted in transit: yes
+- Users can request deletion: no account exists, so there's nothing tied to
+  a person; Analytics data expires under the project's retention setting
 - Privacy policy: https://mohitdha1.github.io/marriage-game/privacy-policy
 
 ## Before publishing

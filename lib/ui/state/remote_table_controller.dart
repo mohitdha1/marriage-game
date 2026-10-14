@@ -10,6 +10,7 @@ import '../../engine/round.dart';
 import '../../net/remote_session.dart';
 import '../home/player_data_provider.dart';
 import '../../net/wire.dart';
+import '../telemetry/analytics.dart';
 import 'table_notifier.dart';
 import 'table_state.dart';
 
@@ -55,6 +56,12 @@ class RemoteTableController extends TableNotifier {
         if (message.roundScores.length > previous.roundScores.length) {
           final score = message.roundScores.last;
           final seat = message.view.you.seat;
+          ref
+              .read(analyticsProvider)
+              .roundFinished(
+                won: score.winner == seat,
+                sawJoker: score.sawJoker[seat],
+              );
           unawaited(
             ref
                 .read(playerDataProvider.notifier)
