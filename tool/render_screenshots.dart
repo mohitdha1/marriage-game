@@ -187,7 +187,11 @@ void main() {
       saved: {
         'settings.tableTheme': 'midnight',
         'lobby.playerCount': 4,
-        'lobby.botDifficulty': 'hard',
+        'lobby.stake': 10,
+        'rules.mode': 'kidnap',
+        'coins.balance': 18450,
+        // The first three tables unlocked, the fourth on its way.
+        'stakes.gamesPlayed': '{"5":50,"10":50,"25":12}',
       },
     );
     await tester.pumpAndSettle();

@@ -71,9 +71,9 @@ can't be cashed out.
 | Feature graphic | `docs/store/feature-graphic.jpg` | 1024 × 500 |
 | Phone screenshots | `docs/store/screenshots/1-home.jpg` … `7-pass.jpg` | 1920 × 1080 |
 
-Screenshots, in order: the home screen, a full table, the Dashain table, the
-game setup, winning a round, the scoreboard, and passing the device between
-friends.
+Screenshots, in order: the home screen, a full table, the Dashain table,
+choosing a stake table and mode, winning a round, the scoreboard, and passing
+the device between friends.
 
 ## Content rating notes
 
