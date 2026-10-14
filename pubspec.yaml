@@ -63,6 +63,9 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  # iOS plugins come from Swift Package Manager rather than CocoaPods.
+  config:
+    enable-swift-package-manager: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
