@@ -29,8 +29,20 @@ computer players who think like real opponents.
 - Win with sets or with seven doublees
 - A full scoreboard: every maal share, payment and penalty, round by round
 
+**Play it your way**
+- Three ways to settle the maal: Standard, Kidnap or Murder
+  - Standard: players who haven't seen the joker lose their maal
+  - Kidnap: the winner takes the maal of players who haven't seen the joker
+  - Murder: players who haven't seen the joker also pay the winner's maal
+- House rules to match how your family plays: add man cards and the
+  Superman, count the alter as maal or not, and turn the joker discard
+  penalty on or off
+- Your rules carry over to every game you start, and when you host, everyone
+  at the table plays by them
+
 **Bots worth beating**
-- Easy, Medium or Hard, each with its own style of play
+- Easy, Medium and Hard, each with its own style of play
+- Bots get tougher as you move up the stake tables
 - Hard bots remember every discard and won't feed you the card you need
 - Bots take a moment to think, so the table feels alive
 
@@ -54,9 +66,9 @@ computer players who think like real opponents.
   shows a short code, friends type it in to join, and bots fill any empty
   seats. No internet needed
 
-Quick Play starts a full table in one tap; Single Player lets you choose the
-players and the bots. Coins are just for fun: you can't buy them and they
-can't be cashed out.
+Quick Play starts a full table in one tap; Single Player lets you pick a stake
+table, from 5 coins a point upwards, with higher tables unlocking as you play.
+Coins are just for fun: you can't buy them and they can't be cashed out.
 
 ## Category and tags
 
