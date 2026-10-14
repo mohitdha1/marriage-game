@@ -38,10 +38,11 @@ Future<void> main() async {
 }
 
 /// Starts Firebase, sending crashes to Crashlytics and events to Analytics,
-/// and returns the overrides that put them to use. Only Android is set up
-/// with Firebase so far; elsewhere the app runs without it.
+/// and returns the overrides that put them to use. Only Android and iOS are
+/// set up with Firebase; elsewhere the app runs without it.
 Future<List<Override>> _startFirebase() async {
-  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return [];
+  const withFirebase = {TargetPlatform.android, TargetPlatform.iOS};
+  if (kIsWeb || !withFirebase.contains(defaultTargetPlatform)) return [];
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   final crashlytics = FirebaseCrashlytics.instance;
   reportCrashes(crashlytics);

@@ -9,7 +9,7 @@ says who you are.
 
 ## What the app collects
 
-The app has no accounts and no ads. On Android it uses two Google Firebase
+The app has no accounts and no ads. It uses two Google Firebase
 services:
 
 - **Firebase Crashlytics** sends a report when the app crashes or hits an

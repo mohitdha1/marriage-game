@@ -26,10 +26,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -58,5 +55,13 @@ class DefaultFirebaseOptions {
     messagingSenderId: '230030317809',
     projectId: 'marriage-game-81ad1',
     storageBucket: 'marriage-game-81ad1.firebasestorage.app',
+  );
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyDOR6UBVd0YBbmyIGeliBjeg8YzwiXu-Vw',
+    appId: '1:230030317809:ios:884d478a85ec9db8a73150',
+    messagingSenderId: '230030317809',
+    projectId: 'marriage-game-81ad1',
+    storageBucket: 'marriage-game-81ad1.firebasestorage.app',
+    iosBundleId: 'io.github.mohitdha1.marriage',
   );
 }
