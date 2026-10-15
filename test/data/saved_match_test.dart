@@ -121,6 +121,46 @@ void main() {
       expect(restored.stake, isNull);
     });
 
+    test('keeps how each person arranged their hand', () {
+      final match = savedMatch();
+      final round = match.replay(Random(0));
+      final arranged = SavedMatch(
+        config: match.config,
+        difficulty: match.difficulty,
+        stake: match.stake,
+        people: match.people,
+        bots: match.bots,
+        roundNumber: match.roundNumber,
+        rounds: match.rounds,
+        start: match.start,
+        log: match.log,
+        arrangements: {
+          0: HandArrangement(
+            cards: round.hands[0].cards.reversed.toList(),
+            groups: [
+              [2, 0, 1],
+              [5, 4],
+            ],
+          ),
+        },
+      );
+
+      final restored = throughJson(arranged).arrangements;
+
+      expect(restored.keys, [0]);
+      expect(restored[0]!.cards, round.hands[0].cards.reversed);
+      expect(restored[0]!.groups, [
+        [2, 0, 1],
+        [5, 4],
+      ]);
+    });
+
+    test('a save from before hands were arranged still loads', () {
+      final json = savedMatch().toJson()..remove('arrangements');
+
+      expect(SavedMatch.fromJson(json).arrangements, isEmpty);
+    });
+
     test('a different version can\'t be read', () {
       final json = savedMatch().toJson()..['version'] = 0;
 

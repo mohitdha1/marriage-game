@@ -74,9 +74,25 @@ List<String> handOf(ProviderContainer container) =>
     [for (final card in container.read(tableProvider).view.hand) '$card']
       ..sort();
 
+/// The human player's hand in the order it's shown, and their groups, as
+/// cards.
+({List<PlayingCard> hand, List<List<PlayingCard>> groups}) arrangementOf(
+  ProviderContainer container,
+) {
+  final table = container.read(tableProvider);
+  final byId = {for (final handCard in table.hand) handCard.id: handCard.card};
+  return (
+    hand: [for (final handCard in table.hand) handCard.card],
+    groups: [
+      for (final group in table.groups) [for (final id in group) byId[id]!],
+    ],
+  );
+}
+
 /// A pass-and-play match between Asha and Bina, saved once Asha has
-/// discarded and it's Bina's turn.
-String passAndPlaySave() {
+/// discarded and it's Bina's turn. With [arranged], each has their hand in
+/// reverse order with its first two cards grouped.
+String passAndPlaySave({bool arranged = false}) {
   final round =
       Round.deal(config: GameConfig(playerCount: 2), random: Random(7))
         ..showOpeningTunnellas(0, [])
@@ -95,6 +111,16 @@ String passAndPlaySave() {
       rounds: const [],
       start: round.start,
       log: round.log,
+      arrangements: {
+        if (arranged)
+          for (final seat in [0, 1])
+            seat: HandArrangement(
+              cards: round.hands[seat].cards.reversed.toList(),
+              groups: [
+                [0, 1],
+              ],
+            ),
+      },
     ).toJson(),
   );
 }
@@ -142,6 +168,8 @@ void main() {
     // Saved the moment the human discards, before any bot moves.
     final hand = container.read(tableProvider).hand;
     unawaited(controller.discard(hand.first.id));
+    // The save is made once the discard is done, ahead of any bot's turn.
+    await Future<void>.value();
     final saved = savedOnDevice(tester);
     await tester.pumpAndSettle();
 
@@ -225,6 +253,65 @@ void main() {
     expect(relaunched.read(savedMatchProvider)!.roundNumber, 2);
   });
 
+  testWidgets('the hand is picked up arranged and grouped as it was left', (
+    tester,
+  ) async {
+    final container = await pumpHome(tester);
+    await tester.tap(find.byKey(const Key('quick-play')));
+    await tester.pumpAndSettle();
+    final controller = container.read(tableProvider.notifier);
+    final hand = container.read(tableProvider).hand;
+    controller
+      ..moveCard(hand.last.id, 0)
+      ..toggleSelected(hand[3].id)
+      ..toggleSelected(hand[7].id)
+      ..groupSelected()
+      ..moveCard(hand[10].id, 5);
+    await tester.pump();
+    final arranged = arrangementOf(container);
+    expect(arranged.groups, hasLength(1));
+
+    final relaunched = await relaunch(tester, savedOnDevice(tester));
+    await tester.tap(find.byKey(const Key('continue-match')));
+    await tester.pumpAndSettle();
+
+    final (hand: cards, :groups) = arrangementOf(relaunched);
+    expect(cards, arranged.hand);
+    expect(groups, arranged.groups);
+  });
+
+  testWidgets('everyone sharing the device gets their own arrangement back', (
+    tester,
+  ) async {
+    final container = await pumpHome(
+      tester,
+      saved: {'match.saved': passAndPlaySave(arranged: true)},
+    );
+    await tester.tap(find.byKey(const Key('continue-match')));
+    await tester.pumpAndSettle();
+    final controller = container.read(tableProvider.notifier)..takeOver();
+    await tester.pump();
+
+    // Bina's turn: her hand, reversed, with two cards grouped.
+    final bina = arrangementOf(container);
+    expect(bina.hand, container.read(tableProvider).view.hand.reversed);
+    expect(bina.groups, [bina.hand.take(2).toList()]);
+
+    // Asha's arrangement waits for her turn.
+    controller.draw(DrawSource.stock);
+    final drawn = container.read(tableProvider).hand.last;
+    await controller.discard(drawn.id);
+    await tester.pumpAndSettle();
+    controller.takeOver();
+    await tester.pump();
+
+    expect(container.read(tableProvider).passingTo, isNull);
+    expect(container.read(tableProvider).view.currentSeat, 0);
+    final asha = arrangementOf(container);
+    expect(asha.hand, container.read(tableProvider).view.hand.reversed);
+    expect(asha.groups, [asha.hand.take(2).toList()]);
+  });
+
   testWidgets('pass and play is picked up covered, for whoever plays next', (
     tester,
   ) async {
@@ -260,6 +347,7 @@ void main() {
     final dealt = container.read(savedMatchProvider)!.log.length;
 
     container.read(tableProvider.notifier).draw(DrawSource.stock);
+    await Future<void>.delayed(Duration.zero);
 
     expect(container.read(savedMatchProvider)!.log, hasLength(dealt + 1));
   });

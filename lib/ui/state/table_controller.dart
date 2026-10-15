@@ -410,7 +410,16 @@ class TableController extends TableNotifier {
         ),
     };
 
-    if (saved != null) return _resumeRound();
+    // Saved after every change: moves, and the person arranging their hand.
+    listenSelf((previous, next) {
+      if (!identical(previous?.view, next.view) ||
+          !identical(previous?.hand, next.hand) ||
+          !identical(previous?.groups, next.groups)) {
+        _saveSoon();
+      }
+    });
+
+    if (saved != null) return _resumeRound(saved);
 
     ref
         .read(analyticsProvider)
@@ -420,12 +429,8 @@ class TableController extends TableNotifier {
           difficulty: _bots.isEmpty ? null : difficulty,
         );
 
-    // Players on other devices see the first deal once it's in place, and
-    // it's saved; neither can happen while the table is being built.
-    Future.microtask(() {
-      _sendUpdates();
-      if (ref.mounted) _save();
-    });
+    // Players on other devices see the first deal once it's in place.
+    Future.microtask(_sendUpdates);
     return _setUpRound();
   }
 
@@ -435,6 +440,21 @@ class TableController extends TableNotifier {
   void endMatch() {
     _ended = true;
     if (!_hosted) ref.read(savedMatchProvider.notifier).clear();
+  }
+
+  /// Whether a save is waiting to be made.
+  var _savePending = false;
+
+  /// Saves the match once the change under way is finished. Several changes
+  /// made together are saved once, and a change made while the table is
+  /// being built is saved after, when other providers may change.
+  void _saveSoon() {
+    if (_savePending) return;
+    _savePending = true;
+    Future.microtask(() {
+      _savePending = false;
+      if (ref.mounted) _save();
+    });
   }
 
   /// Saves the match as it stands, unless it's hosted for other devices,
@@ -457,14 +477,45 @@ class TableController extends TableNotifier {
             rounds: _match.rounds,
             start: _round.start,
             log: _round.log,
+            arrangements: {
+              _viewer: _arrangementOf(state.hand, state.groups),
+              for (final MapEntry(key: seat, value: desk) in _desks.entries)
+                if (desk.hand.isNotEmpty)
+                  seat: _arrangementOf(desk.hand, desk.groups),
+            },
           ),
         );
   }
 
-  /// The first state of a match picked up from a save: the round as it
-  /// was, opening on the person who plays next. Arrangements of the hand
-  /// aren't saved, so each hand opens in the order it was dealt and drawn.
-  TableState _resumeRound() {
+  static HandArrangement _arrangementOf(
+    List<HandCard> hand,
+    List<List<int>> groups,
+  ) {
+    final ids = [for (final handCard in hand) handCard.id];
+    return HandArrangement(
+      cards: [for (final handCard in hand) handCard.card],
+      groups: [
+        for (final group in groups) [for (final id in group) ids.indexOf(id)],
+      ],
+    );
+  }
+
+  /// [arrangement]'s hand and groups, with new ids for the cards.
+  _Desk _deskFrom(HandArrangement arrangement) {
+    final hand = newHandCards(arrangement.cards);
+    return _Desk(
+      hand: hand,
+      groups: [
+        for (final group in arrangement.groups)
+          [for (final i in group) hand[i].id],
+      ],
+    );
+  }
+
+  /// The first state of a match picked up from [saved]: the round as it
+  /// was, each person's hand arranged as they left it, opening on the
+  /// person who plays next.
+  TableState _resumeRound(SavedMatch saved) {
     _botsPlaying = null;
     resetCardIds();
     _desks.clear();
@@ -472,6 +523,11 @@ class TableController extends TableNotifier {
     // A finished round's coins and stats were counted before it was saved.
     _roundRecorded = _round.isOver;
 
+    for (final seat in _people) {
+      if (saved.arrangements[seat] case final arrangement?) {
+        _desks[seat] = _deskFrom(arrangement);
+      }
+    }
     // Anyone who hadn't yet chosen their opening tunnellas chooses again.
     final choosing = [
       for (final seat in _inTurnOrder(_people))
@@ -479,6 +535,7 @@ class TableController extends TableNotifier {
     ];
     for (final seat in choosing) {
       _desks[seat] = _Desk(
+        hand: _desks[seat]?.hand ?? const [],
         openingChoice: findTunnellas(_round.hands[seat].cards),
       );
     }
@@ -496,9 +553,15 @@ class TableController extends TableNotifier {
       if (choosing.isEmpty) unawaited(_advance());
     });
 
+    final hand = _heldFrom(desk.hand);
+    final held = {for (final handCard in hand) handCard.id};
     return TableState(
       view: _snapshot(),
-      hand: _heldFrom(desk.hand),
+      hand: hand,
+      groups: [
+        for (final group in desk.groups)
+          if (group.every(held.contains)) group,
+      ],
       openingChoice: desk.openingChoice,
       roundNumber: _roundNumber,
       seatNames: [
@@ -521,7 +584,6 @@ class TableController extends TableNotifier {
     _round = _newRound(_firstSeat);
     state = _setUpRound();
     _sendUpdates();
-    _save();
   }
 
   /// Makes the opening shows for the newly dealt [_round] and returns its
@@ -973,7 +1035,6 @@ class TableController extends TableNotifier {
       offlineSeats: {..._offline},
     );
     _sendUpdates();
-    _save();
   }
 
   /// Ids of the cards in [hand] that would leave a winning hand if

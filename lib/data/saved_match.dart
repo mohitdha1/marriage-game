@@ -4,6 +4,7 @@ import 'dart:math';
 
 import '../bots/bot_personality.dart';
 import '../bots/bot_player.dart';
+import '../engine/card.dart';
 import '../engine/game_config.dart';
 import '../engine/player_hand.dart';
 import '../engine/round.dart';
@@ -22,10 +23,23 @@ import '../net/wire.dart'
         setsToJson;
 import '../ui/settings/preferences.dart';
 
+/// How a person had arranged their hand: its [cards] in order, and the
+/// sets they'd grouped, as positions in [cards].
+class HandArrangement {
+  HandArrangement({
+    required List<PlayingCard> cards,
+    required List<List<int>> groups,
+  }) : cards = List.unmodifiable(cards),
+       groups = List.unmodifiable(groups.map(List<int>.unmodifiable));
+
+  final List<PlayingCard> cards;
+  final List<List<int>> groups;
+}
+
 /// A match played on this device, saved after every move so it can be
 /// picked up again if the app is closed: who plays it, the rounds finished
-/// so far, and the round being played, as the cards it started from and
-/// every move since.
+/// so far, the round being played, as the cards it started from and every
+/// move since, and how each person had arranged their hand.
 class SavedMatch {
   SavedMatch({
     required this.config,
@@ -37,6 +51,7 @@ class SavedMatch {
     required this.rounds,
     required this.start,
     required this.log,
+    this.arrangements = const {},
   });
 
   /// The rules and number of players.
@@ -67,6 +82,10 @@ class SavedMatch {
 
   /// Every move made in the current round.
   final List<RoundLogEntry> log;
+
+  /// How the people at the device had arranged their hands, by seat. A
+  /// seat that isn't here has its hand dealt in the usual order.
+  final Map<int, HandArrangement> arrangements;
 
   /// The current round, played again to where it was saved. Throws if the
   /// moves no longer fit the cards.
@@ -104,6 +123,10 @@ class SavedMatch {
       'firstSeat': start.firstSeat,
     },
     'log': [for (final entry in log) _entryToJson(entry)],
+    'arrangements': {
+      for (final MapEntry(key: seat, value: hand) in arrangements.entries)
+        '$seat': {'cards': cardsToJson(hand.cards), 'groups': hand.groups},
+    },
   };
 
   /// The match [json] describes. Throws [FormatException] if it isn't one
@@ -148,6 +171,12 @@ class SavedMatch {
           for (final entry in json['log']! as List)
             _entryFromJson(entry as Json),
         ],
+        // Absent from saves made before hands were arranged.
+        arrangements: {
+          for (final MapEntry(:key, :value)
+              in ((json['arrangements'] as Json?) ?? const {}).entries)
+            int.parse(key): _arrangementFromJson(value! as Json),
+        },
       );
     } on FormatException {
       rethrow;
@@ -156,6 +185,14 @@ class SavedMatch {
     }
   }
 }
+
+HandArrangement _arrangementFromJson(Json json) => HandArrangement(
+  cards: cardsFromJson(json['cards']),
+  groups: [
+    for (final group in json['groups']! as List)
+      [for (final i in group as List) i as int],
+  ],
+);
 
 Json _entryToJson(RoundLogEntry entry) => switch (entry) {
   OpeningMove(:final seat, :final tunnellas) => {

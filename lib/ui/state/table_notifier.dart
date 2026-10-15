@@ -121,6 +121,11 @@ abstract class TableNotifier extends Notifier<TableState> {
     return [...kept, ...added];
   }
 
+  /// [cards] as hand cards in the order given, each with a new id.
+  List<HandCard> newHandCards(List<PlayingCard> cards) => [
+    for (final card in cards) HandCard(_nextCardId++, card),
+  ];
+
   /// Starts card ids afresh, for a new round's hand.
   void resetCardIds() => _nextCardId = 0;
 
