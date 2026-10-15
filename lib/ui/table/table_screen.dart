@@ -80,6 +80,18 @@ class _TableScreenState extends ConsumerState<TableScreen> {
   bool get _reduceMotion =>
       MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
+  @override
+  void initState() {
+    super.initState();
+    // A table opened on a round that's already over, as when a saved match
+    // is picked up, goes straight to the scores.
+    if (ref.read(tableProvider).view.winner != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openScoreboard(context);
+      });
+    }
+  }
+
   GlobalKey _handCardKey(int id) =>
       _handCardKeys.putIfAbsent(id, GlobalKey.new);
 

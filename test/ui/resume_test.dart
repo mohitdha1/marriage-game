@@ -14,6 +14,7 @@ import 'package:marriage_game/engine/round_log.dart';
 import 'package:marriage_game/engine/table_event.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/home/player_data_provider.dart';
+import 'package:marriage_game/ui/scoreboard/scoreboard_screen.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
@@ -190,9 +191,8 @@ void main() {
     );
   });
 
-  testWidgets('a round won before the app closed isn\'t paid out again', (
-    tester,
-  ) async {
+  testWidgets('a round won before the app closed isn\'t paid out again, '
+      'and its scores open', (tester) async {
     // The win celebration would otherwise keep the screen busy.
     tester.platformDispatcher.accessibilityFeaturesTestValue =
         const FakeAccessibilityFeatures(disableAnimations: true);
@@ -215,9 +215,12 @@ void main() {
     expect(table.view.winner?.seat, humanSeat);
     expect(table.roundScores, hasLength(1));
     expect((await relaunched.read(playerDataProvider.future)).coins, coins);
+    // The scores open straight away, ready for the next round.
+    expect(find.byType(ScoreboardScreen), findsOneWidget);
 
-    relaunched.read(tableProvider.notifier).startNextRound();
+    await tester.tap(find.byKey(const Key('next-round-button')));
     await tester.pumpAndSettle();
+    expect(find.byType(ScoreboardScreen), findsNothing);
     expect(relaunched.read(tableProvider).roundNumber, 2);
     expect(relaunched.read(savedMatchProvider)!.roundNumber, 2);
   });
