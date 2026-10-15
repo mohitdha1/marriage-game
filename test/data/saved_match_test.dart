@@ -9,7 +9,7 @@ import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/engine/round_log.dart';
 import 'package:marriage_game/engine/scoring.dart';
-import 'package:marriage_game/net/wire.dart' show Json;
+import 'package:marriage_game/net/wire.dart' show Json, cardToJson;
 import 'package:marriage_game/ui/settings/preferences.dart';
 
 import '../engine/round_log_test.dart' show dealt, describe, playOn;
@@ -141,6 +141,7 @@ void main() {
               [2, 0, 1],
               [5, 4],
             ],
+            selected: [7, 3],
           ),
         },
       );
@@ -153,6 +154,28 @@ void main() {
         [2, 0, 1],
         [5, 4],
       ]);
+      expect(restored[0]!.selected, [7, 3]);
+    });
+
+    test('a save from before selections were kept still loads', () {
+      final match = savedMatch();
+      final round = match.replay(Random(0));
+      final json = match.toJson();
+      json['arrangements'] = {
+        '0': {
+          'cards': [for (final card in round.hands[0].cards) cardToJson(card)],
+          'groups': [
+            [0, 1],
+          ],
+        },
+      };
+
+      final arrangement = SavedMatch.fromJson(json).arrangements[0]!;
+
+      expect(arrangement.groups, [
+        [0, 1],
+      ]);
+      expect(arrangement.selected, isEmpty);
     });
 
     test('a save from before hands were arranged still loads', () {

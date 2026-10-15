@@ -414,7 +414,8 @@ class TableController extends TableNotifier {
     listenSelf((previous, next) {
       if (!identical(previous?.view, next.view) ||
           !identical(previous?.hand, next.hand) ||
-          !identical(previous?.groups, next.groups)) {
+          !identical(previous?.groups, next.groups) ||
+          !identical(previous?.selected, next.selected)) {
         _saveSoon();
       }
     });
@@ -478,10 +479,10 @@ class TableController extends TableNotifier {
             start: _round.start,
             log: _round.log,
             arrangements: {
-              _viewer: _arrangementOf(state.hand, state.groups),
+              _viewer: _arrangementOf(state.hand, state.groups, state.selected),
               for (final MapEntry(key: seat, value: desk) in _desks.entries)
                 if (desk.hand.isNotEmpty)
-                  seat: _arrangementOf(desk.hand, desk.groups),
+                  seat: _arrangementOf(desk.hand, desk.groups, desk.selected),
             },
           ),
         );
@@ -490,6 +491,7 @@ class TableController extends TableNotifier {
   static HandArrangement _arrangementOf(
     List<HandCard> hand,
     List<List<int>> groups,
+    Set<int> selected,
   ) {
     final ids = [for (final handCard in hand) handCard.id];
     return HandArrangement(
@@ -497,10 +499,15 @@ class TableController extends TableNotifier {
       groups: [
         for (final group in groups) [for (final id in group) ids.indexOf(id)],
       ],
+      selected: [
+        for (final (i, id) in ids.indexed)
+          if (selected.contains(id)) i,
+      ],
     );
   }
 
-  /// [arrangement]'s hand and groups, with new ids for the cards.
+  /// [arrangement]'s hand, groups and selection, with new ids for the
+  /// cards.
   _Desk _deskFrom(HandArrangement arrangement) {
     final hand = newHandCards(arrangement.cards);
     return _Desk(
@@ -509,6 +516,7 @@ class TableController extends TableNotifier {
         for (final group in arrangement.groups)
           [for (final i in group) hand[i].id],
       ],
+      selected: {for (final i in arrangement.selected) hand[i].id},
     );
   }
 
@@ -536,6 +544,8 @@ class TableController extends TableNotifier {
     for (final seat in choosing) {
       _desks[seat] = _Desk(
         hand: _desks[seat]?.hand ?? const [],
+        groups: _desks[seat]?.groups ?? const [],
+        selected: _desks[seat]?.selected ?? const {},
         openingChoice: findTunnellas(_round.hands[seat].cards),
       );
     }
@@ -562,6 +572,7 @@ class TableController extends TableNotifier {
         for (final group in desk.groups)
           if (group.every(held.contains)) group,
       ],
+      selected: desk.selected.where(held.contains).toSet(),
       openingChoice: desk.openingChoice,
       roundNumber: _roundNumber,
       seatNames: [

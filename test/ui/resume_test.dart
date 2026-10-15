@@ -74,11 +74,10 @@ List<String> handOf(ProviderContainer container) =>
     [for (final card in container.read(tableProvider).view.hand) '$card']
       ..sort();
 
-/// The human player's hand in the order it's shown, and their groups, as
-/// cards.
-({List<PlayingCard> hand, List<List<PlayingCard>> groups}) arrangementOf(
-  ProviderContainer container,
-) {
+/// The human player's hand in the order it's shown, their groups, and
+/// the positions of their selected cards.
+({List<PlayingCard> hand, List<List<PlayingCard>> groups, Set<int> selected})
+arrangementOf(ProviderContainer container) {
   final table = container.read(tableProvider);
   final byId = {for (final handCard in table.hand) handCard.id: handCard.card};
   return (
@@ -86,12 +85,16 @@ List<String> handOf(ProviderContainer container) =>
     groups: [
       for (final group in table.groups) [for (final id in group) byId[id]!],
     ],
+    selected: {
+      for (final (i, handCard) in table.hand.indexed)
+        if (table.selected.contains(handCard.id)) i,
+    },
   );
 }
 
 /// A pass-and-play match between Asha and Bina, saved once Asha has
 /// discarded and it's Bina's turn. With [arranged], each has their hand in
-/// reverse order with its first two cards grouped.
+/// reverse order with its first two cards grouped and its sixth selected.
 String passAndPlaySave({bool arranged = false}) {
   final round =
       Round.deal(config: GameConfig(playerCount: 2), random: Random(7))
@@ -119,6 +122,7 @@ String passAndPlaySave({bool arranged = false}) {
               groups: [
                 [0, 1],
               ],
+              selected: [5],
             ),
       },
     ).toJson(),
@@ -253,9 +257,8 @@ void main() {
     expect(relaunched.read(savedMatchProvider)!.roundNumber, 2);
   });
 
-  testWidgets('the hand is picked up arranged and grouped as it was left', (
-    tester,
-  ) async {
+  testWidgets('the hand is picked up arranged, grouped and selected as it '
+      'was left', (tester) async {
     final container = await pumpHome(tester);
     await tester.tap(find.byKey(const Key('quick-play')));
     await tester.pumpAndSettle();
@@ -266,18 +269,37 @@ void main() {
       ..toggleSelected(hand[3].id)
       ..toggleSelected(hand[7].id)
       ..groupSelected()
-      ..moveCard(hand[10].id, 5);
+      ..moveCard(hand[10].id, 5)
+      ..toggleSelected(hand[12].id)
+      ..toggleSelected(hand[2].id);
     await tester.pump();
     final arranged = arrangementOf(container);
     expect(arranged.groups, hasLength(1));
+    expect(arranged.selected, hasLength(2));
 
     final relaunched = await relaunch(tester, savedOnDevice(tester));
     await tester.tap(find.byKey(const Key('continue-match')));
     await tester.pumpAndSettle();
 
-    final (hand: cards, :groups) = arrangementOf(relaunched);
+    final (hand: cards, :groups, :selected) = arrangementOf(relaunched);
     expect(cards, arranged.hand);
     expect(groups, arranged.groups);
+    expect(selected, arranged.selected);
+  });
+
+  testWidgets('selecting a card is enough to be saved', (tester) async {
+    final container = await pumpHome(tester);
+    await tester.tap(find.byKey(const Key('quick-play')));
+    await tester.pumpAndSettle();
+    final hand = container.read(tableProvider).hand;
+    container.read(tableProvider.notifier).toggleSelected(hand[4].id);
+    await tester.pump();
+
+    final relaunched = await relaunch(tester, savedOnDevice(tester));
+    await tester.tap(find.byKey(const Key('continue-match')));
+    await tester.pumpAndSettle();
+
+    expect(arrangementOf(relaunched).selected, {4});
   });
 
   testWidgets('everyone sharing the device gets their own arrangement back', (
@@ -296,6 +318,7 @@ void main() {
     final bina = arrangementOf(container);
     expect(bina.hand, container.read(tableProvider).view.hand.reversed);
     expect(bina.groups, [bina.hand.take(2).toList()]);
+    expect(bina.selected, {5});
 
     // Asha's arrangement waits for her turn.
     controller.draw(DrawSource.stock);
@@ -310,6 +333,7 @@ void main() {
     final asha = arrangementOf(container);
     expect(asha.hand, container.read(tableProvider).view.hand.reversed);
     expect(asha.groups, [asha.hand.take(2).toList()]);
+    expect(asha.selected, {5});
   });
 
   testWidgets('pass and play is picked up covered, for whoever plays next', (

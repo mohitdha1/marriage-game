@@ -23,17 +23,21 @@ import '../net/wire.dart'
         setsToJson;
 import '../ui/settings/preferences.dart';
 
-/// How a person had arranged their hand: its [cards] in order, and the
-/// sets they'd grouped, as positions in [cards].
+/// How a person had arranged their hand: its [cards] in order, the sets
+/// they'd grouped and the cards they'd [selected], as positions in
+/// [cards].
 class HandArrangement {
   HandArrangement({
     required List<PlayingCard> cards,
     required List<List<int>> groups,
+    List<int> selected = const [],
   }) : cards = List.unmodifiable(cards),
-       groups = List.unmodifiable(groups.map(List<int>.unmodifiable));
+       groups = List.unmodifiable(groups.map(List<int>.unmodifiable)),
+       selected = List.unmodifiable(selected);
 
   final List<PlayingCard> cards;
   final List<List<int>> groups;
+  final List<int> selected;
 }
 
 /// A match played on this device, saved after every move so it can be
@@ -125,7 +129,11 @@ class SavedMatch {
     'log': [for (final entry in log) _entryToJson(entry)],
     'arrangements': {
       for (final MapEntry(key: seat, value: hand) in arrangements.entries)
-        '$seat': {'cards': cardsToJson(hand.cards), 'groups': hand.groups},
+        '$seat': {
+          'cards': cardsToJson(hand.cards),
+          'groups': hand.groups,
+          'selected': hand.selected,
+        },
     },
   };
 
@@ -192,6 +200,8 @@ HandArrangement _arrangementFromJson(Json json) => HandArrangement(
     for (final group in json['groups']! as List)
       [for (final i in group as List) i as int],
   ],
+  // Absent from saves made before selections were kept.
+  selected: [for (final i in (json['selected'] as List?) ?? const []) i as int],
 );
 
 Json _entryToJson(RoundLogEntry entry) => switch (entry) {
