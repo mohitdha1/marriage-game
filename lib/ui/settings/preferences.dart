@@ -12,6 +12,9 @@ abstract interface class PreferencesStore {
   Future<void> setBool(String key, bool value);
   Future<void> setInt(String key, int value);
   Future<void> setString(String key, String value);
+
+  /// Forgets whatever is saved under [key].
+  Future<void> remove(String key);
 }
 
 /// Keeps values in memory only, forgetting them when the app closes.
@@ -38,6 +41,9 @@ class InMemoryPreferences implements PreferencesStore {
   @override
   Future<void> setString(String key, String value) async =>
       _values[key] = value;
+
+  @override
+  Future<void> remove(String key) async => _values.remove(key);
 }
 
 /// Saves values on the device with the shared_preferences package.
@@ -64,6 +70,9 @@ class DevicePreferences implements PreferencesStore {
   @override
   Future<void> setString(String key, String value) =>
       _prefs.setString(key, value);
+
+  @override
+  Future<void> remove(String key) => _prefs.remove(key);
 }
 
 /// Where the app keeps its saved values. The app overrides this with

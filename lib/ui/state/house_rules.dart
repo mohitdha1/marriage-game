@@ -14,6 +14,14 @@ class HouseRules {
     this.jokerPenalty = true,
   });
 
+  /// The rules [config] is set up with.
+  HouseRules.of(GameConfig config)
+    : mode = config.mode,
+      manCards = config.manCardsEnabled,
+      superman = config.supermanCardEnabled,
+      alterIsMaal = config.alterIsMaal,
+      jokerPenalty = config.jokerDiscardPenaltyEnabled;
+
   /// See [GameConfig.mode].
   final GameMode mode;
 

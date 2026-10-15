@@ -151,7 +151,7 @@ class SeatUpdate extends WireMessage {
     seatNames: _strings(json['names']),
     roundScores: [
       for (final score in json['scores']! as List)
-        _roundScoreFromJson(score as Json),
+        roundScoreFromJson(score as Json),
     ],
     totals: _ints(json['totals']),
     jokerPenalty: json['jokerPenalty']! as bool,
@@ -199,7 +199,7 @@ class SeatUpdate extends WireMessage {
     'winningCards': cardsToJson(winningCards),
     'round': roundNumber,
     'names': seatNames,
-    'scores': [for (final score in roundScores) _roundScoreToJson(score)],
+    'scores': [for (final score in roundScores) roundScoreToJson(score)],
     'totals': totals,
     'jokerPenalty': jokerPenalty,
     'mode': mode.name,
@@ -507,7 +507,7 @@ MaalBreakdown _maalFromJson(Json json) => MaalBreakdown(
   superman: json['superman']! as int,
 );
 
-Json _roundScoreToJson(RoundScore score) => {
+Json roundScoreToJson(RoundScore score) => {
   'winner': score.winner,
   'maal': [for (final maal in score.maal) _maalToJson(maal)],
   'net': score.net,
@@ -519,7 +519,7 @@ Json _roundScoreToJson(RoundScore score) => {
   'doublees': score.wonWithDoublees,
 };
 
-RoundScore _roundScoreFromJson(Json json) => RoundScore(
+RoundScore roundScoreFromJson(Json json) => RoundScore(
   winner: json['winner']! as int,
   maal: [for (final maal in json['maal']! as List) _maalFromJson(maal as Json)],
   net: _ints(json['net']),

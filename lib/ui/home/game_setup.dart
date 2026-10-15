@@ -1,5 +1,7 @@
 import '../../bots/bot_player.dart';
+import '../../data/saved_match.dart';
 import '../../engine/game_config.dart';
+import '../state/house_rules.dart';
 import '../state/table_controller.dart';
 import 'stake_table_picker.dart';
 
@@ -45,4 +47,20 @@ String describeSetup(MatchSetup setup) {
       '${level[0].toUpperCase()}${level.substring(1)}'
       '${stake == null ? '' : ' · ${formatStake(stake)} table'}'
       '${setup.rules.mode == GameMode.standard ? '' : ' · ${modeName(setup.rules.mode)}'}';
+}
+
+/// [saved] summed up for picking it up again: the round it's on, then who
+/// plays it, as "Round 3 · 4 bots · Medium" or "Round 2 · Pass and play".
+String describeSavedMatch(SavedMatch saved) {
+  final players = saved.isPassAndPlay
+      ? 'Pass and play'
+      : describeSetup(
+          MatchSetup(
+            playerCount: saved.config.playerCount,
+            difficulty: saved.difficulty,
+            stake: saved.stake,
+            rules: HouseRules.of(saved.config),
+          ),
+        );
+  return 'Round ${saved.roundNumber} · $players';
 }

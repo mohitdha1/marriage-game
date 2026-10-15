@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/saved_match.dart';
 import '../../engine/card.dart';
 import '../haptics/table_haptics.dart';
 import '../lobby/host_lobby_screen.dart';
@@ -31,7 +32,8 @@ const singlePlayerTable = TableSounds(
 /// The first screen: the player's avatar, name and coins along the top, a
 /// settings gear, a large tile for each way to play (Single Player sets up a
 /// custom game), and a Quick Play button that starts a game against bots
-/// straight away.
+/// straight away. A match left unfinished can be picked up with the
+/// Continue button beside it.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -41,6 +43,7 @@ class HomeScreen extends ConsumerWidget {
     final playerData = ref.watch(playerDataProvider).value;
     final coins = playerData?.coins;
     final stakeTables = ref.watch(stakeTablesProvider).value;
+    final saved = ref.watch(savedMatchProvider);
     // Quick Play deals the stake table last chosen, once the tables and the
     // player's coins have loaded.
     final quickPlay = stakeTables == null || playerData == null
@@ -131,14 +134,30 @@ class HomeScreen extends ConsumerWidget {
                                 ],
                               ),
                               const SizedBox(height: 14),
-                              _QuickPlayButton(
-                                setup: quickPlay == null
-                                    ? ''
-                                    : describeSetup(quickPlay),
-                                onPressed: quickPlay == null
-                                    ? null
-                                    : () =>
-                                          _startMatch(context, ref, quickPlay),
+                              Wrap(
+                                spacing: 16,
+                                runSpacing: 12,
+                                alignment: WrapAlignment.center,
+                                children: [
+                                  if (saved != null)
+                                    _ContinueButton(
+                                      match: describeSavedMatch(saved),
+                                      onPressed: () =>
+                                          _continueMatch(context, ref, saved),
+                                    ),
+                                  _QuickPlayButton(
+                                    setup: quickPlay == null
+                                        ? ''
+                                        : describeSetup(quickPlay),
+                                    onPressed: quickPlay == null
+                                        ? null
+                                        : () => _startMatch(
+                                            context,
+                                            ref,
+                                            quickPlay,
+                                          ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 8),
                             ],
@@ -187,10 +206,64 @@ class HomeScreen extends ConsumerWidget {
   void _startMatch(BuildContext context, WidgetRef ref, MatchSetup setup) {
     final settings = ref.read(settingsProvider);
     startMatchWith(ref, setup.withRules(settings.rules));
+    _openTable(context);
+  }
+
+  /// Opens the [saved] match where it was left.
+  void _continueMatch(BuildContext context, WidgetRef ref, SavedMatch saved) {
+    resumeMatch(ref, saved);
+    _openTable(context);
+  }
+
+  void _openTable(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: 'table'),
         builder: (_) => singlePlayerTable,
+      ),
+    );
+  }
+}
+
+/// Picks up the match left unfinished, named underneath.
+class _ContinueButton extends StatelessWidget {
+  const _ContinueButton({required this.match, required this.onPressed});
+
+  final String match;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      key: const Key('continue-match'),
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        backgroundColor: const Color(0x33000000),
+        side: const BorderSide(color: Colors.white, width: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
+        shape: const StadiumBorder(),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.replay_rounded, size: 26),
+              SizedBox(width: 6),
+              Text(
+                'Continue',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          Text(
+            match,
+            key: const Key('continue-match-setup'),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }

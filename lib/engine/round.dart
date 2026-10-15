@@ -4,6 +4,7 @@ import 'card.dart';
 import 'game_config.dart';
 import 'joker.dart';
 import 'player_hand.dart';
+import 'round_log.dart';
 import 'scoring.dart';
 import 'shoe.dart';
 import 'table_event.dart';
@@ -32,6 +33,9 @@ enum DrawSource { stock, discardPile }
 ///
 /// Read state from here and act through this class's methods, not through
 /// the [PlayerHand]s directly, so the table rules are always applied.
+///
+/// Every change is written to [log], so a round can be saved as its [start]
+/// and log, and played again to the same point with [Round.replay].
 class Round {
   /// Shuffles a fresh shoe with [random], deals, and turns up the first
   /// discard. [random] is also used whenever the stock needs reshuffling.
@@ -69,7 +73,13 @@ class Round {
        _stock = [...stock],
        _discardPile = [...discardPile],
        _currentSeat = firstSeat,
-       _jokerDiscards = List.filled(hands.length, 0) {
+       _jokerDiscards = List.filled(hands.length, 0),
+       start = RoundStart(
+         hands: hands,
+         stock: stock,
+         discardPile: discardPile,
+         firstSeat: firstSeat,
+       ) {
     if (hands.length != config.playerCount) {
       throw ArgumentError.value(
         hands.length,
@@ -82,13 +92,67 @@ class Round {
     }
   }
 
+  /// Plays [log] again from [start], ending where the round it came from
+  /// was when the log was taken. [random] is used only for reshuffles
+  /// after the log runs out. Throws as the move would have if an entry
+  /// isn't allowed, as when the log doesn't belong to [start].
+  factory Round.replay({
+    required GameConfig config,
+    required Random random,
+    required RoundStart start,
+    required List<RoundLogEntry> log,
+  }) {
+    final round = Round.fromCards(
+      config: config,
+      random: random,
+      hands: start.hands,
+      stock: start.stock,
+      discardPile: start.discardPile,
+      firstSeat: start.firstSeat,
+    );
+    for (final entry in log) {
+      switch (entry) {
+        case OpeningMove(:final seat, :final tunnellas):
+          round.showOpeningTunnellas(seat, tunnellas);
+        case DrawMove(:final source):
+          round.draw(source);
+        case ShowMove(
+          kind: ShowKind.pureSets,
+          :final sets,
+          :final tipluPosition,
+        ):
+          round.showPureSets(sets, tipluPosition: tipluPosition);
+        case ShowMove(
+          kind: ShowKind.doublees,
+          :final sets,
+          :final tipluPosition,
+        ):
+          round.showDoublees(sets, tipluPosition: tipluPosition);
+        case PickTipluMove(:final position):
+          round.pickTiplu(position);
+        case DiscardMove(:final card):
+          round.discard(card);
+        case WinMove(:final card):
+          round.declareWin(card);
+        case StockShuffle(:final stock):
+          round._refillStock(stock);
+      }
+    }
+    return round;
+  }
+
   final GameConfig config;
+
+  /// The cards the round was dealt from.
+  final RoundStart start;
+
   final Random _random;
   final List<PlayerHand> _hands;
   final List<PlayingCard> _stock;
   final List<PlayingCard> _discardPile;
   final List<int> _jokerDiscards;
   final List<TableEvent> _events = [];
+  final List<RoundLogEntry> _log = [];
   int _currentSeat;
   Jokers? _jokers;
   PlayingCard? _takenFromDiscardPile;
@@ -135,6 +199,9 @@ class Round {
   /// Everything every player has seen happen so far, oldest first.
   List<TableEvent> get events => List.unmodifiable(_events);
 
+  /// Every change made to the round since [start], oldest first.
+  List<RoundLogEntry> get log => List.unmodifiable(_log);
+
   bool get isOver => _winner != null;
 
   /// The card the current player took from the discard pile this turn,
@@ -150,6 +217,7 @@ class Round {
   void showOpeningTunnellas(int seat, List<List<PlayingCard>> tunnellas) {
     _checkNotOver();
     _hands[seat].showOpeningTunnellas(tunnellas);
+    _log.add(OpeningMove(seat, _copySets(tunnellas)));
     if (tunnellas.isNotEmpty) {
       _events.add(OpenedTunnellas(seat, _copySets(tunnellas)));
     }
@@ -184,6 +252,7 @@ class Round {
       _discardPile.removeLast();
       _takenFromDiscardPile = card;
     }
+    _log.add(DrawMove(source));
     _events.add(
       DrewCard(
         _currentSeat,
@@ -226,6 +295,7 @@ class Round {
     _refillStockIfEmpty();
     _checkTipluPosition(position);
     _takeTiplu(position);
+    _log.add(PickTipluMove(position));
   }
 
   /// Ends the current player's turn by discarding [card], and passes the
@@ -234,6 +304,7 @@ class Round {
     _checkNotOver();
     _checkNoTipluPick();
     _discardFromCurrentHand(card);
+    _log.add(DiscardMove(card));
     _events.add(DiscardedCard(_currentSeat, card));
     _currentSeat = (_currentSeat + 1) % _hands.length;
   }
@@ -277,6 +348,7 @@ class Round {
 
     _discardFromCurrentHand(card);
     _winner = _currentSeat;
+    _log.add(WinMove(card));
     _events.add(WonRound(_currentSeat, card));
   }
 
@@ -312,6 +384,7 @@ class Round {
         );
       }
       show();
+      _log.add(ShowMove(kind, _copySets(sets), null));
       _events.add(ShowedSets(_currentSeat, kind, _copySets(sets)));
       return;
     }
@@ -322,6 +395,7 @@ class Round {
     _refillStockIfEmpty();
     _checkTipluPosition(tipluPosition);
     show();
+    _log.add(ShowMove(kind, _copySets(sets), tipluPosition));
     _events.add(ShowedSets(_currentSeat, kind, _copySets(sets)));
     _takeTiplu(tipluPosition!);
   }
@@ -378,12 +452,20 @@ class Round {
   /// card is shuffled to become the new stock.
   void _refillStockIfEmpty() {
     if (_stock.isNotEmpty || _discardPile.length < 2) return;
+    final shuffled = _discardPile.sublist(0, _discardPile.length - 1);
+    fisherYatesShuffle(shuffled, _random);
+    _refillStock(shuffled);
+  }
+
+  /// Makes [shuffled], the discards under the top card in a new order, the
+  /// stock.
+  void _refillStock(List<PlayingCard> shuffled) {
     final top = _discardPile.removeLast();
-    _stock.addAll(_discardPile);
+    _stock.addAll(shuffled);
     _discardPile
       ..clear()
       ..add(top);
-    fisherYatesShuffle(_stock, _random);
+    _log.add(StockShuffle(List.unmodifiable(shuffled)));
     _events.add(StockReshuffled(_currentSeat));
   }
 

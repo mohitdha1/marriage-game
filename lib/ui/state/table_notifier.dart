@@ -53,6 +53,9 @@ abstract class TableNotifier extends Notifier<TableState> {
   /// total back at zero.
   void startNewMatch() => ref.invalidateSelf();
 
+  /// The person has left the table, ending the match on this device.
+  void endMatch() {}
+
   /// Whether the match can be started again from here.
   bool get canStartNewMatch => dealsRounds;
 

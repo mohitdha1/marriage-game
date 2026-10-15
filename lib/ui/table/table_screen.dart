@@ -706,6 +706,7 @@ Future<void> _leave(
     if (leave != true) return;
     ref.read(analyticsProvider).gameQuitEarly();
   }
+  ref.read(tableProvider.notifier).endMatch();
   navigator.pop();
 }
 

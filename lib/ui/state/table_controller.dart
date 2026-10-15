@@ -17,8 +17,10 @@ import '../../engine/win_check.dart';
 import '../../net/connection.dart';
 import '../../net/game_host.dart' show Rejoin;
 import '../../net/wire.dart';
+import '../../data/saved_match.dart';
 import '../../data/stake_tables.dart';
 import '../home/player_data_provider.dart';
+import '../settings/preferences.dart';
 import '../telemetry/analytics.dart';
 import 'house_rules.dart';
 import 'table_notifier.dart';
@@ -210,9 +212,75 @@ final tableProvider = NotifierProvider<TableNotifier, TableState>(
 /// table is built, the update would land in the middle of a widget build,
 /// where a change can't be announced.
 void startMatchWith(WidgetRef ref, MatchSetup setup) {
+  ref.read(resumeSlotProvider).take();
   ref.read(matchSetupProvider.notifier).choose(setup);
   ref.read(roundFactoryProvider);
   ref.invalidate(tableProvider);
+}
+
+/// Sets up [saved] to be picked up where it was left, for the table opened
+/// next.
+void resumeMatch(WidgetRef ref, SavedMatch saved) {
+  final rules = HouseRules.of(saved.config);
+  ref
+      .read(matchSetupProvider.notifier)
+      .choose(
+        saved.isPassAndPlay
+            ? MatchSetup.passAndPlay(saved.people, rules: rules)
+            : MatchSetup(
+                playerCount: saved.config.playerCount,
+                difficulty: saved.difficulty,
+                stake: saved.stake,
+                rules: rules,
+              ),
+      );
+  ref.read(resumeSlotProvider).put(saved);
+  ref.read(roundFactoryProvider);
+  ref.invalidate(tableProvider);
+}
+
+/// Holds a saved match for the next table built to pick up, once; any
+/// table built after it deals afresh.
+class ResumeSlot {
+  SavedMatch? _match;
+
+  void put(SavedMatch match) => _match = match;
+
+  /// The match waiting to be picked up, if any, leaving the slot empty.
+  SavedMatch? take() {
+    final match = _match;
+    _match = null;
+    return match;
+  }
+}
+
+final resumeSlotProvider = Provider<ResumeSlot>((ref) => ResumeSlot());
+
+/// Where the match in progress is saved.
+final savedMatchStoreProvider = Provider<SavedMatchStore>(
+  (ref) => SavedMatchStore(ref.watch(preferencesProvider)),
+);
+
+/// The match on this device that was left unfinished and can be picked up
+/// again, if there is one. Kept up to date as the match is played, and
+/// cleared once the player leaves the table.
+final savedMatchProvider = NotifierProvider<SavedMatchController, SavedMatch?>(
+  SavedMatchController.new,
+);
+
+class SavedMatchController extends Notifier<SavedMatch?> {
+  @override
+  SavedMatch? build() => ref.watch(savedMatchStoreProvider).load();
+
+  void save(SavedMatch match) {
+    state = match;
+    unawaited(ref.read(savedMatchStoreProvider).save(match));
+  }
+
+  void clear() {
+    state = null;
+    unawaited(ref.read(savedMatchStoreProvider).clear());
+  }
 }
 
 /// Owns the engine's [Round], applies the human player's moves to it, and
@@ -225,6 +293,9 @@ void startMatchWith(WidgetRef ref, MatchSetup setup) {
 /// play one at a time after a short thinking pause, and the table is
 /// published after each bot's move, so the people watch the game unfold.
 /// Nobody can move while a bot is thinking.
+///
+/// A match played on this device alone is saved after every change, and
+/// can be picked up again from [savedMatchProvider] through [resumeMatch].
 ///
 /// The table shows one person's view at a time: their hand, groups and
 /// selection. Each person's are kept on their own [_Desk] while someone
@@ -246,6 +317,10 @@ class TableController extends TableNotifier {
 
   /// The stake table's coins per point, if the match is at one.
   int? _stake;
+  late BotDifficulty _difficulty;
+
+  /// Whether the person has left the table, ending the match.
+  var _ended = false;
 
   /// Whose view the table shows: the person playing now, or the last one to
   /// play while bots take their turns.
@@ -283,10 +358,16 @@ class TableController extends TableNotifier {
     // choices for the next game change meanwhile.
     _newRound = ref.read(roundFactoryProvider);
     _thinkingTime = ref.watch(botThinkingTimeProvider);
-    _firstSeat = 0;
-    _roundNumber = 1;
-    _round = _newRound(_firstSeat);
+    final random = _random = ref.watch(randomProvider);
+    final saved = ref.read(resumeSlotProvider).take();
+    _ended = false;
+    _firstSeat = saved?.start.firstSeat ?? 0;
+    _roundNumber = saved?.roundNumber ?? 1;
+    _round = saved?.replay(random) ?? _newRound(_firstSeat);
     _match = MatchScore(_round.hands.length);
+    for (final round in saved?.rounds ?? const <RoundScore>[]) {
+      _match.addRound(round);
+    }
 
     final setup = ref.read(matchSetupProvider);
     final seats = [for (var seat = 0; seat < _round.hands.length; seat++) seat];
@@ -311,14 +392,15 @@ class TableController extends TableNotifier {
     }
 
     // The same bots play every round of the match.
-    final random = _random = ref.watch(randomProvider);
     _matchId = random.nextInt(1 << 30);
-    final difficulty = ref.read(botDifficultyProvider);
+    final difficulty = _difficulty = ref.read(botDifficultyProvider);
     final botSeats = [
       for (final seat in seats)
         if (!_people.contains(seat) && !_remote.containsKey(seat)) seat,
     ];
-    final personalities = BotPersonality.pick(botSeats.length, random);
+    final personalities = saved == null
+        ? BotPersonality.pick(botSeats.length, random)
+        : [for (final seat in botSeats) saved.bots[seat]!];
     _bots = {
       for (var i = 0; i < botSeats.length; i++)
         botSeats[i]: BotPlayer(
@@ -328,6 +410,8 @@ class TableController extends TableNotifier {
         ),
     };
 
+    if (saved != null) return _resumeRound();
+
     ref
         .read(analyticsProvider)
         .gameStarted(
@@ -336,9 +420,95 @@ class TableController extends TableNotifier {
           difficulty: _bots.isEmpty ? null : difficulty,
         );
 
-    // Players on other devices see the first deal once it's in place.
-    Future.microtask(_sendUpdates);
+    // Players on other devices see the first deal once it's in place, and
+    // it's saved; neither can happen while the table is being built.
+    Future.microtask(() {
+      _sendUpdates();
+      if (ref.mounted) _save();
+    });
     return _setUpRound();
+  }
+
+  /// The person has left the table: the match is over, so it's no longer
+  /// saved, and bots still to play stop.
+  @override
+  void endMatch() {
+    _ended = true;
+    if (!_hosted) ref.read(savedMatchProvider.notifier).clear();
+  }
+
+  /// Saves the match as it stands, unless it's hosted for other devices,
+  /// which can't be picked up again without them.
+  void _save() {
+    if (_hosted || _ended) return;
+    ref
+        .read(savedMatchProvider.notifier)
+        .save(
+          SavedMatch(
+            config: _round.config,
+            difficulty: _difficulty,
+            stake: _stake,
+            people: _passAndPlay ? _peopleNames : const [],
+            bots: {
+              for (final MapEntry(key: seat, value: bot) in _bots.entries)
+                seat: bot.personality,
+            },
+            roundNumber: _roundNumber,
+            rounds: _match.rounds,
+            start: _round.start,
+            log: _round.log,
+          ),
+        );
+  }
+
+  /// The first state of a match picked up from a save: the round as it
+  /// was, opening on the person who plays next. Arrangements of the hand
+  /// aren't saved, so each hand opens in the order it was dealt and drawn.
+  TableState _resumeRound() {
+    _botsPlaying = null;
+    resetCardIds();
+    _desks.clear();
+    _remoteChoosing.clear();
+    // A finished round's coins and stats were counted before it was saved.
+    _roundRecorded = _round.isOver;
+
+    // Anyone who hadn't yet chosen their opening tunnellas chooses again.
+    final choosing = [
+      for (final seat in _inTurnOrder(_people))
+        if (!_round.hands[seat].hasOpened) seat,
+    ];
+    for (final seat in choosing) {
+      _desks[seat] = _Desk(
+        openingChoice: findTunnellas(_round.hands[seat].cards),
+      );
+    }
+    final current = _round.currentSeat;
+    _viewer = choosing.isNotEmpty
+        ? choosing.first
+        : _people.contains(current)
+        ? current
+        : _inTurnOrder(_people).first;
+    final desk = _desks.remove(_viewer) ?? _Desk();
+
+    Future.microtask(() {
+      if (!ref.mounted) return;
+      _publish();
+      if (choosing.isEmpty) unawaited(_advance());
+    });
+
+    return TableState(
+      view: _snapshot(),
+      hand: _heldFrom(desk.hand),
+      openingChoice: desk.openingChoice,
+      roundNumber: _roundNumber,
+      seatNames: [
+        for (var seat = 0; seat < _round.hands.length; seat++) _nameOf(seat),
+      ],
+      roundScores: List.unmodifiable(_match.rounds),
+      totals: List.unmodifiable(_match.totals),
+      handProgress: _handProgress(),
+      passingTo: _passAndPlay ? _viewer : null,
+    );
   }
 
   /// Deals the next round once the current one is over. The first player
@@ -351,6 +521,7 @@ class TableController extends TableNotifier {
     _round = _newRound(_firstSeat);
     state = _setUpRound();
     _sendUpdates();
+    _save();
   }
 
   /// Makes the opening shows for the newly dealt [_round] and returns its
@@ -739,7 +910,7 @@ class TableController extends TableNotifier {
   Future<void> _runBots() async {
     while (!_round.isOver && _botFor(_round.currentSeat) != null) {
       await Future<void>.delayed(_thinkingTime());
-      if (!ref.mounted) return;
+      if (!ref.mounted || _ended) return;
       final seat = _round.currentSeat;
       // The player may have come back while the bot was thinking.
       final bot = _botFor(seat);
@@ -802,6 +973,7 @@ class TableController extends TableNotifier {
       offlineSeats: {..._offline},
     );
     _sendUpdates();
+    _save();
   }
 
   /// Ids of the cards in [hand] that would leave a winning hand if
