@@ -106,11 +106,14 @@ class HouseRulesScreen extends ConsumerWidget {
                 key: const Key('house-rules'),
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: theme.panel,
+                  // A Material, not a DecoratedBox, so the switches' ink
+                  // splashes show on the panel.
+                  Material(
+                    color: theme.panel,
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0x33FFFFFF)),
+                      side: const BorderSide(color: Color(0x33FFFFFF)),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 10),
