@@ -3,52 +3,37 @@ import 'package:marriage_game/engine/hand_arrangement.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
 
 void main() {
-  group('handHelperText', () {
-    test('before the joker: pure sets and dublees toward the show', () {
+  group('toWinOf', () {
+    test('nothing before the joker is seen', () {
       expect(
-        handHelperText(
-          const ShowProgress(pureSets: 2, pureSetsNeeded: 3, doublees: 5),
+        toWinOf(
+          const ShowProgress(pureSets: 3, pureSetsNeeded: 3, doublees: 7),
         ),
-        'Sets 2/3 · Dublees 5/7',
+        isNull,
+      );
+      expect(toWinOf(null), isNull);
+    });
+
+    test('on the sets route: the sets still needed', () {
+      expect(
+        toWinOf(
+          const WinProgress(setsMade: 4, unmatched: 7, setsToWin: 3, maal: 0),
+        ),
+        3,
       );
     });
 
-    test('enough pure sets: ready to show', () {
-      expect(
-        handHelperText(
-          const ShowProgress(pureSets: 4, pureSetsNeeded: 3, doublees: 1),
-        ),
-        'Ready to show · Dublees 1/7',
-      );
-      expect(
-        handHelperText(
-          const ShowProgress(pureSets: 0, pureSetsNeeded: 0, doublees: 0),
-        ),
-        'Ready to show · Dublees 0/7',
-      );
+    test('on the dublee route: 1 until the 8th doublee, then 0', () {
+      expect(toWinOf(const DubleeProgress(doublees: 7, maal: 0)), 1);
+      expect(toWinOf(const DubleeProgress(doublees: 8, maal: 0)), 0);
     });
+  });
 
-    test('dublees never read more than 7/7', () {
-      expect(
-        handHelperText(
-          const ShowProgress(pureSets: 0, pureSetsNeeded: 3, doublees: 9),
-        ),
-        'Sets 0/3 · Dublees 7/7',
-      );
-    });
-
-    test('after the joker: sets made and unmatched cards', () {
-      expect(
-        handHelperText(const WinProgress(setsMade: 5, unmatched: 4, maal: 7)),
-        '5 sets · 4 unmatched',
-      );
-    });
-
-    test('on the dublee route: progress to the 8th', () {
-      expect(
-        handHelperText(const DubleeProgress(doublees: 7, maal: 0)),
-        'Dublees 7/8',
-      );
+  group('toWinText', () {
+    test('counts down, then says the hand is ready', () {
+      expect(toWinText(3), '3 to win');
+      expect(toWinText(1), '1 to win');
+      expect(toWinText(0), 'Ready to win!');
     });
   });
 
@@ -60,7 +45,9 @@ void main() {
       );
       expect(maalOf(null), isNull);
       expect(
-        maalOf(const WinProgress(setsMade: 3, unmatched: 9, maal: 12)),
+        maalOf(
+          const WinProgress(setsMade: 3, unmatched: 9, setsToWin: 3, maal: 12),
+        ),
         12,
       );
       expect(maalOf(const DubleeProgress(doublees: 7, maal: 5)), 5);

@@ -451,12 +451,19 @@ Json? _progressToJson(HandProgress? progress) => switch (progress) {
     'pureSetsNeeded': pureSetsNeeded,
     'doublees': doublees,
   },
-  WinProgress(:final setsMade, :final unmatched, :final maal) => {
-    'type': 'win',
-    'setsMade': setsMade,
-    'unmatched': unmatched,
-    'maal': maal,
-  },
+  WinProgress(
+    :final setsMade,
+    :final unmatched,
+    :final setsToWin,
+    :final maal,
+  ) =>
+    {
+      'type': 'win',
+      'setsMade': setsMade,
+      'unmatched': unmatched,
+      'setsToWin': setsToWin,
+      'maal': maal,
+    },
   DubleeProgress(:final doublees, :final maal) => {
     'type': 'doublee',
     'doublees': doublees,
@@ -474,6 +481,7 @@ HandProgress? _progressFromJson(Json? json) => switch (json?['type']) {
   'win' => WinProgress(
     setsMade: json!['setsMade']! as int,
     unmatched: json['unmatched']! as int,
+    setsToWin: json['setsToWin']! as int,
     maal: json['maal']! as int,
   ),
   'doublee' => DubleeProgress(

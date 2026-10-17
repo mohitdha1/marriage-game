@@ -811,19 +811,22 @@ void main() {
       await pumpTable(tester, yourHand: winnableHand);
       expect(find.byKey(const Key('joker-chip')), findsNothing);
 
-      // Before the joker: the helper counts toward the show; no maal yet.
-      expect(
-        tester
-            .widget<Text>(
-              find.descendant(
-                of: find.byKey(const Key('hand-helper')),
-                matching: find.byType(Text),
-              ),
-            )
-            .data,
-        'Ready to show · Dublees 0/7',
-      );
+      String badge(String key) => tester
+          .widget<Text>(
+            find.descendant(
+              of: find.byKey(Key(key)),
+              matching: find.byType(Text),
+            ),
+          )
+          .data!;
+
+      // Before the joker: the helper counts toward the show; no maal, and
+      // no count toward the win yet.
+      expect(badge('dub-count'), 'Dub 0');
+      expect(badge('seq-count'), 'Seq 3');
       expect(find.byKey(const Key('maal-badge')), findsNothing);
+      expect(find.byKey(const Key('to-win')), findsNothing);
+      expect(find.textContaining('to win'), findsNothing);
 
       await tester.tap(find.byKey(const Key('stock')));
       await tester.pump();
@@ -855,17 +858,10 @@ void main() {
       await tester.pump();
       expect(find.byType(JokerReveal), findsNothing);
 
-      // After the joker: sets made and unmatched cards, and the maal badge
-      // (8♥ is the poplu, worth 2).
-      String badge(String key) => tester
-          .widget<Text>(
-            find.descendant(
-              of: find.byKey(Key(key)),
-              matching: find.byType(Text),
-            ),
-          )
-          .data!;
-      expect(badge('hand-helper'), '5 sets · 1 unmatched');
+      // After the joker: the one unmatched card can be discarded to win, and
+      // the maal badge shows (8♥ is the poplu, worth 2).
+      expect(find.byKey(const Key('dub-count')), findsNothing);
+      expect(badge('to-win'), 'Ready to win!');
       expect(badge('maal-badge'), 'Maal 2');
 
       // The joker stays in the corner, and wild cards in hand glow.

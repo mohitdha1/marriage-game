@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/card.dart';
 import '../../engine/hand_arrangement.dart';
-import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
 import '../../engine/scoring.dart';
 import '../../engine/table_event.dart';
@@ -596,9 +595,9 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                           Positioned(
                             right: 0,
                             bottom: aboveHand,
-                            child: _CornerBadge(
+                            child: _HandHelper(
                               key: const Key('hand-helper'),
-                              text: handHelperText(progress),
+                              progress: progress,
                             ),
                           ),
                         Positioned.fill(
@@ -754,22 +753,16 @@ String statusLine(TableState state) {
   return 'Select a card to discard.';
 }
 
-/// The hand helper's summary of [progress]: progress toward showing before
-/// the joker is seen, and toward winning after.
-String handHelperText(HandProgress progress) => switch (progress) {
-  ShowProgress(:final pureSets, :final pureSetsNeeded, :final doublees)
-      when pureSets >= pureSetsNeeded =>
-    'Ready to show · Dublees ${min(doublees, PlayerHand.doubleesToShow)}/'
-        '${PlayerHand.doubleesToShow}',
-  ShowProgress(:final pureSets, :final pureSetsNeeded, :final doublees) =>
-    'Sets $pureSets/$pureSetsNeeded · Dublees '
-        '${min(doublees, PlayerHand.doubleesToShow)}/'
-        '${PlayerHand.doubleesToShow}',
-  WinProgress(:final setsMade, :final unmatched) =>
-    '$setsMade sets · $unmatched unmatched',
-  DubleeProgress(:final doublees, :final doubleesNeeded) =>
-    'Dublees $doublees/$doubleesNeeded',
+/// How many more sets (or, on the dublee route, doublees) the hand needs
+/// to win, once the player has seen the joker; 0 when it can win this turn.
+int? toWinOf(HandProgress? progress) => switch (progress) {
+  WinProgress(:final setsToWin) => setsToWin,
+  DubleeProgress(:final doubleesToWin) => doubleesToWin,
+  ShowProgress() || null => null,
 };
+
+/// The to-win badge's text for [toWin] (see [toWinOf]).
+String toWinText(int toWin) => toWin == 0 ? 'Ready to win!' : '$toWin to win';
 
 /// The hand's maal points, once the player has seen the joker.
 int? maalOf(HandProgress? progress) => switch (progress) {
@@ -801,31 +794,71 @@ class _TopButton extends StatelessWidget {
   }
 }
 
-/// A small read-only label over a corner of the hand.
+/// A small read-only label over a corner of the hand. A [lit] badge is
+/// drawn in the theme's accent colour, for a goal reached.
 class _CornerBadge extends StatelessWidget {
-  const _CornerBadge({super.key, required this.text});
+  const _CornerBadge({super.key, required this.text, this.lit = false});
 
   final String text;
+  final bool lit;
 
   @override
   Widget build(BuildContext context) {
+    final theme = TableTheme.of(context);
     return IgnorePointer(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: TableTheme.of(context).panel,
+          color: lit ? theme.accent : theme.panel,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0x66FFFFFF)),
         ),
         child: Text(
           text,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: lit ? Colors.black : Colors.white,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The hand helper in the hand's right corner. Before the joker is seen it
+/// counts doublees and pure sequences toward the show, each lit once there
+/// are enough; afterwards it counts down to the win.
+class _HandHelper extends StatelessWidget {
+  const _HandHelper({super.key, required this.progress});
+
+  final HandProgress progress;
+
+  @override
+  Widget build(BuildContext context) {
+    if (toWinOf(progress) case final toWin?) {
+      return _CornerBadge(
+        key: const Key('to-win'),
+        text: toWinText(toWin),
+        lit: toWin == 0,
+      );
+    }
+    final show = progress as ShowProgress;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: 6,
+      children: [
+        _CornerBadge(
+          key: const Key('dub-count'),
+          text: 'Dub ${min(show.doublees, show.doubleesNeeded)}',
+          lit: show.doublees >= show.doubleesNeeded,
+        ),
+        _CornerBadge(
+          key: const Key('seq-count'),
+          text: 'Seq ${show.pureSets}',
+          lit: show.pureSets >= show.pureSetsNeeded,
+        ),
+      ],
     );
   }
 }

@@ -227,6 +227,7 @@ class WinProgress extends HandProgress {
   const WinProgress({
     required this.setsMade,
     required this.unmatched,
+    required this.setsToWin,
     required this.maal,
   });
 
@@ -237,6 +238,11 @@ class WinProgress extends HandProgress {
   /// Cards held that fit into no set in that arrangement. One unmatched card
   /// after drawing means the hand can win by discarding it.
   final int unmatched;
+
+  /// How many more 3-card sets the unmatched cards still need to form, not
+  /// counting the card about to be discarded: the unmatched cards divided by
+  /// 3, rounded up. 0 exactly when the hand can win this turn.
+  final int setsToWin;
 
   /// The hand's maal points right now.
   final int maal;
@@ -254,6 +260,9 @@ class DubleeProgress extends HandProgress {
   final int maal;
 
   int get doubleesNeeded => PlayerHand.doubleesToShow + 1;
+
+  /// 1 until the 8th doublee is made, then 0: the hand can win this turn.
+  int get doubleesToWin => doublees >= doubleesNeeded ? 0 : 1;
 }
 
 /// How far [hand] has come, given the round's [jokers] (`null` until the
@@ -284,14 +293,33 @@ HandProgress handProgress(
 
   final arrangement = bestArrangement(cards, jokers);
   final inSets = arrangement.fold(0, (total, set) => total + set.length);
+  final unmatched = cards.length - inSets;
   return WinProgress(
     setsMade:
         hand.openingTunnellas.length +
         hand.shownSets.length +
         arrangement.length,
-    unmatched: cards.length - inSets,
+    unmatched: unmatched,
+    setsToWin: _setsToWin(hand, jokers, unmatched),
     maal: maal,
   );
+}
+
+/// See [WinProgress.setsToWin]. Before drawing, a hand whose cards are all
+/// in sets wins by discarding whatever it draws. After drawing, one card
+/// goes out with the discard, and 0 is confirmed by trying each discard,
+/// since a hand with every card in sets may have none it can spare.
+int _setsToWin(PlayerHand hand, Jokers jokers, int unmatched) {
+  final cards = hand.cards;
+  if (!hand.hasDrawn) return (unmatched + 2) ~/ 3;
+  if (unmatched <= 1) {
+    for (var i = 0; i < cards.length; i++) {
+      if (canSplitIntoSets([...cards.take(i), ...cards.skip(i + 1)], jokers)) {
+        return 0;
+      }
+    }
+  }
+  return max(1, (unmatched - 1 + 2) ~/ 3);
 }
 
 /// Every distinct 3-card pure sequence and tunnella that [cards] could

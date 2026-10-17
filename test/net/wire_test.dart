@@ -172,7 +172,7 @@ void main() {
     test('every kind of hand progress', () {
       for (final progress in const [
         ShowProgress(pureSets: 1, pureSetsNeeded: 3, doublees: 4),
-        WinProgress(setsMade: 5, unmatched: 2, maal: 6),
+        WinProgress(setsMade: 5, unmatched: 2, setsToWin: 1, maal: 6),
         DubleeProgress(doublees: 7, maal: 1),
         null,
       ]) {

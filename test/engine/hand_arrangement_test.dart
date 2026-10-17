@@ -261,6 +261,63 @@ void main() {
       expect(progress.maal, 2);
     });
 
+    group('sets to win', () {
+      // Shows three runs before the first draw, then holds [held].
+      PlayerHand shown(List<PlayingCard> held) {
+        final spadesRun = run(Suit.spades, [Rank.two, Rank.three, Rank.four]);
+        final diamondsRun = run(Suit.diamonds, [
+          Rank.nine,
+          Rank.ten,
+          Rank.jack,
+        ]);
+        return opened([...heartsRun, ...spadesRun, ...diamondsRun, ...held])
+          ..showPureSets([heartsRun, spadesRun, diamondsRun]);
+      }
+
+      int setsToWin(PlayerHand hand) =>
+          (handProgress(hand, jokers) as WinProgress).setsToWin;
+
+      // K♠ K♦ with 7♣ (a joker) make a trial.
+      final trial = [
+        c(Suit.spades, Rank.king),
+        c(Suit.diamonds, Rank.king),
+        c(Suit.clubs, Rank.seven),
+      ];
+      final loose = [
+        c(Suit.diamonds, Rank.two),
+        c(Suit.clubs, Rank.five),
+        c(Suit.spades, Rank.nine),
+        c(Suit.hearts, Rank.queen),
+      ];
+
+      test('every card held in sets before drawing: ready to win', () {
+        expect(setsToWin(shown(trial)), 0);
+      });
+
+      test('unmatched cards before drawing, divided by 3 and rounded up', () {
+        expect(setsToWin(shown([...trial, ...loose.take(1)])), 1);
+        expect(setsToWin(shown([...trial, ...loose.take(3)])), 1);
+        expect(setsToWin(shown([...trial, ...loose])), 2);
+      });
+
+      test('after drawing, the card to discard doesn\'t count', () {
+        expect(setsToWin(shown(trial)..draw(loose[0])), 0);
+        expect(
+          setsToWin(shown([...trial, ...loose.take(3)])..draw(loose[3])),
+          1,
+        );
+        expect(
+          setsToWin(shown([...trial, ...loose.take(2)])..draw(loose[2])),
+          1,
+        );
+      });
+
+      test('after drawing, an unmatched card left over still needs a set', () {
+        // Two unmatched cards: discarding one leaves the other alone.
+        expect(setsToWin(shown([...trial, loose[0]])..draw(loose[1])), 1);
+      });
+    });
+
     test('after showing doublees: progress toward the 8th', () {
       final pairs = [
         for (final rank in [
@@ -284,12 +341,25 @@ void main() {
               as DubleeProgress;
       expect(noPair.doublees, 7);
       expect(noPair.doubleesNeeded, 8);
+      expect(noPair.doubleesToWin, 1);
 
       // 7♣ is a joker, so it pairs with anything for the 8th.
       final withJoker =
           handProgress(dubleeHand([c(Suit.clubs, Rank.seven)]), jokers)
               as DubleeProgress;
       expect(withJoker.doublees, 8);
+      expect(withJoker.doubleesToWin, 0);
+
+      // A natural pair makes the 8th too.
+      final withPair =
+          handProgress(
+                dubleeHand([c(Suit.spades, Rank.king)])
+                  ..discard(c(Suit.spades, Rank.ace))
+                  ..draw(c(Suit.spades, Rank.king)),
+                jokers,
+              )
+              as DubleeProgress;
+      expect(withPair.doubleesToWin, 0);
     });
   });
 }
