@@ -201,9 +201,16 @@ class _TableScreenState extends ConsumerState<TableScreen> {
 
   /// The dragged card was let go at [at]. The drawn card glides from there
   /// to its place: where it was dropped if the hand took it ([placed]),
-  /// otherwise the right end, where every draw lands. A refused draw glides
-  /// back to its pile instead.
-  void _pileDragEnded(DrawSource source, Offset at, bool placed) {
+  /// otherwise the right end, where every draw lands. A card [flicked] up
+  /// from the stock is discarded straight away instead; one from the
+  /// discard pile can't go back the same turn, so it joins the hand. A
+  /// refused draw glides back to its pile.
+  void _pileDragEnded(
+    DrawSource source,
+    Offset at, {
+    required bool placed,
+    required bool flicked,
+  }) {
     final drag = _pileDrag;
     _pileDrag = null;
     _drawnCard.value = null;
@@ -225,6 +232,10 @@ class _TableScreenState extends ConsumerState<TableScreen> {
       return;
     }
     setState(() => _arriving.remove(id));
+    if (flicked && !placed && source == DrawSource.stock) {
+      unawaited(_discardReleased(id, at));
+      return;
+    }
     // Launched once the hand is laid out with the card in its new place.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _snapBack(id, at);

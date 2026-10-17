@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/card.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
+import 'package:marriage_game/engine/table_event.dart';
 import 'package:marriage_game/main.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/scoreboard/scoreboard_screen.dart';
@@ -44,6 +46,7 @@ final kingOfClubs = c(Suit.clubs, Rank.king);
 Future<void> pumpTable(
   WidgetTester tester, {
   List<PlayingCard>? yourHand,
+  List<PlayingCard>? stock,
   int firstSeat = 0,
   Duration thinkingTime = Duration.zero,
   bool reduceMotion = true,
@@ -79,12 +82,14 @@ Future<void> pumpTable(
                 c(Suit.spades, Rank.queen),
               ],
             ],
-            stock: [
-              c(Suit.clubs, Rank.five),
-              c(Suit.hearts, Rank.seven),
-              c(Suit.clubs, Rank.two),
-              queenOfDiamonds,
-            ],
+            stock:
+                stock ??
+                [
+                  c(Suit.clubs, Rank.five),
+                  c(Suit.hearts, Rank.seven),
+                  c(Suit.clubs, Rank.two),
+                  queenOfDiamonds,
+                ],
             discardPile: [kingOfClubs],
             firstSeat: firstSeat,
           ),
@@ -320,6 +325,45 @@ void main() {
         findsOneWidget,
       );
     });
+  });
+
+  testWidgets('a quick flick up from the stock draws and discards in one '
+      'move', (tester) async {
+    await pumpTable(tester);
+    final before = stateOf(tester).hand.map((c) => c.card).toList();
+
+    await tester.fling(
+      find.byKey(const Key('stock')),
+      const Offset(0, -150),
+      1500,
+    );
+    await tester.pumpAndSettle();
+
+    final state = stateOf(tester);
+    expect(state.hand.map((c) => c.card), before);
+    expect(
+      state.view.events.whereType<DiscardedCard>().first,
+      isA<DiscardedCard>()
+          .having((e) => e.seat, 'seat', 0)
+          .having((e) => e.card, 'card', queenOfDiamonds),
+    );
+    expect(state.view.isYourTurn, isTrue, reason: 'the bot has played');
+  });
+
+  testWidgets('a quick flick up from the discard pile only takes the card', (
+    tester,
+  ) async {
+    await pumpTable(tester);
+
+    await tester.fling(
+      find.byKey(const Key('discard-pile')),
+      const Offset(0, -150),
+      1500,
+    );
+    await tester.pumpAndSettle();
+
+    expect(stateOf(tester).hand.last.card, kingOfClubs);
+    expect(stateOf(tester).view.youHaveDrawn, isTrue);
   });
 
   testWidgets('drag a card onto the discard pile to discard it', (
@@ -842,6 +886,57 @@ void main() {
 
       int idOf(WidgetTester tester, PlayingCard card) =>
           stateOf(tester).hand.firstWhere((h) => h.card == card).id;
+
+      testWidgets('a joker flicked up from the stock asks first', (
+        tester,
+      ) async {
+        // Every 7 is wild, whichever the tiplu turns out to be.
+        final sevenOfSpades = c(Suit.spades, Rank.seven);
+        await pumpTable(
+          tester,
+          yourHand: winnableHand,
+          stock: [
+            sevenOfSpades,
+            sevenOfSpades,
+            c(Suit.diamonds, Rank.seven),
+            c(Suit.diamonds, Rank.seven),
+            queenOfDiamonds,
+          ],
+        );
+        final controller = controllerOf(tester)..draw(DrawSource.stock);
+        for (final run in [heartsRun, spadesRun, clubsRun]) {
+          select(tester, run);
+          controller.groupSelected();
+        }
+        controller
+          ..showGroups()
+          ..pickTiplu(1)
+          ..dismissReveal();
+        // Completes once the bot has played, which the pumping lets it do.
+        unawaited(controller.discard(idOf(tester, queenOfDiamonds)));
+        await tester.pumpAndSettle();
+        expect(stateOf(tester).view.isYourTurn, isTrue);
+        final before = stateOf(tester).hand.map((c) => c.card).toList();
+
+        await tester.fling(
+          find.byKey(const Key('stock')),
+          const Offset(0, -150),
+          1500,
+        );
+        await tester.pumpAndSettle();
+        expect(dialog, findsOneWidget);
+        expect(find.textContaining('15-point penalty'), findsOneWidget);
+        expect(stateOf(tester).hand, hasLength(before.length + 1));
+
+        await tester.tap(find.byKey(const Key('joker-discard-confirm')));
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+        expect(stateOf(tester).hand.map((c) => c.card), before);
+        expect(
+          stateOf(tester).view.events.whereType<DiscardedCard>().last.card.rank,
+          Rank.seven,
+        );
+      });
 
       bool inHand(WidgetTester tester, PlayingCard card) =>
           stateOf(tester).hand.any((h) => h.card == card);

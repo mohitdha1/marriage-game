@@ -15,8 +15,9 @@ import 'hand_fan.dart';
 /// Tap the stock to draw from it, or the discard pile to take its top card,
 /// or — once a card is drawn — to discard the selected card. Dragging
 /// either pile draws from it as the drag begins, and the drawn card follows
-/// the finger ([drawnCard]) to be placed in the hand. A card dragged from
-/// the hand onto the discard pile is discarded.
+/// the finger ([drawnCard]) to be placed in the hand, or, flicked upwards
+/// from the stock, to be thrown straight on the discard pile. A card
+/// dragged from the hand onto the discard pile is discarded.
 class TableCenter extends StatelessWidget {
   const TableCenter({
     super.key,
@@ -47,9 +48,14 @@ class TableCenter extends StatelessWidget {
   final void Function(DrawSource source)? onPileDragStarted;
 
   /// Called when a dragged pile card is let go, with the card's centre
-  /// where it was let go, in global coordinates, and whether the hand took
-  /// it.
-  final void Function(DrawSource source, Offset releasedAt, bool placed)?
+  /// where it was let go, in global coordinates, whether the hand took it,
+  /// and whether it was flicked upwards (see [HandFan.flickSpeed]).
+  final void Function(
+    DrawSource source,
+    Offset releasedAt, {
+    required bool placed,
+    required bool flicked,
+  })?
   onPileDragEnded;
 
   /// The card drawn by the drag under way, once known. Until then a card
@@ -152,7 +158,8 @@ class TableCenter extends StatelessWidget {
       onDragEnd: (details) => onPileDragEnded?.call(
         source,
         details.offset + centre,
-        details.wasAccepted,
+        placed: details.wasAccepted,
+        flicked: -details.velocity.pixelsPerSecond.dy >= HandFan.flickSpeed,
       ),
       child: child,
     );
