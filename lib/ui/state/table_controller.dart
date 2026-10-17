@@ -1001,7 +1001,7 @@ class TableController extends TableNotifier {
       // doesn't touch them.
       final playerData = ref.read(playerDataProvider.notifier);
       if (!_passAndPlay && !_hosted) {
-        unawaited(playerData.addCoins(score.net[humanSeat] * (_stake ?? 1)));
+        unawaited(playerData.addCoins(score.coinsAt(_stake ?? 1)[humanSeat]));
       }
       // So are the stats, except when several people share the device, and
       // the round counts toward unlocking the next stake table.

@@ -209,8 +209,10 @@ class RoundScore {
     List<int>? winnerPayments,
     List<bool>? sawJoker,
     List<int>? kidnapped,
+    List<int>? setsShown,
     this.wonWithDoublees = false,
   }) : penalties = penalties ?? List.filled(net.length, 0),
+       setsShown = setsShown ?? List.filled(net.length, 0),
        kidnapped = kidnapped ?? List.filled(net.length, 0),
        maalShares = maalShares ?? List.filled(net.length, 0),
        winnerPayments = winnerPayments ?? List.filled(net.length, 0),
@@ -246,9 +248,17 @@ class RoundScore {
   /// Whether each player had seen the joker when the round ended.
   final List<bool> sawJoker;
 
+  /// How many sets each player had put down when the round ended: opening
+  /// tunnellas plus the pure sets or doublees shown to see the joker.
+  final List<int> setsShown;
+
   /// Whether the winner showed doublees, which earns them
   /// [ScoringTable.dubleeWinBonus] extra from every other player.
   final bool wonWithDoublees;
+
+  /// Each player's coins won (+) or lost (−) this round when every point is
+  /// worth [stake] coins. Sums to zero, as [net] does.
+  List<int> coinsAt(int stake) => [for (final points in net) points * stake];
 
   /// [penalties] as transfers: negative for each player who paid, and the
   /// total collected (positive) for the winner.
@@ -350,6 +360,10 @@ RoundScore scoreRound({
     maalShares: maalShares,
     winnerPayments: winnerPayments,
     sawJoker: [for (final hand in hands) hand.hasSeenJoker],
+    setsShown: [
+      for (final hand in hands)
+        hand.openingTunnellas.length + hand.shownSets.length,
+    ],
     kidnapped: kidnapped,
     wonWithDoublees: dubleeWin,
   );

@@ -178,6 +178,15 @@ void main() {
       expect(arrangement.selected, isEmpty);
     });
 
+    test('a save from before sets shown were kept still loads', () {
+      final json = savedMatch().toJson();
+      for (final round in json['scores']! as List) {
+        (round as Json).remove('setsShown');
+      }
+
+      expect(SavedMatch.fromJson(json).rounds.single.setsShown, [0, 0, 0, 0]);
+    });
+
     test('a save from before hands were arranged still loads', () {
       final json = savedMatch().toJson()..remove('arrangements');
 

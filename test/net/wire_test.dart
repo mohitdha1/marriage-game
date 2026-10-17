@@ -140,6 +140,7 @@ void main() {
             winnerPayments: const [-10, 10],
             sawJoker: const [true, false],
             kidnapped: const [0, 4],
+            setsShown: const [3, 1],
             wonWithDoublees: true,
           ),
         ],
@@ -166,6 +167,7 @@ void main() {
       expect(back.roundScores.single.maal.first.man, 5);
       expect(back.roundScores.single.maal.first.superman, 5);
       expect(back.roundScores.single.kidnapped, [0, 4]);
+      expect(back.roundScores.single.setsShown, [3, 1]);
       expect(back.mode, GameMode.murder);
     });
 

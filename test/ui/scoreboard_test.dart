@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/scoring.dart';
 import 'package:marriage_game/ui/scoreboard/scoreboard_screen.dart';
@@ -7,25 +9,29 @@ import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_state.dart';
 import 'package:marriage_game/ui/state/table_view.dart';
 
-/// A controller that serves a fixed state and records Next round.
+import '../engine/round_log_test.dart' show dealt, playOn;
+
+/// A controller that serves a fixed state, at a [fixedStake] table if one
+/// is given, and records Next round and End match.
 class FakeTableController extends TableController {
-  FakeTableController(this.fixed);
+  FakeTableController(this.fixed, {this.fixedStake});
 
   final TableState fixed;
+  final int? fixedStake;
   var nextRoundRequests = 0;
-  var newMatchRequests = 0;
+  var endMatchRequests = 0;
 
   @override
   TableState build() => fixed;
 
   @override
+  int? get stake => fixedStake;
+
+  @override
   void startNextRound() => nextRoundRequests++;
 
   @override
-  bool get canStartNewMatch => true;
-
-  @override
-  void startNewMatch() => newMatchRequests++;
+  void endMatch() => endMatchRequests++;
 }
 
 const names = ['You', 'Priya', 'Jack'];
@@ -44,6 +50,7 @@ final round1 = RoundScore(
   winnerPayments: const [13, -3, -10],
   penalties: const [0, 15, 0],
   sawJoker: const [true, true, false],
+  setsShown: const [3, 3, 0],
   net: const [59, -26, -33],
 );
 
@@ -54,6 +61,7 @@ final round2 = RoundScore(
   maalShares: const [0, 0, 0],
   winnerPayments: const [-3, 13, -10],
   sawJoker: const [true, true, false],
+  setsShown: const [3, 3, 0],
   net: const [-3, 13, -10],
 );
 
@@ -90,13 +98,14 @@ Future<FakeTableController> openScoreboard(
   WidgetTester tester,
   TableState state, {
   Size size = const Size(844, 390),
+  int? stake,
 }) async {
   tester.view
     ..physicalSize = size
     ..devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 
-  final controller = FakeTableController(state);
+  final controller = FakeTableController(state, fixedStake: stake);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [tableProvider.overrideWith(() => controller)],
@@ -155,9 +164,10 @@ void main() {
 
     expect(find.text('Round 2: Priya won'), findsOneWidget);
     expect(cellsOf(tester, 'round-breakdown'), [
-      ['You', 'Yes', '0', '0', '0', '0', '0', '−3', '0', '−3'],
-      ['Priya 🏆', 'Yes', '0', '0', '0', '0', '0', '+13', '0', '+13'],
-      ['Jack', 'No', '0', '0', '0', '0', '0', '−10', '0', '−10'],
+      ['You', '3', '0', '0', '0', '0', '0', '−3', '0', '−3'],
+      ['Priya 🏆', '3', '0', '0', '0', '0', '0', '+13', '0', '+13'],
+      ['Jack', '0', '0', '0', '0', '0', '0', '−10', '0', '−10'],
+      ['Total', '', '', '', '', '', '0', '0', '0', '0'],
     ]);
   });
 
@@ -171,11 +181,13 @@ void main() {
 
     expect(find.text('Round 1: You won'), findsOneWidget);
     expect(cellsOf(tester, 'round-breakdown'), [
-      // Tunnellas, marriages, maal cards and maal; then the round's items,
-      // which add up to the round total.
-      ['You 🏆', 'Yes', '5', '10', '3', '18', '+31', '+13', '+15', '+59'],
-      ['Priya', 'Yes', '0', '0', '5', '5', '−8', '−3', '−15', '−26'],
-      ['Jack', 'No', '0', '0', '0', '0', '−23', '−10', '0', '−33'],
+      // Sets shown, tunnellas, marriages, maal cards and maal; then the
+      // round's items (maal share, game fee, penalty), which add up to the
+      // round total, and each settles to 0.
+      ['You 🏆', '3', '5', '10', '3', '18', '+31', '+13', '+15', '+59'],
+      ['Priya', '3', '0', '0', '5', '5', '−8', '−3', '−15', '−26'],
+      ['Jack', '0', '0', '0', '0', '0', '−23', '−10', '0', '−33'],
+      ['Total', '', '', '', '', '', '0', '0', '0', '0'],
     ]);
   });
 
@@ -233,24 +245,103 @@ void main() {
     expect(find.text('table'), findsOneWidget);
   });
 
-  testWidgets('New match asks first, then starts afresh and returns to the '
-      'table', (tester) async {
+  testWidgets('End match asks first, then ends the match and goes home', (
+    tester,
+  ) async {
     final controller = await openScoreboard(tester, stateWith([round1]));
 
-    await tester.tap(find.byKey(const Key('new-match')));
+    await tester.tap(find.byKey(const Key('end-match')));
     await tester.pumpAndSettle();
-    expect(find.text('Start a new match?'), findsOneWidget);
+    expect(find.text('End the match?'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(controller.newMatchRequests, 0);
+    expect(controller.endMatchRequests, 0);
     expect(find.byType(ScoreboardScreen), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('new-match')));
+    await tester.tap(find.byKey(const Key('end-match')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('new-match-confirm')));
+    await tester.tap(find.byKey(const Key('end-match-confirm')));
     await tester.pumpAndSettle();
-    expect(controller.newMatchRequests, 1);
+    expect(controller.endMatchRequests, 1);
     expect(find.byType(ScoreboardScreen), findsNothing);
+    expect(find.text('table'), findsOneWidget);
+  });
+
+  testWidgets('at a stake table, each result is shown in coins too', (
+    tester,
+  ) async {
+    await openScoreboard(tester, stateWith([round1, round2]), stake: 5);
+
+    expect(
+      [for (final row in cellsOf(tester, 'round-breakdown')) row.last],
+      ['−15', '+65', '−50', '0'],
+    );
+    expect(
+      [for (final row in cellsOf(tester, 'match-totals')) row.last],
+      ['+280', '−65', '−215'],
+    );
+    expect(
+      find.text('Points and coins won and lost settle to 0.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('without a stake, there are no coins', (tester) async {
+    await openScoreboard(tester, stateWith([round1]));
+
+    expect(find.text('Coins'), findsNothing);
+    expect(find.text('Points won and lost settle to 0.'), findsOneWidget);
+  });
+
+  testWidgets('shows exactly what the engine settled for a played round', (
+    tester,
+  ) async {
+    final round = dealt(7);
+    playOn(round, Random(7), turns: 1000);
+    expect(round.isOver, isTrue);
+    final score = round.score();
+    final players = score.net.length;
+    final names = [for (var seat = 0; seat < players; seat++) 'P$seat'];
+    final seats = [
+      for (var seat = 0; seat < players; seat++)
+        SeatView(seat: seat, name: names[seat], cardCount: 0),
+    ];
+    final state = TableState(
+      view: TableView(
+        you: seats[0],
+        opponents: seats.sublist(1),
+        hand: const [],
+        stockCount: 0,
+        topDiscard: null,
+        currentSeat: 0,
+        youHaveDrawn: false,
+        winner: seats[score.winner],
+      ),
+      hand: const [],
+      seatNames: names,
+      roundScores: [score],
+      totals: score.net,
+    );
+
+    await openScoreboard(tester, state, stake: 10);
+
+    final rows = cellsOf(tester, 'round-breakdown');
+    final penalties = score.penaltyTransfers;
+    for (var seat = 0; seat < players; seat++) {
+      expect(rows[seat].sublist(1), [
+        '${score.setsShown[seat]}',
+        '${score.maal[seat].tunnellas}',
+        '${score.maal[seat].marriages}',
+        isA<String>(),
+        '${score.maal[seat].total}',
+        signed(score.maalShares[seat]),
+        signed(score.winnerPayments[seat]),
+        signed(penalties[seat]),
+        signed(score.net[seat]),
+        signed(score.coinsAt(10)[seat]),
+      ]);
+    }
+    expect(rows.last.sublist(6), ['0', '0', '0', '0', '0']);
   });
 
   testWidgets('Next round is not offered while a round is being played', (

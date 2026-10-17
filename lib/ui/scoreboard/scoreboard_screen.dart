@@ -12,7 +12,8 @@ import '../theme/table_theme.dart';
 /// each round with running totals.
 ///
 /// Once the current round is over, Next round deals the next one and returns
-/// to the table.
+/// to the table, and End match finishes the match and goes home. At a stake
+/// table, each result is also shown in coins.
 class ScoreboardScreen extends ConsumerStatefulWidget {
   const ScoreboardScreen({super.key});
 
@@ -30,6 +31,8 @@ class _ScoreboardScreenState extends ConsumerState<ScoreboardScreen> {
     final rounds = state.roundScores;
     final roundOver = state.view.winner != null;
     final shown = _shownRound ?? rounds.length - 1;
+    final controller = ref.read(tableProvider.notifier);
+    final stake = controller.stake;
 
     final theme = TableTheme.of(context);
     final heading = Theme.of(
@@ -45,7 +48,7 @@ class _ScoreboardScreenState extends ConsumerState<ScoreboardScreen> {
         foregroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         actions: [
-          if (roundOver && !ref.read(tableProvider.notifier).dealsRounds)
+          if (roundOver && !controller.dealsRounds)
             const Padding(
               padding: EdgeInsets.only(right: 16),
               child: Center(
@@ -53,14 +56,14 @@ class _ScoreboardScreenState extends ConsumerState<ScoreboardScreen> {
                 child: Text('The host deals the next round'),
               ),
             ),
-          if (roundOver && ref.read(tableProvider.notifier).canStartNewMatch)
+          if (roundOver && controller.dealsRounds)
             TextButton(
-              key: const Key('new-match'),
+              key: const Key('end-match'),
               style: TextButton.styleFrom(foregroundColor: Colors.white),
-              onPressed: () => _startNewMatch(context),
-              child: const Text('New match'),
+              onPressed: () => _endMatch(context),
+              child: const Text('End match'),
             ),
-          if (roundOver && ref.read(tableProvider.notifier).dealsRounds)
+          if (roundOver && controller.dealsRounds)
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: FilledButton(
@@ -113,14 +116,17 @@ class _ScoreboardScreenState extends ConsumerState<ScoreboardScreen> {
                       child: RoundBreakdownTable(
                         score: rounds[shown],
                         names: state.seatNames,
+                        stake: stake,
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    _SettlementCheck(score: rounds[shown], stake: stake),
                     const SizedBox(height: 16),
                     Text('Match totals', style: heading),
                     const SizedBox(height: 6),
                     _Panel(
                       color: theme.panel,
-                      child: MatchTotalsTable(state: state),
+                      child: MatchTotalsTable(state: state, stake: stake),
                     ),
                   ],
                 ),
@@ -130,63 +136,82 @@ class _ScoreboardScreenState extends ConsumerState<ScoreboardScreen> {
   }
 }
 
-/// Asks before starting the match again, then does so and returns to the
-/// table.
-Future<void> _startNewMatch(BuildContext context) async {
-  final container = ProviderScope.containerOf(context);
+/// Asks before ending the match, then ends it and goes back home.
+Future<void> _endMatch(BuildContext context) async {
+  final controller = ProviderScope.containerOf(
+    context,
+  ).read(tableProvider.notifier);
   final go = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      key: const Key('new-match-dialog'),
-      title: const Text('Start a new match?'),
-      content: const Text('The scores so far will be cleared.'),
+      key: const Key('end-match-dialog'),
+      title: const Text('End the match?'),
+      content: const Text('Coins from the rounds played are kept.'),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
           child: const Text('Cancel'),
         ),
         FilledButton(
-          key: const Key('new-match-confirm'),
+          key: const Key('end-match-confirm'),
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('New match'),
+          child: const Text('End match'),
         ),
       ],
     ),
   );
   if (go != true || !context.mounted) return;
-  container.read(tableProvider.notifier).startNewMatch();
-  Navigator.of(context).pop();
+  controller.endMatch();
+  Navigator.of(context).popUntil((route) => route.isFirst);
 }
 
 /// One round, item by item, for every player. Each player's items add up to
-/// their round result.
+/// their round result, shown in coins too at a [stake] table. A last row
+/// totals each column that moves points between players, which always
+/// comes to 0.
 class RoundBreakdownTable extends StatelessWidget {
   const RoundBreakdownTable({
     super.key,
     required this.score,
     required this.names,
+    this.stake,
   });
 
   final RoundScore score;
   final List<String> names;
 
+  /// Coins per point, at a stake table.
+  final int? stake;
+
   @override
   Widget build(BuildContext context) {
     final penalties = score.penaltyTransfers;
+    final coins = switch (stake) {
+      null => null,
+      final stake => score.coinsAt(stake),
+    };
+    final settled = [
+      score.maalShares,
+      score.winnerPayments,
+      penalties,
+      score.net,
+      ?coins,
+    ];
     return _ScrollableTable(
       key: const Key('round-breakdown'),
-      firstNumericColumn: 2,
-      columns: const [
+      firstNumericColumn: 1,
+      columns: [
         'Player',
-        'Seen',
+        'Shown',
         'Tunnellas',
         'Marriages',
         'Maal cards',
         'Maal',
         'Maal share',
-        'Win / lose',
+        'Game fee',
         'Penalty',
         'Round',
+        if (coins != null) 'Coins',
       ],
       rows: [
         for (var seat = 0; seat < names.length; seat++)
@@ -197,20 +222,26 @@ class RoundBreakdownTable extends StatelessWidget {
               mark: seat == score.winner ? ScoreMark.winner : null,
             ),
             cells: [
-              score.sawJoker[seat] ? 'Yes' : 'No',
+              '${score.setsShown[seat]}',
               '${score.maal[seat].tunnellas}',
               '${score.maal[seat].marriages}',
               '${_maalCards(score.maal[seat])}',
               '${score.maal[seat].total}',
-              signed(score.maalShares[seat]),
-              signed(score.winnerPayments[seat]),
-              signed(penalties[seat]),
-              signed(score.net[seat]),
+              for (final column in settled) signed(column[seat]),
             ],
           ),
+        _Row(
+          name: const ScoreName('Total'),
+          cells: [
+            for (var i = 0; i < 5; i++) '',
+            for (final column in settled) signed(_sum(column)),
+          ],
+        ),
       ],
     );
   }
+
+  static int _sum(List<int> column) => column.fold(0, (sum, n) => sum + n);
 
   static int _maalCards(MaalBreakdown maal) =>
       maal.tiplu +
@@ -221,12 +252,15 @@ class RoundBreakdownTable extends StatelessWidget {
       maal.superman;
 }
 
-/// Every player's result for each round, and their running total. The
-/// leader (or leaders, if tied) is marked.
+/// Every player's result for each round, and their running total, also in
+/// coins at a [stake] table. The leader (or leaders, if tied) is marked.
 class MatchTotalsTable extends StatelessWidget {
-  const MatchTotalsTable({super.key, required this.state});
+  const MatchTotalsTable({super.key, required this.state, this.stake});
 
   final TableState state;
+
+  /// Coins per point, at a stake table.
+  final int? stake;
 
   @override
   Widget build(BuildContext context) {
@@ -239,6 +273,7 @@ class MatchTotalsTable extends StatelessWidget {
         'Player',
         for (var i = 0; i < rounds.length; i++) 'R${i + 1}',
         'Total',
+        if (stake != null) 'Coins',
       ],
       rows: [
         for (var seat = 0; seat < state.seatNames.length; seat++)
@@ -251,9 +286,35 @@ class MatchTotalsTable extends StatelessWidget {
             cells: [
               for (final round in rounds) signed(round.net[seat]),
               signed(state.totals[seat]),
+              if (stake case final stake?)
+                signed(
+                  rounds.fold(0, (sum, r) => sum + r.coinsAt(stake)[seat]),
+                ),
             ],
           ),
       ],
+    );
+  }
+}
+
+/// A line under a round's breakdown confirming that it settles: every
+/// point (and coin) won by one player was lost by another.
+class _SettlementCheck extends StatelessWidget {
+  const _SettlementCheck({required this.score, required this.stake});
+
+  final RoundScore score;
+  final int? stake;
+
+  @override
+  Widget build(BuildContext context) {
+    final balance = score.net.fold(0, (sum, n) => sum + n);
+    final what = stake == null ? 'Points' : 'Points and coins';
+    return Text(
+      balance == 0
+          ? '$what won and lost settle to 0.'
+          : 'This round doesn\'t settle: it\'s off by ${signed(balance)}.',
+      key: const Key('settlement-check'),
+      style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 12),
     );
   }
 }

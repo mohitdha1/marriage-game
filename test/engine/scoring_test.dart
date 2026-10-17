@@ -279,6 +279,38 @@ void main() {
       expect(result.net.fold(0, (sum, n) => sum + n), 0);
     });
 
+    test('counts the sets each player put down', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(),
+          seenHand(opening: [tunnellaOf(poplu)], shown: [spadesRun, clubsRun]),
+          unseenHand(opening: [tunnellaOf(alter)]),
+          unseenHand(),
+        ],
+        winner: 0,
+        jokers: jokers,
+      );
+
+      expect(result.setsShown, [3, 3, 1, 0]);
+    });
+
+    test('coins are the net points times the stake, and sum to zero', () {
+      final result = scoreRound(
+        hands: [
+          seenHand(held: [jhiplu, tiplu, poplu]),
+          seenHand(held: [tiplu]),
+          unseenHand(held: [alter]),
+        ],
+        winner: 0,
+        jokers: jokers,
+      );
+
+      expect(result.coinsAt(5), [for (final n in result.net) n * 5]);
+      expect(result.coinsAt(5), [150, -35, -115]);
+      expect(result.coinsAt(5).fold(0, (sum, n) => sum + n), 0);
+      expect(result.coinsAt(1), result.net);
+    });
+
     test('a dublee winner collects 5 extra from every other player', () {
       final pairs = [
         for (final rank in [
