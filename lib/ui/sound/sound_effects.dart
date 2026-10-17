@@ -89,7 +89,11 @@ class AudioPlayerSoundEffects implements SoundEffects {
   /// The player for [sound], set up once with [soundEffectsAudioContext]
   /// before it plays anything.
   Future<AudioPlayer> _playerFor(Sfx sound) => _players[sound] ??= () async {
-    final player = AudioPlayer();
+    // Nothing reads the position of a sound effect. Without this, the
+    // player asks the platform for it on every frame and keeps frames
+    // coming, which a short sound in low-latency mode can do forever,
+    // since it never reports finishing.
+    final player = AudioPlayer()..positionUpdater = null;
     await player.setAudioContext(soundEffectsAudioContext());
     await player.setPlayerMode(PlayerMode.lowLatency);
     return player;
