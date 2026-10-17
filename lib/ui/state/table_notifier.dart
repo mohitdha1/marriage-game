@@ -20,8 +20,9 @@ abstract class TableNotifier extends Notifier<TableState> {
 
   // The game's side.
 
-  /// Draws from [source] to start the turn.
-  void draw(DrawSource source);
+  /// Draws from [source] to start the turn. Returns whether the draw was
+  /// made, or, when another device plays the game, sent to it.
+  bool draw(DrawSource source);
 
   /// Discards the card with [cardId] to end the turn. Completes once any
   /// bots have taken their turns after it.

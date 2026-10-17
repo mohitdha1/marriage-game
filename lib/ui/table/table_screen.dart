@@ -76,8 +76,21 @@ class _TableScreenState extends ConsumerState<TableScreen> {
   var _discardsFlying = 0;
   PlayingCard? _pileShowing;
 
+  /// A draw being dragged in from a pile, while the finger is down.
+  _PileDrag? _pileDrag;
+
+  /// The card that drag drew, once it's known, for the card under the
+  /// finger to show.
+  final _drawnCard = ValueNotifier<PlayingCard?>(null);
+
   bool get _reduceMotion =>
       MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+  @override
+  void dispose() {
+    _drawnCard.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -177,6 +190,63 @@ class _TableScreenState extends ConsumerState<TableScreen> {
     );
   }
 
+  /// Draws from [source] as it starts being dragged, so the drawn card can
+  /// be placed in the hand while the finger is still down.
+  void _pileDragStarted(DrawSource source) {
+    final drag = _PileDrag();
+    _pileDrag = drag;
+    _drawnCard.value = null;
+    drag.drew = ref.read(tableProvider.notifier).draw(source);
+  }
+
+  /// The dragged card was let go at [at]. The drawn card glides from there
+  /// to its place: where it was dropped if the hand took it ([placed]),
+  /// otherwise the right end, where every draw lands. A refused draw glides
+  /// back to its pile instead.
+  void _pileDragEnded(DrawSource source, Offset at, bool placed) {
+    final drag = _pileDrag;
+    _pileDrag = null;
+    _drawnCard.value = null;
+    if (drag == null) return;
+    final id = drag.cardId;
+    if (id == null) {
+      // Sent to another device that hasn't answered yet: the card flies in
+      // from the pile when it arrives.
+      if (drag.drew) return;
+      final layer = _flights.currentState;
+      if (_reduceMotion || layer == null) return;
+      layer.fly(
+        fromPoint: at,
+        to: source == DrawSource.stock ? _anchors.stock : _anchors.discardPile,
+        face: source == DrawSource.discardPile
+            ? ref.read(tableProvider).view.topDiscard
+            : null,
+      );
+      return;
+    }
+    setState(() => _arriving.remove(id));
+    // Launched once the hand is laid out with the card in its new place.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _snapBack(id, at);
+    });
+  }
+
+  /// The card drawn by the pile drag under way, the moment it appears in
+  /// the hand: it stays hidden there, keeping its place open, while the
+  /// finger carries it.
+  void _catchDrawnCard(TableState? previous, TableState next) {
+    final drag = _pileDrag;
+    if (drag == null || drag.cardId != null || previous == null) return;
+    final before = {for (final card in previous.hand) card.id};
+    final drawn = next.hand.where((c) => !before.contains(c.id)).firstOrNull;
+    if (drawn == null) return;
+    setState(() {
+      drag.cardId = drawn.id;
+      _arriving.add(drawn.id);
+    });
+    _drawnCard.value = drawn.card;
+  }
+
   var _firstDealShown = false;
 
   @override
@@ -235,6 +305,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
   /// discard glides from where it came from to where it went, one after
   /// another.
   void _animateMoves(TableState? previous, TableState next) {
+    _catchDrawnCard(previous, next);
     if (previous == null || _reduceMotion) return;
     if (previous.roundNumber != next.roundNumber) {
       _handCardKeys.clear();
@@ -254,6 +325,8 @@ class _TableScreenState extends ConsumerState<TableScreen> {
     // flights once the new layout is in place.
     final newest = next.hand.isEmpty ? null : next.hand.last;
     final you = next.view.you.seat;
+    // A card drawn by dragging a pile travels under the finger instead.
+    final dragged = newest != null && newest.id == _pileDrag?.cardId;
     final humanDraws = fresh.any((e) => e is DrewCard && e.seat == you);
     final discards = fresh
         .where((e) => e is DiscardedCard || e is WonRound)
@@ -281,7 +354,9 @@ class _TableScreenState extends ConsumerState<TableScreen> {
             final from = source == DrawSource.stock
                 ? _anchors.stock
                 : _anchors.discardPile;
-            if (seat == you && newest != null) {
+            if (seat == you && dragged) {
+              // Nothing flies: the finger is carrying it.
+            } else if (seat == you && newest != null) {
               layer.fly(
                 from: from,
                 to: _handCardKey(newest.id),
@@ -492,6 +567,9 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                                     controller.draw(DrawSource.stock),
                                 onDiscardPileTap: _discardPileTapped,
                                 onCardDropped: _discardReleased,
+                                onPileDragStarted: _pileDragStarted,
+                                onPileDragEnded: _pileDragEnded,
+                                drawnCard: _drawnCard,
                               ),
                               const SizedBox(height: 6),
                               ConstrainedBox(
@@ -560,7 +638,12 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                               sounds.play(Sfx.select);
                               controller.toggleSelected(id);
                             },
-                            onDraw: controller.draw,
+                            placingId: _pileDrag?.cardId,
+                            onPlaceDrawn: (slot) {
+                              if (_pileDrag?.cardId case final id?) {
+                                controller.moveCard(id, slot);
+                              }
+                            },
                             onReorder: controller.moveCard,
                             onFlick: _discardReleased,
                             onDropMissed: _snapBack,
@@ -719,6 +802,13 @@ Future<void> _leave(
   }
   ref.read(tableProvider.notifier).endMatch();
   navigator.pop();
+}
+
+/// A draw made by dragging a pile: whether the draw was made (or sent),
+/// and the drawn card's id once it's in the hand.
+class _PileDrag {
+  bool drew = false;
+  int? cardId;
 }
 
 /// How long the table stays on screen after a round ends before the

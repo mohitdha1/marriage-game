@@ -95,6 +95,18 @@ Future<void> pumpTable(
   );
 }
 
+/// Whether [face] is drawn in the hand or on a pile, rather than carried
+/// under the finger.
+bool _inHandOrPile(WidgetTester tester, CardFace face) => find
+    .ancestor(
+      of: find.byWidget(face),
+      matching: find.byWidgetPredicate(
+        (w) => w is HandFan || w.key == const Key('discard-pile'),
+      ),
+    )
+    .evaluate()
+    .isNotEmpty;
+
 TableState stateOf(WidgetTester tester) => ProviderScope.containerOf(
   tester.element(find.byType(TableScreen)),
 ).read(tableProvider);
@@ -178,30 +190,136 @@ void main() {
     );
   });
 
-  testWidgets('drag the stock onto the hand to draw', (tester) async {
-    await pumpTable(tester);
+  group('dragging a pile into the hand', () {
+    /// Picks up [pile], then moves over the hand card at [slot] (measured
+    /// once the drawn card has joined the hand) and lets go there, or at
+    /// [releaseAt] instead. Returns what the finger was carrying just before
+    /// letting go.
+    Future<List<PlayingCard>> dragPileTo(
+      WidgetTester tester,
+      Finder pile, {
+      int? slot,
+      Offset? releaseAt,
+    }) async {
+      final gesture = await tester.startGesture(tester.getCenter(pile));
+      await gesture.moveBy(const Offset(0, 20));
+      await tester.pump();
+      final target =
+          releaseAt ??
+          tester.getCenter(
+            find.byKey(ValueKey(stateOf(tester).hand[slot!].id)),
+          );
+      await gesture.moveTo(target);
+      await tester.pump();
+      final carried = [
+        for (final face in tester.widgetList<CardFace>(find.byType(CardFace)))
+          if (!_inHandOrPile(tester, face)) face.card,
+      ];
+      await gesture.up();
+      await tester.pumpAndSettle();
+      return carried;
+    }
 
-    await dragBetween(
+    testWidgets('from the stock, the card shows face up and drops into the '
+        'middle of the hand', (tester) async {
+      await pumpTable(tester);
+
+      final carried = await dragPileTo(
+        tester,
+        find.byKey(const Key('stock')),
+        slot: 3,
+      );
+
+      expect(carried, contains(queenOfDiamonds));
+      final hand = stateOf(tester).hand.map((c) => c.card).toList();
+      expect(hand, hasLength(yourCards.length + 1));
+      expect(hand[3], queenOfDiamonds);
+      expect(status(tester), 'Select a card to discard.');
+    });
+
+    testWidgets('from the discard pile, the card drops into the middle of '
+        'the hand', (tester) async {
+      await pumpTable(tester);
+
+      await dragPileTo(tester, find.byKey(const Key('discard-pile')), slot: 2);
+
+      final hand = stateOf(tester).hand.map((c) => c.card).toList();
+      expect(hand[2], kingOfClubs);
+      expect(stateOf(tester).view.topDiscard, isNull);
+    });
+
+    testWidgets('let go away from the hand, the card goes to the right end', (
       tester,
-      find.byKey(const Key('stock')),
-      find.byType(HandFan),
-    );
+    ) async {
+      await pumpTable(tester);
 
-    expect(stateOf(tester).hand.last.card, queenOfDiamonds);
-  });
+      await dragPileTo(
+        tester,
+        find.byKey(const Key('stock')),
+        releaseAt: const Offset(60, 120),
+      );
 
-  testWidgets('drag the discard pile onto the hand to take its card', (
-    tester,
-  ) async {
-    await pumpTable(tester);
+      expect(stateOf(tester).hand.last.card, queenOfDiamonds);
+    });
 
-    await dragBetween(
+    testWidgets('the other cards slide apart to show where it will land', (
       tester,
-      find.byKey(const Key('discard-pile')),
-      find.byType(HandFan),
-    );
+    ) async {
+      await pumpTable(tester);
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('stock'))),
+      );
+      await gesture.moveBy(const Offset(0, 20));
+      await tester.pump();
+      final third = stateOf(tester).hand[2].id;
+      final before = tester.getTopLeft(find.byKey(ValueKey(third))).dx;
 
-    expect(stateOf(tester).hand.last.card, kingOfClubs);
+      await gesture.moveTo(
+        tester.getCenter(find.byKey(ValueKey(stateOf(tester).hand[1].id))),
+      );
+      await tester.pump();
+
+      // The card that was third makes way for the one being placed second.
+      expect(
+        tester.getTopLeft(find.byKey(ValueKey(third))).dx,
+        greaterThan(before),
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a draw that isn\'t allowed glides back to its pile', (
+      tester,
+    ) async {
+      await pumpTable(tester, reduceMotion: false);
+      await tester.pumpAndSettle(); // the deal
+      await tester.tap(find.byKey(const Key('stock')));
+      await tester.pumpAndSettle();
+      final hand = stateOf(tester).hand;
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('discard-pile'))),
+      );
+      await gesture.moveBy(const Offset(0, 20));
+      await tester.pump();
+      await gesture.moveTo(tester.getCenter(find.byKey(ValueKey(hand[2].id))));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+
+      expect(find.byKey(const Key('flying-card')), findsOneWidget);
+      expect(
+        tester.widget<CardFace>(find.byKey(const Key('flying-card'))).card,
+        kingOfClubs,
+      );
+      await tester.pumpAndSettle();
+      expect(stateOf(tester).hand, hand);
+      expect(stateOf(tester).view.topDiscard, kingOfClubs);
+      expect(
+        find.text('Already drew this turn; discard first'),
+        findsOneWidget,
+      );
+    });
   });
 
   testWidgets('drag a card onto the discard pile to discard it', (

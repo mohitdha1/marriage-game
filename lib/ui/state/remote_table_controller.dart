@@ -136,8 +136,10 @@ class RemoteTableController extends TableNotifier {
   }
 
   @override
-  void draw(DrawSource source) {
-    if (checkYourTurn()) _host.send(MoveDraw(source));
+  bool draw(DrawSource source) {
+    if (!checkYourTurn()) return false;
+    _host.send(MoveDraw(source));
+    return true;
   }
 
   @override

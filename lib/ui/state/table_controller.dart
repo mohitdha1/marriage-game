@@ -686,10 +686,8 @@ class TableController extends TableNotifier {
   }
 
   @override
-  void draw(DrawSource source) {
-    if (!checkYourTurn()) return;
-    _act(() => _round.draw(source));
-  }
+  bool draw(DrawSource source) =>
+      checkYourTurn() && _act(() => _round.draw(source));
 
   /// Discards the card with [cardId] to end the turn; any bots then play
   /// until it's a person's turn again. The returned future completes once

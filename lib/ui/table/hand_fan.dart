@@ -20,8 +20,8 @@ import 'card_view.dart';
 /// the hand (or onto the pile): while it's held over the hand, the other
 /// cards slide aside to show where it will go, and a card in a grouped set
 /// brings its whole set. Any card let go over the hand moves to that spot,
-/// however it was picked up. Dropping the stock or the discard pile onto
-/// the fan draws from it.
+/// however it was picked up. A card dragged in from the stock or the
+/// discard pile ([placingId]) opens a gap the same way, and drops into it.
 class HandFan extends StatefulWidget {
   const HandFan({
     super.key,
@@ -31,7 +31,8 @@ class HandFan extends StatefulWidget {
     this.groupOf,
     this.jokers,
     this.onCardTap,
-    this.onDraw,
+    this.placingId,
+    this.onPlaceDrawn,
     this.onReorder,
     this.onFlick,
     this.onDropMissed,
@@ -55,8 +56,14 @@ class HandFan extends StatefulWidget {
 
   final void Function(int cardId)? onCardTap;
 
-  /// Called when a pile is dragged onto the fan.
-  final void Function(DrawSource source)? onDraw;
+  /// The id of the card just drawn from a pile that is still being dragged
+  /// in, if any. It keeps a gap open where it would land, and is drawn by
+  /// whatever is dragging it.
+  final int? placingId;
+
+  /// Called when the card being dragged in from a pile is let go over the
+  /// fan, with the position it was dropped at.
+  final void Function(int newIndex)? onPlaceDrawn;
 
   /// Called when a card is long-pressed and dropped back on the fan, with
   /// the position it was dropped at.
@@ -279,11 +286,32 @@ class _HandFanState extends State<HandFan> {
           ),
         );
 
-        // A pile dropped on the fan draws from it. A hand card let go over
-        // the fan moves to where it was let go, whether it was picked up
-        // with a long press or started off upwards.
-        return DragTarget<DrawSource>(
-          onAcceptWithDetails: (details) => widget.onDraw?.call(details.data),
+        // A card dragged in from a pile, like a hand card moved within the
+        // hand, shows where it would land while it's held over the fan.
+        void hoverDrawn(Offset globalTopLeft) {
+          final id = widget.placingId;
+          if (id == null) return;
+          final slot = slotAt(globalTopLeft);
+          if (id != _dragging || slot != _hoverSlot) {
+            setState(() {
+              _dragging = id;
+              _hoverSlot = slot;
+            });
+          }
+        }
+
+        // A card dragged in from a pile drops where it was let go. A hand
+        // card let go over the fan moves there too, whether it was picked
+        // up with a long press or started off upwards.
+        return DragTarget<PileDraw>(
+          onMove: (details) => hoverDrawn(details.offset),
+          onLeave: (_) => _dragEnded(),
+          onAcceptWithDetails: (details) {
+            if (widget.placingId != null) {
+              widget.onPlaceDrawn?.call(slotAt(details.offset));
+            }
+            _dragEnded();
+          },
           builder: (context, candidates, rejected) => DragTarget<Object>(
             onWillAcceptWithDetails: (details) =>
                 _cardIdIn(details.data) != null,
@@ -303,6 +331,13 @@ class _HandFanState extends State<HandFan> {
       },
     );
   }
+}
+
+/// A card being dragged from the [source] pile, drawn as the drag began.
+class PileDraw {
+  const PileDraw(this.source);
+
+  final DrawSource source;
 }
 
 /// A hand card being dragged straight up to be discarded, as opposed to a
