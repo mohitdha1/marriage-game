@@ -40,8 +40,6 @@ void main() {
       expect(settings.vibration, isTrue);
       expect(settings.handHelper, isTrue);
       expect(settings.rules, const HouseRules());
-      expect(settings.playerName, 'Player');
-      expect(settings.avatarColor, Settings.avatarColors.first);
     });
 
     test('changes are saved and read back on the next launch', () {
@@ -54,9 +52,7 @@ void main() {
         ..setManCards(true)
         ..setSuperman(true)
         ..setAlterIsMaal(false)
-        ..setJokerPenalty(false)
-        ..setPlayerName('  Mohit ')
-        ..setAvatarColor(Settings.avatarColors[3]);
+        ..setJokerPenalty(false);
 
       final reloaded = containerWith(store).read(settingsProvider);
 
@@ -73,15 +69,6 @@ void main() {
           jokerPenalty: false,
         ),
       );
-      expect(reloaded.playerName, 'Mohit');
-      expect(reloaded.avatarColor, Settings.avatarColors[3]);
-    });
-
-    test('a blank name falls back to the default', () {
-      final container = containerWith(InMemoryPreferences());
-      container.read(settingsProvider.notifier).setPlayerName('   ');
-
-      expect(container.read(settingsProvider).playerName, 'Player');
     });
   });
 

@@ -1,5 +1,6 @@
 import 'economy_config.dart';
 import 'gift_session.dart';
+import 'player_profile.dart';
 
 /// The player's record over every round they've finished.
 class PlayerStats {
@@ -45,6 +46,7 @@ class PlayerStats {
 /// stake, their hourly gifts and today's rewarded ads.
 class PlayerData {
   const PlayerData({
+    this.profile = const PlayerProfile(),
     this.coins = startingCoins,
     this.gems = 0,
     this.stats = const PlayerStats(),
@@ -61,6 +63,9 @@ class PlayerData {
 
   /// The most coins a player can hold.
   static const maxCoins = 1 << 31;
+
+  /// Who the player is at the table: their name and avatar.
+  final PlayerProfile profile;
 
   final int coins;
 
@@ -221,6 +226,9 @@ class PlayerData {
   PlayerData _withReward(Reward reward) =>
       withCoinsAdded(reward.coins).withGemsAdded(reward.gems);
 
+  /// This data with [profile] as the player's.
+  PlayerData withProfile(PlayerProfile profile) => _copyWith(profile: profile);
+
   /// Games played at the table with [stake].
   int gamesAt(int stake) => gamesAtStake[stake] ?? 0;
 
@@ -256,6 +264,7 @@ class PlayerData {
   );
 
   PlayerData _copyWith({
+    PlayerProfile? profile,
     int? coins,
     int? gems,
     PlayerStats? stats,
@@ -266,6 +275,7 @@ class PlayerData {
     String? adDay,
     int? adsWatched,
   }) => PlayerData(
+    profile: profile ?? this.profile,
     coins: coins ?? this.coins,
     gems: gems ?? this.gems,
     stats: stats ?? this.stats,
@@ -280,6 +290,7 @@ class PlayerData {
   @override
   bool operator ==(Object other) =>
       other is PlayerData &&
+      other.profile == profile &&
       other.coins == coins &&
       other.gems == gems &&
       other.giftCollectedAt == giftCollectedAt &&
@@ -293,6 +304,7 @@ class PlayerData {
 
   @override
   int get hashCode => Object.hash(
+    profile,
     coins,
     gems,
     giftCollectedAt,

@@ -26,6 +26,7 @@ import 'stake_table_picker.dart';
 import 'stake_tables_provider.dart';
 import 'pass_and_play_setup.dart';
 import 'player_avatar.dart';
+import '../../data/player_profile.dart';
 
 /// The table for a game against bots, with its sounds and vibration, asking
 /// before the back gesture leaves a round in progress.
@@ -70,8 +71,10 @@ class HomeScreen extends ConsumerWidget {
                     Row(
                       children: [
                         _PlayerBadge(
-                          name: settings.playerName,
-                          color: Color(settings.avatarColor),
+                          name:
+                              playerData?.profile.name ??
+                              PlayerProfile.defaultName,
+                          look: playerData?.profile.look,
                           onTap: () => showProfileDialog(context),
                         ),
                         const Spacer(),
@@ -373,12 +376,12 @@ class _QuickPlayButton extends StatelessWidget {
 class _PlayerBadge extends StatelessWidget {
   const _PlayerBadge({
     required this.name,
-    required this.color,
+    required this.look,
     required this.onTap,
   });
 
   final String name;
-  final Color color;
+  final int? look;
   final VoidCallback onTap;
 
   @override
@@ -392,7 +395,7 @@ class _PlayerBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            PlayerAvatar(name: name, color: color, radius: 20),
+            PlayerAvatar(name: name, look: look, radius: 20),
             const SizedBox(width: 8),
             Text(
               name,

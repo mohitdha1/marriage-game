@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../settings/house_rules_screen.dart';
 import '../settings/settings.dart';
 import 'mode_picker.dart';
+import 'player_data_provider.dart';
 
 /// Opens the setup for a game passed round this device: how many people
 /// play and their names, in seat order. Completes with the names when the
@@ -43,7 +44,9 @@ class _PassAndPlayState extends ConsumerState<_PassAndPlayDialog> {
   late final _names = [
     for (var i = 0; i < Settings.maxPlayers; i++)
       TextEditingController(
-        text: i == 0 ? ref.read(settingsProvider).playerName : '',
+        text: i == 0
+            ? ref.read(playerDataProvider).value?.profile.name ?? ''
+            : '',
       ),
   ];
 

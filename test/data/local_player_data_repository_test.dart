@@ -3,6 +3,7 @@ import 'package:marriage_game/data/economy_config.dart';
 import 'package:marriage_game/data/gift_session.dart';
 import 'package:marriage_game/data/local_player_data_repository.dart';
 import 'package:marriage_game/data/player_data.dart';
+import 'package:marriage_game/data/player_profile.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
 
 void main() {
@@ -254,4 +255,50 @@ void main() {
       expect((await LocalPlayerDataRepository(store).load()).gems, 1);
     },
   );
+
+  group('The profile', () {
+    test('a new player has the default name and the first look, not yet '
+        'chosen', () async {
+      final data = await LocalPlayerDataRepository(
+        InMemoryPreferences(),
+      ).load();
+
+      expect(data.profile, const PlayerProfile());
+      expect(data.profile.name, 'Player');
+      expect(data.profile.chosen, isFalse);
+    });
+
+    test('a profile saved is read back on the next launch', () async {
+      final store = InMemoryPreferences();
+      await LocalPlayerDataRepository(
+        store,
+      ).saveProfile(const PlayerProfile(name: 'Asha', look: 12, chosen: true));
+
+      expect(
+        (await LocalPlayerDataRepository(store).load()).profile,
+        const PlayerProfile(name: 'Asha', look: 12, chosen: true),
+      );
+    });
+
+    test('a name and colour kept before profiles carry over', () async {
+      final store = InMemoryPreferences({
+        'profile.name': 'Mohit',
+        'profile.avatarColor': 0xFFCE93D8,
+      });
+
+      final profile = (await LocalPlayerDataRepository(store).load()).profile;
+      expect(profile.name, 'Mohit');
+      expect(profile.look, 3, reason: 'the fourth colour becomes look 3');
+      expect(profile.chosen, isFalse, reason: 'asked once to choose');
+    });
+
+    test('saving the profile keeps the coins and gems', () async {
+      final store = InMemoryPreferences({'coins.balance': 777});
+      final data = await LocalPlayerDataRepository(
+        store,
+      ).saveProfile(const PlayerProfile(name: 'Gita', chosen: true));
+
+      expect(data.coins, 777);
+    });
+  });
 }

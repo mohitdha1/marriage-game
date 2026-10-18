@@ -7,6 +7,7 @@ import 'package:marriage_game/data/economy_config.dart';
 import 'package:marriage_game/data/gift_session.dart';
 import 'package:marriage_game/data/player_data.dart';
 import 'package:marriage_game/data/player_data_repository.dart';
+import 'package:marriage_game/data/player_profile.dart';
 import 'package:marriage_game/ui/home/economy_config_provider.dart';
 import 'package:marriage_game/ui/home/player_data_provider.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
@@ -56,6 +57,12 @@ class RecordingRepository implements PlayerDataRepository {
   ]) async {
     calls.add('claimAdReward ${currency.name}');
     return data = data.withAdReward(ad, now, currency);
+  }
+
+  @override
+  Future<PlayerData> saveProfile(PlayerProfile profile) async {
+    calls.add('saveProfile ${profile.name} ${profile.look}');
+    return data = data.withProfile(profile);
   }
 
   @override

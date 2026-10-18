@@ -1,0 +1,73 @@
+# Words a display name may not contain, one a line.
+#
+# A word starting with * is caught anywhere in a name. Any other is caught
+# only as a whole word, or as the whole name, so ordinary names that happen
+# to contain it (Ashita, Cassandra, Dickens) are left alone. Look-alikes
+# such as "a55" and spellings broken up by dots or spaces are folded first.
+
+# English
+*fuck
+*motherf
+*bitch
+*asshole
+*bastard
+*pussy
+*whore
+*slut
+*wanker
+*retard
+*nigger
+*nigga
+*faggot
+*porn
+*penis
+*vagina
+*hitler
+shit
+shitty
+ass
+arse
+dick
+cock
+cunt
+twat
+fag
+cum
+sex
+sexy
+rape
+rapist
+nazi
+boob
+boobs
+tits
+jerk
+idiot
+moron
+porno
+dildo
+horny
+nude
+naked
+
+# Romanized Nepali and Hindi
+muji
+*machikne
+*machikney
+*chikne
+*bhosdi
+*madarchod
+*bhenchod
+*behenchod
+*chutiya
+*chutia
+randi
+*harami
+*bhalu
+lado
+puti
+gandu
+kutta
+kutti
+lund
+chod

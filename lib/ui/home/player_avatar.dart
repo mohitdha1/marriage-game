@@ -4,6 +4,17 @@ import 'package:flutter/material.dart';
 
 import '../../data/avatar_look.dart';
 
+/// Background colours for avatars of people without a look, such as
+/// those sharing this device, by seat.
+const seatColors = [
+  0xFF90CAF9,
+  0xFFA5D6A7,
+  0xFFFFCC80,
+  0xFFCE93D8,
+  0xFFEF9A9A,
+  0xFF80CBC4,
+];
+
 /// A round avatar in a gold frame: the drawn face numbered [look] among
 /// [AvatarLook.presets], or, without one, the initials of [name] on
 /// [color].

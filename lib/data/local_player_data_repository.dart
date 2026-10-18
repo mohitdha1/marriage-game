@@ -5,6 +5,7 @@ import 'economy_config.dart';
 import 'gift_session.dart';
 import 'player_data.dart';
 import 'player_data_repository.dart';
+import 'player_profile.dart';
 
 /// Keeps the player's coins, gems and stats on the device, among the app's
 /// saved preferences.
@@ -12,6 +13,24 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
   LocalPlayerDataRepository(this._store);
 
   final PreferencesStore _store;
+
+  static const _name = 'profile.name';
+  static const _look = 'profile.look';
+  static const _profileChosen = 'profile.chosen';
+
+  /// Where the avatar colour was kept before avatars had looks.
+  static const _oldAvatarColor = 'profile.avatarColor';
+
+  /// The avatar colours offered before avatars had looks, in order: each
+  /// becomes the look with the same number.
+  static const _oldAvatarColors = [
+    0xFF90CAF9,
+    0xFFA5D6A7,
+    0xFFFFCC80,
+    0xFFCE93D8,
+    0xFFEF9A9A,
+    0xFF80CBC4,
+  ];
 
   static const _coins = 'coins.balance';
   static const _gems = 'gems.balance';
@@ -33,6 +52,9 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
   Future<void> save(PlayerData data) async {
     final best = data.stats.bestRound;
     await Future.wait([
+      _store.setString(_name, data.profile.name),
+      _store.setInt(_look, data.profile.look),
+      _store.setBool(_profileChosen, data.profile.chosen),
       _store.setInt(_coins, data.coins),
       _store.setInt(_gems, data.gems),
       if (data.giftCollectedAt case final at?)
@@ -117,6 +139,10 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
   }
 
   @override
+  Future<PlayerData> saveProfile(PlayerProfile profile) =>
+      _change((data) => data.withProfile(profile));
+
+  @override
   Future<PlayerData> recordGameResult({
     required bool won,
     required int points,
@@ -135,6 +161,7 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
   }
 
   PlayerData _read() => PlayerData(
+    profile: _readProfile(),
     coins: _store.getInt(_coins) ?? PlayerData.startingCoins,
     gems: _store.getInt(_gems) ?? 0,
     giftCollectedAt: switch (_store.getInt(_giftCollectedAt)) {
@@ -151,6 +178,19 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
       bestRound: _store.getInt(_best),
     ),
     gamesAtStake: _readGamesAtStake(),
+  );
+
+  PlayerProfile _readProfile() => PlayerProfile(
+    name: _store.getString(_name) ?? PlayerProfile.defaultName,
+    look:
+        _store.getInt(_look) ??
+        switch (_oldAvatarColors.indexOf(
+          _store.getInt(_oldAvatarColor) ?? -1,
+        )) {
+          -1 => 0,
+          final i => i,
+        },
+    chosen: _store.getBool(_profileChosen) ?? false,
   );
 
   /// The last gift's session; `null` if there's none, or it can't be read,

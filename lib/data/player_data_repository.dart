@@ -1,6 +1,7 @@
 import 'economy_config.dart';
 import 'gift_session.dart';
 import 'player_data.dart';
+import 'player_profile.dart';
 
 /// Where the player's coins, gems and stats live. The rest of the app reads and
 /// changes them only through this interface, so where they're kept (on the
@@ -9,8 +10,8 @@ import 'player_data.dart';
 ///
 /// Every change goes through [addCoins], [addGems], [giveStartingGems],
 /// [spendGems], [collectGift], [doubleGift], [pickExtraGiftCard],
-/// [claimGiftBonus], [claimAdReward], [claimAdEntry], [addPurchase] or
-/// [recordGameResult], which apply
+/// [claimGiftBonus], [claimAdReward], [claimAdEntry], [addPurchase],
+/// [saveProfile] or [recordGameResult], which apply
 /// the rules in [PlayerData] to the stored data and return the result, so a
 /// store shared between devices can make each change in one step.
 abstract interface class PlayerDataRepository {
@@ -82,6 +83,9 @@ abstract interface class PlayerDataRepository {
   /// the day's limit (see [PlayerData.withAdWatched]) and returns the data
   /// as it now stands. Throws a [StateError] once the day's ads are used up.
   Future<PlayerData> claimAdEntry(RewardedAd ad, DateTime now);
+
+  /// Makes [profile] the player's, and returns the data as it now stands.
+  Future<PlayerData> saveProfile(PlayerProfile profile);
 
   /// Counts a finished round: whether the player [won] it, the [points] it
   /// won or lost them, and the [stake] of the table, if it was played at

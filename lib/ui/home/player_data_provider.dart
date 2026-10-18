@@ -8,7 +8,9 @@ import '../../data/economy_config.dart';
 import '../../data/gift_session.dart';
 import '../../data/local_player_data_repository.dart';
 import '../../data/player_data.dart';
+import '../../data/name_rules.dart';
 import '../../data/player_data_repository.dart';
+import '../../data/player_profile.dart';
 import '../settings/preferences.dart';
 import 'economy_config_provider.dart';
 
@@ -230,6 +232,15 @@ class PlayerDataController extends AsyncNotifier<PlayerData> {
   /// Adds [amount] gems, or takes them away when it's negative.
   Future<void> addGems(int amount) =>
       _update((repository) => repository.addGems(amount));
+
+  /// Makes [name], tidied, and the avatar numbered [look] the player's
+  /// chosen profile. Check the name against [NameRules] first.
+  Future<void> saveProfile({required String name, required int look}) =>
+      _update(
+        (repository) => repository.saveProfile(
+          PlayerProfile(name: NameRules.tidy(name), look: look, chosen: true),
+        ),
+      );
 
   /// Counts a finished round: whether the player [won] it, the [points] it
   /// won or lost them, and the [stake] of the table, if it was played at

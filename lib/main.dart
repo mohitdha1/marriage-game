@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
 import 'ui/home/home_screen.dart';
+import 'ui/settings/profile_setup_screen.dart';
 import 'ui/settings/about.dart';
 import 'ui/settings/preferences.dart';
 import 'ui/settings/settings.dart';
@@ -60,7 +61,10 @@ Future<List<Override>> _startFirebase() async {
 /// Root widget of the application, styled with the chosen [TableTheme].
 /// The sound effects load as it starts, so the first deal isn't silent.
 class MarriageApp extends ConsumerStatefulWidget {
-  const MarriageApp({super.key, this.home = const HomeScreen()});
+  const MarriageApp({
+    super.key,
+    this.home = const ProfileGate(child: HomeScreen()),
+  });
 
   /// The first screen. Tests start straight at [singlePlayerTable].
   final Widget home;

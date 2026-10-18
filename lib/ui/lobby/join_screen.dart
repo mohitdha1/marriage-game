@@ -9,11 +9,11 @@ import '../../net/remote_session.dart';
 import '../../net/room_code.dart';
 import '../../net/wire.dart';
 import '../home/home_screen.dart';
-import '../settings/settings.dart';
 import '../state/remote_table_controller.dart';
 import '../state/table_controller.dart';
 import '../theme/table_felt.dart';
 import '../theme/table_theme.dart';
+import '../home/player_data_provider.dart';
 
 /// Connects to the game at an address as a named player. Tests swap it.
 final joinGameProvider =
@@ -33,8 +33,19 @@ class JoinScreen extends ConsumerStatefulWidget {
 
 class _JoinScreenState extends ConsumerState<JoinScreen> {
   late final _name = TextEditingController(
-    text: ref.read(settingsProvider).playerName,
+    text: ref.read(playerDataProvider).value?.profile.name,
   );
+
+  @override
+  void initState() {
+    super.initState();
+    // The name fills in once the player's data has loaded, unless one has
+    // been typed meanwhile.
+    ref.read(playerDataProvider.future).then((data) {
+      if (mounted && _name.text.isEmpty) _name.text = data.profile.name;
+    }, onError: (_) {});
+  }
+
   final _code = TextEditingController();
 
   RemoteSession? _session;

@@ -36,6 +36,7 @@ import 'suit_icon.dart';
 import 'table_center.dart';
 import 'tiplu_picker.dart';
 import 'win_celebration.dart';
+import '../home/player_avatar.dart';
 
 /// The main game screen, in landscape: opponents around the top and sides
 /// (the one whose turn it is glows), the stock and discard pile in the
@@ -746,9 +747,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
           if (state.passingTo case final seat?)
             PassScreen(
               name: state.seatNames[seat],
-              color: Color(
-                Settings.avatarColors[seat % Settings.avatarColors.length],
-              ),
+              color: Color(seatColors[seat % seatColors.length]),
               since: movesSince(table.events, seat, (s) => state.seatNames[s]),
               choosingOpening: state.openingChoice != null,
               onReady: controller.takeOver,

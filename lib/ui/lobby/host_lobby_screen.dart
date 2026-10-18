@@ -15,6 +15,7 @@ import '../settings/settings.dart';
 import '../state/table_controller.dart';
 import '../theme/table_felt.dart';
 import '../theme/table_theme.dart';
+import '../home/player_data_provider.dart';
 
 /// Finds the address other devices can reach this one at. Tests swap it.
 final localAddressProvider = Provider<Future<String?> Function()>(
@@ -68,10 +69,9 @@ class _HostLobbyScreenState extends ConsumerState<HostLobbyScreen> {
       return;
     }
     try {
-      final host = await ref.read(openLobbyProvider)(
-        ref.read(settingsProvider).playerName,
-        4,
-      );
+      final profile = (await ref.read(playerDataProvider.future)).profile;
+      if (!mounted) return;
+      final host = await ref.read(openLobbyProvider)(profile.name, 4);
       if (!mounted) {
         unawaited(host.close());
         return;
@@ -247,10 +247,7 @@ class _Seats extends StatelessWidget {
                   if (seat < names.length)
                     PlayerAvatar(
                       name: names[seat],
-                      color: Color(
-                        Settings.avatarColors[seat %
-                            Settings.avatarColors.length],
-                      ),
+                      color: Color(seatColors[seat % seatColors.length]),
                       radius: 12,
                     )
                   else

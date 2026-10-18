@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/data/economy_config.dart';
+import 'package:marriage_game/data/name_rules.dart';
+import 'package:marriage_game/ui/settings/name_rules_provider.dart';
 import 'package:marriage_game/data/stake_tables.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
@@ -50,7 +52,10 @@ Future<ProviderContainer> pumpHome(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        preferencesProvider.overrideWithValue(InMemoryPreferences(saved)),
+        // A player who has chosen a profile, unless [saved] says otherwise.
+        preferencesProvider.overrideWithValue(
+          InMemoryPreferences({'profile.chosen': true, ...?saved}),
+        ),
         randomProvider.overrideWithValue(Random(0)),
         botThinkingTimeProvider.overrideWithValue(() => Duration.zero),
         soundEffectsProvider.overrideWithValue(const SilentSoundEffects()),
@@ -65,6 +70,9 @@ Future<ProviderContainer> pumpHome(
             File(EconomyConfig.asset).readAsStringSync(),
           ),
         ),
+        nameRulesProvider.overrideWith(
+          (ref) => NameRules.fromList(File(NameRules.asset).readAsStringSync()),
+        ),
         if (clock != null) clockProvider.overrideWithValue(clock),
         ...overrides,
       ],
@@ -72,7 +80,7 @@ Future<ProviderContainer> pumpHome(
     ),
   );
   await tester.pumpAndSettle();
-  return ProviderScope.containerOf(tester.element(find.byType(HomeScreen)));
+  return ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
 }
 
 void main() {
@@ -683,7 +691,7 @@ void main() {
     expect(find.byKey(const Key('theme-dashain')), findsOneWidget);
   });
 
-  testWidgets('Profile changes the name and avatar colour', (tester) async {
+  testWidgets('Profile changes the name and avatar', (tester) async {
     final container = await pumpHome(tester);
 
     await tester.tap(find.byKey(const Key('settings-button')));
@@ -692,15 +700,13 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byKey(const Key('profile-name')), 'Asha');
-    await tester.tap(find.byKey(const Key('avatar-colour-2')));
+    await tester.tap(find.byKey(const Key('look-12')));
     await tester.tap(find.byKey(const Key('profile-save')));
     await tester.pumpAndSettle();
 
-    expect(container.read(settingsProvider).playerName, 'Asha');
-    expect(
-      container.read(settingsProvider).avatarColor,
-      Settings.avatarColors[2],
-    );
+    final profile = container.read(playerDataProvider).value!.profile;
+    expect(profile.name, 'Asha');
+    expect(profile.look, 12);
     expect(find.text('Asha'), findsOneWidget);
   });
 
