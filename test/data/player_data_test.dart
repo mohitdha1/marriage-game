@@ -22,6 +22,42 @@ void main() {
     expect(const PlayerData(coins: 20).withCoinsAdded(-50).coins, 0);
   });
 
+  test('gems are added and taken away, never below zero', () {
+    final data = const PlayerData(gems: 3).withGemsAdded(4).withGemsAdded(-2);
+
+    expect(data.gems, 5);
+    expect(data.withGemsAdded(-9).gems, 0);
+  });
+
+  test('changing one balance keeps everything else', () {
+    const data = PlayerData(
+      coins: 500,
+      gems: 7,
+      stats: PlayerStats(roundsPlayed: 2, roundsWon: 1, bestRound: 9),
+      gamesAtStake: {5: 2},
+    );
+
+    expect(
+      data.withGemsAdded(1),
+      const PlayerData(
+        coins: 500,
+        gems: 8,
+        stats: PlayerStats(roundsPlayed: 2, roundsWon: 1, bestRound: 9),
+        gamesAtStake: {5: 2},
+      ),
+    );
+    expect(data.withCoinsAdded(1).gems, 7);
+    expect(data.withGameResult(won: true, points: 3).gems, 7);
+  });
+
+  test('gems count toward equality', () {
+    expect(const PlayerData(gems: 1), isNot(const PlayerData(gems: 2)));
+    expect(
+      const PlayerData(gems: 2).hashCode,
+      const PlayerData(gems: 2).hashCode,
+    );
+  });
+
   test('rounds are counted and the best kept', () {
     final stats = const PlayerData()
         .withGameResult(won: false, points: -5)

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:marriage_game/data/economy_config.dart';
 import 'package:marriage_game/data/stake_tables.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
@@ -13,6 +14,7 @@ import 'package:marriage_game/engine/scoring.dart';
 import 'package:marriage_game/main.dart';
 import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/ui/home/game_setup.dart';
+import 'package:marriage_game/ui/home/economy_config_provider.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/home/pass_and_play_setup.dart';
 import 'package:marriage_game/ui/home/stake_table_picker.dart';
@@ -54,6 +56,11 @@ Future<ProviderContainer> pumpHome(
           (ref) =>
               StakeTables.fromJson(File(StakeTables.asset).readAsStringSync()),
         ),
+        economyConfigProvider.overrideWith(
+          (ref) => EconomyConfig.fromJson(
+            File(EconomyConfig.asset).readAsStringSync(),
+          ),
+        ),
         ...overrides,
       ],
       child: const MarriageApp(),
@@ -75,6 +82,46 @@ void main() {
     expect(find.text('Mohit'), findsOneWidget);
     expect(find.text('12,345'), findsOneWidget);
     expect(find.byKey(const Key('settings-button')), findsOneWidget);
+  });
+
+  testWidgets('the top bar shows gems, a new player starting with 3', (
+    tester,
+  ) async {
+    await pumpHome(tester);
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('gem-balance')),
+        matching: find.text('3'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('screen readers hear what each balance counts', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await pumpHome(tester, saved: {'coins.balance': 12345});
+
+    expect(find.bySemanticsLabel('12,345 coins'), findsOneWidget);
+    expect(find.bySemanticsLabel('3 gems'), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('gems saved earlier show, without more starting gems', (
+    tester,
+  ) async {
+    await pumpHome(
+      tester,
+      saved: {'gems.balance': 1234, 'gems.startingGiven': true},
+    );
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('gem-balance')),
+        matching: find.text('1,234'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Quick Play opens a fresh table every time', (tester) async {

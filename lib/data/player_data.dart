@@ -38,10 +38,12 @@ class PlayerStats {
 }
 
 /// Everything the app keeps about the player's progress: their play-money
-/// coins, their stats, and how many games they've played at each stake.
+/// coins and gems, their stats, and how many games they've played at each
+/// stake.
 class PlayerData {
   const PlayerData({
     this.coins = startingCoins,
+    this.gems = 0,
     this.stats = const PlayerStats(),
     this.gamesAtStake = const {},
   });
@@ -53,6 +55,11 @@ class PlayerData {
   static const maxCoins = 1 << 31;
 
   final int coins;
+
+  /// The second, scarcer currency. A new player's gems come from the
+  /// economy's data file.
+  final int gems;
+
   final PlayerStats stats;
 
   /// Games played at each stake table, by its stake. Stakes not played
@@ -64,11 +71,13 @@ class PlayerData {
 
   /// This data with [amount] coins added, or taken away when [amount] is
   /// negative. The balance never goes below zero.
-  PlayerData withCoinsAdded(int amount) => PlayerData(
-    coins: (coins + amount).clamp(0, maxCoins),
-    stats: stats,
-    gamesAtStake: gamesAtStake,
-  );
+  PlayerData withCoinsAdded(int amount) =>
+      _copyWith(coins: (coins + amount).clamp(0, maxCoins));
+
+  /// This data with [amount] gems added, or taken away when [amount] is
+  /// negative. The balance never goes below zero.
+  PlayerData withGemsAdded(int amount) =>
+      _copyWith(gems: (gems + amount).clamp(0, maxCoins));
 
   /// This data with a finished round counted in the stats, and, when it
   /// was played at a stake table, as a game at that [stake].
@@ -76,18 +85,30 @@ class PlayerData {
     required bool won,
     required int points,
     int? stake,
-  }) => PlayerData(
-    coins: coins,
+  }) => _copyWith(
     stats: stats.withRound(won: won, points: points),
     gamesAtStake: stake == null
         ? gamesAtStake
         : Map.unmodifiable({...gamesAtStake, stake: gamesAt(stake) + 1}),
   );
 
+  PlayerData _copyWith({
+    int? coins,
+    int? gems,
+    PlayerStats? stats,
+    Map<int, int>? gamesAtStake,
+  }) => PlayerData(
+    coins: coins ?? this.coins,
+    gems: gems ?? this.gems,
+    stats: stats ?? this.stats,
+    gamesAtStake: gamesAtStake ?? this.gamesAtStake,
+  );
+
   @override
   bool operator ==(Object other) =>
       other is PlayerData &&
       other.coins == coins &&
+      other.gems == gems &&
       other.stats == stats &&
       other.gamesAtStake.length == gamesAtStake.length &&
       gamesAtStake.entries.every((e) => other.gamesAtStake[e.key] == e.value);
@@ -95,6 +116,7 @@ class PlayerData {
   @override
   int get hashCode => Object.hash(
     coins,
+    gems,
     stats,
     Object.hashAllUnordered(gamesAtStake.entries.map((e) => (e.key, e.value))),
   );

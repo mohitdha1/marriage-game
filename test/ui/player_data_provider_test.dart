@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:marriage_game/data/economy_config.dart';
 import 'package:marriage_game/data/player_data.dart';
 import 'package:marriage_game/data/player_data_repository.dart';
+import 'package:marriage_game/ui/home/economy_config_provider.dart';
 import 'package:marriage_game/ui/home/player_data_provider.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
 import 'package:marriage_game/ui/settings/profile_dialog.dart';
@@ -39,6 +41,22 @@ class RecordingRepository implements PlayerDataRepository {
   }
 
   @override
+  Future<PlayerData> addGems(int amount) async {
+    calls.add('addGems $amount');
+    return data = data.withGemsAdded(amount);
+  }
+
+  var startingGemsGiven = false;
+
+  @override
+  Future<PlayerData> giveStartingGems(int gems) async {
+    calls.add('giveStartingGems $gems');
+    if (startingGemsGiven) return data;
+    startingGemsGiven = true;
+    return data = data.withGemsAdded(gems);
+  }
+
+  @override
   Future<PlayerData> recordGameResult({
     required bool won,
     required int points,
@@ -51,9 +69,19 @@ class RecordingRepository implements PlayerDataRepository {
   }
 }
 
-ProviderContainer containerWith(PlayerDataRepository repository) {
+/// A container using [repository]. The economy's amounts arrive when
+/// [economy] completes, or never, so the starting gems stay out of the way.
+ProviderContainer containerWith(
+  PlayerDataRepository repository, {
+  Future<EconomyConfig>? economy,
+}) {
   final container = ProviderContainer(
-    overrides: [playerDataRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      playerDataRepositoryProvider.overrideWithValue(repository),
+      economyConfigProvider.overrideWith(
+        (ref) => economy ?? Completer<EconomyConfig>().future,
+      ),
+    ],
   );
   addTearDown(container.dispose);
   return container;
@@ -126,23 +154,61 @@ void main() {
     expect(container.read(playerDataProvider).value, repository.data);
   });
 
-  test('on the device by default, saved between launches', () async {
-    final store = InMemoryPreferences();
-    final first = ProviderContainer(
-      overrides: [preferencesProvider.overrideWithValue(store)],
-    );
-    addTearDown(first.dispose);
-    await first.read(playerDataProvider.future);
-    await first.read(playerDataProvider.notifier).addCoins(50);
+  test('gems change through the repository too', () async {
+    final repository = RecordingRepository();
+    final container = containerWith(repository);
+    await container.read(playerDataProvider.future);
 
-    final next = ProviderContainer(
-      overrides: [preferencesProvider.overrideWithValue(store)],
-    );
-    addTearDown(next.dispose);
-    expect(
-      (await next.read(playerDataProvider.future)).coins,
-      PlayerData.startingCoins + 50,
-    );
+    await container.read(playerDataProvider.notifier).addGems(2);
+
+    expect(repository.calls, ['load', 'addGems 2']);
+    expect(container.read(playerDataProvider).value?.gems, 2);
+  });
+
+  test("a new player's gems follow the economy's amounts, without the data "
+      'waiting for them', () async {
+    final economy = Completer<EconomyConfig>();
+    final repository = RecordingRepository();
+    final container = containerWith(repository, economy: economy.future);
+
+    expect((await container.read(playerDataProvider.future)).gems, 0);
+
+    economy.complete(const EconomyConfig(startingGems: 3));
+    await pumpEventQueue();
+    expect(repository.calls, ['load', 'giveStartingGems 3']);
+    expect(container.read(playerDataProvider).value?.gems, 3);
+  });
+
+  group('on the device by default', () {
+    ProviderContainer onDevice(InMemoryPreferences store) {
+      final container = ProviderContainer(
+        overrides: [
+          preferencesProvider.overrideWithValue(store),
+          economyConfigProvider.overrideWith(
+            (ref) => const EconomyConfig(startingGems: 3),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('saved between launches, starting gems given only once', () async {
+      final store = InMemoryPreferences();
+      final first = onDevice(store);
+      await first.read(playerDataProvider.future);
+      await pumpEventQueue();
+      expect(first.read(playerDataProvider).value?.gems, 3);
+      await first.read(playerDataProvider.notifier).addCoins(50);
+      await first.read(playerDataProvider.notifier).addGems(-1);
+
+      final next = onDevice(store);
+      await next.read(playerDataProvider.future);
+      await pumpEventQueue();
+      final data = next.read(playerDataProvider).requireValue;
+      expect(data.coins, PlayerData.startingCoins + 50);
+      expect(data.gems, 2);
+    });
   });
 
   group('describeStats', () {

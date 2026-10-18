@@ -10,10 +10,41 @@ void main() {
     expect(await repository.load(), const PlayerData());
   });
 
+  test('starting gems are given once, and never again', () async {
+    final store = InMemoryPreferences();
+    final repository = LocalPlayerDataRepository(store);
+
+    expect((await repository.giveStartingGems(3)).gems, 3);
+    await repository.addGems(-3);
+    expect((await repository.giveStartingGems(3)).gems, 0);
+    expect(
+      (await LocalPlayerDataRepository(store).giveStartingGems(3)).gems,
+      0,
+      reason: 'given on an earlier launch',
+    );
+  });
+
+  test('starting gems add to gems earned before they arrived', () async {
+    final repository = LocalPlayerDataRepository(InMemoryPreferences());
+    await repository.addGems(2);
+
+    expect((await repository.giveStartingGems(3)).gems, 5);
+  });
+
+  test('gems added are saved, and the new balance returned', () async {
+    final store = InMemoryPreferences();
+    final repository = LocalPlayerDataRepository(store);
+
+    expect((await repository.addGems(5)).gems, 5);
+    expect((await repository.addGems(-2)).gems, 3);
+    expect((await LocalPlayerDataRepository(store).load()).gems, 3);
+  });
+
   test('what was saved is loaded on the next launch', () async {
     final store = InMemoryPreferences();
     const data = PlayerData(
       coins: 2400,
+      gems: 12,
       stats: PlayerStats(roundsPlayed: 9, roundsWon: 4, bestRound: 57),
     );
     await LocalPlayerDataRepository(store).save(data);
@@ -56,25 +87,24 @@ void main() {
     expect(data.stats.roundsWon, 1);
   });
 
-  test(
-    'coins and stats saved by earlier versions of the app still load',
-    () async {
-      final store = InMemoryPreferences({
-        'coins.balance': 12345,
-        'stats.roundsPlayed': 3,
-        'stats.roundsWon': 1,
-        'stats.bestRound': 31,
-      });
+  test('coins and stats saved before gems existed still load, '
+      'and get the starting gems', () async {
+    final store = InMemoryPreferences({
+      'coins.balance': 12345,
+      'stats.roundsPlayed': 3,
+      'stats.roundsWon': 1,
+      'stats.bestRound': 31,
+    });
 
-      expect(
-        await LocalPlayerDataRepository(store).load(),
-        const PlayerData(
-          coins: 12345,
-          stats: PlayerStats(roundsPlayed: 3, roundsWon: 1, bestRound: 31),
-        ),
-      );
-    },
-  );
+    final repository = LocalPlayerDataRepository(store);
+    const before = PlayerData(
+      coins: 12345,
+      stats: PlayerStats(roundsPlayed: 3, roundsWon: 1, bestRound: 31),
+    );
+    expect(await repository.load(), before);
+    // A player from before gems existed gets the starting gems too.
+    expect(await repository.giveStartingGems(3), before.withGemsAdded(3));
+  });
 
   test('games at each stake are saved for the next launch', () async {
     final store = InMemoryPreferences();

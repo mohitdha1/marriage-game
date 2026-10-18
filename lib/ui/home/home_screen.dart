@@ -29,10 +29,10 @@ const singlePlayerTable = TableSounds(
   child: TableHaptics(child: LeaveGuard(child: TableScreen())),
 );
 
-/// The first screen: the player's avatar, name and coins along the top, a
-/// settings gear, a large tile for each way to play (Single Player sets up a
-/// custom game), and a Quick Play button that starts a game against bots
-/// straight away. A match left unfinished can be picked up with the
+/// The first screen: the player's avatar, name, gems and coins along the
+/// top, a settings gear, a large tile for each way to play (Single Player
+/// sets up a custom game), and a Quick Play button that starts a game
+/// against bots straight away. A match left unfinished can be picked up with the
 /// Continue button beside it.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -69,6 +69,8 @@ class HomeScreen extends ConsumerWidget {
                           onTap: () => showProfileDialog(context),
                         ),
                         const Spacer(),
+                        GemPill(gems: playerData?.gems),
+                        const SizedBox(width: 8),
                         CoinPill(coins: coins),
                         const SizedBox(width: 8),
                         IconButton.filledTonal(
@@ -377,30 +379,73 @@ class CoinPill extends StatelessWidget {
   final int? coins;
 
   @override
+  Widget build(BuildContext context) => _BalancePill(
+    key: const Key('coin-balance'),
+    icon: const CoinIcon(size: 22),
+    balance: coins,
+    unit: 'coins',
+  );
+}
+
+/// The gem balance in a pill, with a drawn gem.
+class GemPill extends StatelessWidget {
+  const GemPill({super.key, required this.gems});
+
+  /// The balance, or `null` while it loads.
+  final int? gems;
+
+  @override
+  Widget build(BuildContext context) => _BalancePill(
+    key: const Key('gem-balance'),
+    icon: const GemIcon(size: 22),
+    balance: gems,
+    unit: 'gems',
+  );
+}
+
+class _BalancePill extends StatelessWidget {
+  const _BalancePill({
+    super.key,
+    required this.icon,
+    required this.balance,
+    required this.unit,
+  });
+
+  final Widget icon;
+  final int? balance;
+
+  /// What the balance counts, for screen readers: "10,255 coins".
+  final String unit;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      key: const Key('coin-balance'),
-      padding: const EdgeInsets.fromLTRB(6, 4, 12, 4),
-      decoration: BoxDecoration(
-        color: const Color(0x66000000),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CoinIcon(size: 22),
-          const SizedBox(width: 6),
-          Text(
-            switch (coins) {
-              null => '…',
-              final coins => formatCoins(coins),
-            },
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
+    final text = switch (balance) {
+      null => '…',
+      final balance => formatCoins(balance),
+    };
+    return Semantics(
+      label: balance == null ? null : '$text $unit',
+      excludeSemantics: balance != null,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(6, 4, 12, 4),
+        decoration: BoxDecoration(
+          color: const Color(0x66000000),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            icon,
+            const SizedBox(width: 6),
+            Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -449,6 +494,61 @@ class CoinIcon extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A simple cut gem: a flat top, sloping crown and pointed base, in shades
+/// of violet so it reads apart from the gold coin.
+class GemIcon extends StatelessWidget {
+  const GemIcon({super.key, required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) =>
+      CustomPaint(size: Size.square(size), painter: const _GemPainter());
+}
+
+class _GemPainter extends CustomPainter {
+  const _GemPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    // The outline's corners: the table (top edge), the girdle (widest
+    // line) and the point.
+    final tableLeft = Offset(w * 0.3, h * 0.15);
+    final tableRight = Offset(w * 0.7, h * 0.15);
+    final girdleLeft = Offset(w * 0.05, h * 0.4);
+    final girdleRight = Offset(w * 0.95, h * 0.4);
+    final point = Offset(w * 0.5, h * 0.92);
+
+    Path shape(List<Offset> corners) => Path()..addPolygon(corners, true);
+    final crown = shape([tableLeft, tableRight, girdleRight, girdleLeft]);
+    final pavilion = shape([girdleLeft, girdleRight, point]);
+    canvas
+      ..drawPath(crown, Paint()..color = const Color(0xFFCE93D8))
+      ..drawPath(pavilion, Paint()..color = const Color(0xFF8E24AA))
+      // A lighter facet down the middle of the base catches the light.
+      ..drawPath(
+        shape([Offset(w * 0.35, h * 0.4), Offset(w * 0.65, h * 0.4), point]),
+        Paint()..color = const Color(0xFFAB47BC),
+      );
+    final edge = Paint()
+      ..color = const Color(0xFF4A148C)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.06
+      ..strokeJoin = StrokeJoin.round;
+    canvas
+      ..drawPath(
+        shape([tableLeft, tableRight, girdleRight, point, girdleLeft]),
+        edge,
+      )
+      ..drawLine(girdleLeft, girdleRight, edge);
+  }
+
+  @override
+  bool shouldRepaint(_GemPainter oldDelegate) => false;
 }
 
 /// A large, tappable tile for one way to play.

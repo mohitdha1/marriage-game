@@ -77,11 +77,14 @@ class StakeTablePickerScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
         actions: [
           const HouseRulesButton(onDark: true),
-          if (data != null)
+          if (data != null) ...[
+            GemPill(gems: data.gems),
+            const SizedBox(width: 8),
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: CoinPill(coins: data.coins),
             ),
+          ],
         ],
       ),
       body: TableFelt(

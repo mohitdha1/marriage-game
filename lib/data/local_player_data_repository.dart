@@ -4,14 +4,16 @@ import '../ui/settings/preferences.dart';
 import 'player_data.dart';
 import 'player_data_repository.dart';
 
-/// Keeps the player's coins and stats on the device, among the app's saved
-/// preferences.
+/// Keeps the player's coins, gems and stats on the device, among the app's
+/// saved preferences.
 class LocalPlayerDataRepository implements PlayerDataRepository {
   LocalPlayerDataRepository(this._store);
 
   final PreferencesStore _store;
 
   static const _coins = 'coins.balance';
+  static const _gems = 'gems.balance';
+  static const _startingGemsGiven = 'gems.startingGiven';
   static const _played = 'stats.roundsPlayed';
   static const _won = 'stats.roundsWon';
   static const _best = 'stats.bestRound';
@@ -25,6 +27,7 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
     final best = data.stats.bestRound;
     await Future.wait([
       _store.setInt(_coins, data.coins),
+      _store.setInt(_gems, data.gems),
       _store.setInt(_played, data.stats.roundsPlayed),
       _store.setInt(_won, data.stats.roundsWon),
       if (best != null) _store.setInt(_best, best),
@@ -41,6 +44,18 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
   @override
   Future<PlayerData> addCoins(int amount) =>
       _change((data) => data.withCoinsAdded(amount));
+
+  @override
+  Future<PlayerData> addGems(int amount) =>
+      _change((data) => data.withGemsAdded(amount));
+
+  @override
+  Future<PlayerData> giveStartingGems(int gems) async {
+    if (_store.getBool(_startingGemsGiven) ?? false) return _read();
+    final data = _read().withGemsAdded(gems);
+    await Future.wait([_store.setBool(_startingGemsGiven, true), save(data)]);
+    return data;
+  }
 
   @override
   Future<PlayerData> recordGameResult({
@@ -62,6 +77,7 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
 
   PlayerData _read() => PlayerData(
     coins: _store.getInt(_coins) ?? PlayerData.startingCoins,
+    gems: _store.getInt(_gems) ?? 0,
     stats: PlayerStats(
       roundsPlayed: _store.getInt(_played) ?? 0,
       roundsWon: _store.getInt(_won) ?? 0,
