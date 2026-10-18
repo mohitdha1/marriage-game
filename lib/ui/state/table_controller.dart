@@ -419,7 +419,7 @@ class TableController extends TableNotifier {
     final personalities =
         previous != null && botSeats.every(previous.containsKey)
         ? [for (final seat in botSeats) previous[seat]!]
-        : BotPersonality.pick(botSeats.length, random);
+        : BotPersonality.pick(botSeats.length, random, difficulty);
     _bots = {
       for (var i = 0; i < botSeats.length; i++)
         botSeats[i]: BotPlayer(
@@ -925,7 +925,15 @@ class TableController extends TableNotifier {
               seat,
               () => BotPlayer(
                 difficulty: BotDifficulty.medium,
-                personality: BotPersonality.pick(1, _random).single,
+                personality: BotPersonality.pick(
+                  1,
+                  _random,
+                  BotDifficulty.medium,
+                  seated: [
+                    for (var s = 0; s < _round.hands.length; s++)
+                      if (s != seat) _nameOf(s),
+                  ],
+                ).single,
                 random: _random,
               ),
             )
@@ -1136,7 +1144,7 @@ class TableController extends TableNotifier {
     _round,
     humanSeat: seat,
     nameOf: _nameOf,
-    avatarOf: (seat) => _bots[seat]?.personality.avatarColor,
+    lookOf: (seat) => _bots[seat]?.personality.look,
   );
 
   String _nameOf(int seat) => switch ((_bots[seat], _remote[seat])) {

@@ -81,7 +81,7 @@ class ConsoleGame {
       for (var seat = 0; seat < config.playerCount; seat++)
         if (seat != humanSeat) seat,
     ];
-    final personalities = BotPersonality.pick(seats.length, random);
+    final personalities = BotPersonality.pick(seats.length, random, difficulty);
     return {
       for (var i = 0; i < seats.length; i++)
         seats[i]: BotPlayer(

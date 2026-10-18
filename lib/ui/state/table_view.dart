@@ -13,7 +13,7 @@ class SeatView {
     this.hasShown = false,
     this.hasSeenJoker = false,
     this.laidDown = const [],
-    this.avatarColor,
+    this.look,
     this.lastDiscard,
   });
 
@@ -35,8 +35,9 @@ class SeatView {
   /// own.
   final List<List<PlayingCard>> laidDown;
 
-  /// The avatar's background colour as 0xAARRGGBB, if this player has one.
-  final int? avatarColor;
+  /// This player's avatar, as its number among the drawn avatar looks, if
+  /// they have one.
+  final int? look;
 
   /// The card this player discarded most recently this round, if any.
   final PlayingCard? lastDiscard;
@@ -72,7 +73,7 @@ class TableView {
     Round round, {
     required int humanSeat,
     required String Function(int seat) nameOf,
-    int? Function(int seat)? avatarOf,
+    int? Function(int seat)? lookOf,
   }) {
     final playerCount = round.hands.length;
     SeatView seatView(int seat) {
@@ -88,7 +89,7 @@ class TableView {
           ...hand.shownSets,
           for (final card in hand.keptAside) [card],
         ],
-        avatarColor: avatarOf?.call(seat),
+        look: lookOf?.call(seat),
         lastDiscard: _lastDiscardBy(seat, round.events),
       );
     }

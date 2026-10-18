@@ -34,9 +34,9 @@ SavedMatch savedMatch({int turns = 25, GameConfig? config}) {
     stake: 50,
     people: const [],
     bots: {
-      1: BotPersonality.all[2],
-      2: BotPersonality.all[0],
-      3: BotPersonality.all[5],
+      1: BotPersonality.named('Kiran')!,
+      2: BotPersonality.named('Bishal')!,
+      3: BotPersonality.named('Sabina')!,
     },
     roundNumber: 2,
     rounds: [first.score()],

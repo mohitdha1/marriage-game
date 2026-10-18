@@ -328,7 +328,7 @@ Json seatViewToJson(SeatView seat) => {
   'shown': seat.hasShown,
   'seen': seat.hasSeenJoker,
   'laidDown': setsToJson(seat.laidDown),
-  'avatar': seat.avatarColor,
+  'look': seat.look,
   'lastDiscard': seat.lastDiscard == null
       ? null
       : cardToJson(seat.lastDiscard!),
@@ -341,7 +341,7 @@ SeatView seatViewFromJson(Json json) => SeatView(
   hasShown: json['shown']! as bool,
   hasSeenJoker: json['seen']! as bool,
   laidDown: setsFromJson(json['laidDown']),
-  avatarColor: json['avatar'] as int?,
+  look: json['look'] as int?,
   lastDiscard: _cardOrNull(json['lastDiscard']),
 );
 

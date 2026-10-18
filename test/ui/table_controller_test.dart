@@ -1060,11 +1060,11 @@ void main() {
   });
 
   group('Bot turns', () {
-    test('bots have personality names and avatar colours', () {
+    test('bots have personality names and their own avatars', () {
       final bot = tableWith().table.view.opponents.single;
 
-      expect(BotPersonality.all.map((p) => p.name), contains(bot.name));
-      expect(bot.avatarColor, isNotNull);
+      expect(BotPersonality.named(bot.name)?.look, bot.look);
+      expect(bot.look, isNotNull);
     });
 
     test('you cannot move while a bot is thinking', () async {

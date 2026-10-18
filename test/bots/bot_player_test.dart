@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/bots/bot_personality.dart';
+import 'package:marriage_game/data/avatar_look.dart';
 import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/bots/table_memory.dart';
 import 'package:marriage_game/engine/card.dart';
@@ -16,11 +17,7 @@ List<PlayingCard> run(Suit suit, List<Rank> ranks) => [
   for (final rank in ranks) c(suit, rank),
 ];
 
-const steady = BotPersonality(
-  name: 'Test',
-  tagline: 'For tests',
-  avatarColor: 0xFFFFFFFF,
-);
+const steady = BotPersonality(name: 'Test', tagline: 'For tests');
 
 BotPlayer bot(
   BotDifficulty difficulty, {
@@ -721,24 +718,100 @@ void main() {
   });
 
   group('BotPersonality', () {
-    test('the cast has Nepali names, all different', () {
+    test('the cast is fifteen Nepali names, all different', () {
       final names = BotPersonality.all.map((p) => p.name).toList();
 
+      expect(names, hasLength(15));
       expect(names.toSet(), hasLength(names.length));
       expect(names, containsAll(['Bishal', 'Priya', 'Kiran', 'Sabina']));
     });
 
-    test('picking gives different personalities', () {
-      final picked = BotPersonality.pick(4, Random(3));
+    test('none borrows a name from another game', () {
+      final names = BotPersonality.all.map((p) => p.name.toLowerCase());
 
-      expect(picked.map((p) => p.name).toSet(), hasLength(4));
+      for (final taken in [
+        'shikshak',
+        'nauty nurse',
+        'tarikpetarik',
+        'chitralekha',
+      ]) {
+        expect(names, isNot(contains(taken)));
+      }
     });
 
-    test('cannot pick more personalities than there are', () {
+    test('every level has five bots, enough for a full table', () {
+      for (final difficulty in BotDifficulty.values) {
+        final bots = BotPersonality.at(difficulty);
+
+        expect(bots, hasLength(5), reason: difficulty.name);
+        expect(bots.every((b) => b.difficulty == difficulty), isTrue);
+      }
+    });
+
+    test('every bot has its own avatar look', () {
+      final looks = BotPersonality.all.map((p) => p.look).toList();
+
+      expect(looks.toSet(), hasLength(looks.length));
       expect(
-        () => BotPersonality.pick(BotPersonality.all.length + 1, Random(0)),
+        looks.every((l) => l >= 0 && l < AvatarLook.presets.length),
+        isTrue,
+      );
+    });
+
+    test('picking gives different bots, all of the table\'s level', () {
+      for (final difficulty in BotDifficulty.values) {
+        for (var seed = 0; seed < 20; seed++) {
+          final picked = BotPersonality.pick(4, Random(seed), difficulty);
+
+          expect(picked.map((p) => p.name).toSet(), hasLength(4));
+          expect(picked.every((p) => p.difficulty == difficulty), isTrue);
+        }
+      }
+    });
+
+    test('picking is random: different seeds seat different bots', () {
+      final tables = {
+        for (var seed = 0; seed < 20; seed++)
+          BotPersonality.pick(
+            4,
+            Random(seed),
+            BotDifficulty.easy,
+          ).map((p) => p.name).join(','),
+      };
+
+      expect(tables.length, greaterThan(1));
+    });
+
+    test('a bot already seated is never picked again', () {
+      final picked = BotPersonality.pick(
+        1,
+        Random(0),
+        BotDifficulty.medium,
+        seated: ['Kiran', 'Sunita', 'Anjali', 'Suman'],
+      );
+
+      expect(picked.single.name, 'Dipak');
+    });
+
+    test('cannot pick more bots than a level has free', () {
+      expect(
+        () => BotPersonality.pick(6, Random(0), BotDifficulty.hard),
         throwsArgumentError,
       );
+      expect(
+        () => BotPersonality.pick(
+          2,
+          Random(0),
+          BotDifficulty.hard,
+          seated: ['Priya', 'Sabina', 'Arjun', 'Nabin'],
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('a bot is found by name, for picking a saved match up again', () {
+      expect(BotPersonality.named('Sarita')?.difficulty, BotDifficulty.hard);
+      expect(BotPersonality.named('Nobody'), isNull);
     });
   });
 }

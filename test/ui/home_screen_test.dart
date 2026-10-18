@@ -12,6 +12,7 @@ import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 import 'package:marriage_game/engine/scoring.dart';
 import 'package:marriage_game/main.dart';
+import 'package:marriage_game/bots/bot_personality.dart';
 import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/ui/home/game_setup.dart';
 import 'package:marriage_game/ui/home/economy_config_provider.dart';
@@ -331,6 +332,14 @@ void main() {
       expect(container.read(matchSetupProvider).stake, 10);
       expect(container.read(botDifficultyProvider), BotDifficulty.easy);
       expect(container.read(settingsProvider).stake, 10);
+      // Only the easy level's own bots sit at an easy table.
+      for (final bot in container.read(tableProvider).view.opponents) {
+        expect(
+          BotPersonality.named(bot.name)?.difficulty,
+          BotDifficulty.easy,
+          reason: bot.name,
+        );
+      }
     });
 
     testWidgets('a locked table can be looked at but not played', (
@@ -611,7 +620,9 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('setup-play')));
-    await tester.pumpAndSettle();
+    // Pumped for a while rather than settled: a joker in the hand glows
+    // for as long as it's held.
+    await tester.pump(const Duration(seconds: 2));
     final config = container.read(gameConfigProvider);
     expect(config.manCardsEnabled, isTrue);
     expect(config.supermanCardEnabled, isTrue);

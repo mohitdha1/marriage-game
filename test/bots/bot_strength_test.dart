@@ -13,11 +13,7 @@ import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/engine/game_config.dart';
 import 'package:marriage_game/engine/round.dart';
 
-const _steady = BotPersonality(
-  name: 'Test',
-  tagline: 'For tests',
-  avatarColor: 0xFFFFFFFF,
-);
+const _steady = BotPersonality(name: 'Test', tagline: 'For tests');
 
 /// How [a] did against [b] over 4-player rounds: rounds won by each, and
 /// [a]'s net points over all of them.

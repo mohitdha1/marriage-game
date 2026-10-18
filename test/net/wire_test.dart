@@ -121,7 +121,7 @@ void main() {
         round,
         humanSeat: 0,
         nameOf: (seat) => ['Asha', 'Bina'][seat],
-        avatarOf: (seat) => seat == 1 ? 0xFF90CAF9 : null,
+        lookOf: (seat) => seat == 1 ? 7 : null,
       );
       final update = SeatUpdate(
         view: view,

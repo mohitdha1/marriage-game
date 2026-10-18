@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../home/player_avatar.dart';
+
 import '../state/table_view.dart';
 import '../theme/table_theme.dart';
 import 'card_view.dart';
@@ -52,15 +54,7 @@ class OpponentSeat extends StatelessWidget {
             CardFace(card, width: 18, key: Key('last-discard-${seat.seat}')),
             const SizedBox(width: 6),
           ],
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: Color(seat.avatarColor ?? 0xFFFFE0B2),
-            foregroundColor: const Color(0xFF4E342E),
-            child: Text(
-              seat.name.characters.first,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
+          PlayerAvatar(name: seat.name, look: seat.look, radius: 16),
           const SizedBox(width: 8),
           Column(
             mainAxisSize: MainAxisSize.min,

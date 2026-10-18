@@ -109,6 +109,8 @@ flutter analyze              # static analysis
   [WTFPL](http://www.wtfpl.net/) where public domain isn't recognised, and
   may be used in commercial software. The figure panels were cropped from
   the SVGs and resized; everything else on the cards is drawn in Flutter.
+- **Avatars** are original, drawn in code by `lib/ui/home/player_avatar.dart`
+  from the looks in `lib/data/avatar_look.dart`; no image files are used.
 - **Sound effects** come from three packs by [Kenney](https://kenney.nl),
   released under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
   (public domain, commercial use allowed, no credit required). Each was cut,
