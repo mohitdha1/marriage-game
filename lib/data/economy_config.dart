@@ -35,6 +35,20 @@ class RewardedAd {
   final Duration length;
 }
 
+/// The gems it costs to start a match at a stake table: [gems] at any
+/// table whose stake, in coins a point, is above [aboveStake]. Tables at
+/// or below it are free.
+class EntryFee {
+  const EntryFee({required this.gems, required this.aboveStake});
+
+  final int gems;
+  final int aboveStake;
+
+  /// The gems a match at [stake] costs; 0 away from a stake table, when
+  /// [stake] is `null`.
+  int gemsFor(int? stake) => stake != null && stake > aboveStake ? gems : 0;
+}
+
 /// Every amount in the game's coin and gem economy, read from the data file
 /// `assets/config/economy.json`, so the amounts can be tuned there without
 /// touching the code.
@@ -43,6 +57,7 @@ class EconomyConfig {
     required this.startingGems,
     required this.hourlyGift,
     required this.rewardedAd,
+    required this.entryFee,
   });
 
   /// Reads the amounts from the data file's JSON:
@@ -51,7 +66,8 @@ class EconomyConfig {
   /// {
   ///   "startingGems": 3,
   ///   "hourlyGift": {"coins": 500, "minutes": 60, "gems": 1, "gemEvery": 4},
-  ///   "rewardedAd": {"coins": 1000, "perDay": 5, "seconds": 30}
+  ///   "rewardedAd": {"coins": 1000, "perDay": 5, "seconds": 30},
+  ///   "entryFee": {"gems": 1, "aboveStake": 100}
   /// }
   /// ```
   ///
@@ -69,6 +85,7 @@ class EconomyConfig {
     }
     final gift = _object(decoded, 'hourlyGift');
     final ad = _object(decoded, 'rewardedAd');
+    final fee = _object(decoded, 'entryFee');
     return EconomyConfig(
       startingGems: _count(decoded, 'startingGems'),
       hourlyGift: HourlyGift(
@@ -86,6 +103,10 @@ class EconomyConfig {
           seconds: _count(ad, 'seconds', within: 'rewardedAd', least: 1),
         ),
       ),
+      entryFee: EntryFee(
+        gems: _count(fee, 'gems', within: 'entryFee'),
+        aboveStake: _count(fee, 'aboveStake', within: 'entryFee'),
+      ),
     );
   }
 
@@ -97,6 +118,7 @@ class EconomyConfig {
 
   final HourlyGift hourlyGift;
   final RewardedAd rewardedAd;
+  final EntryFee entryFee;
 
   /// The object under [key] in [json].
   static Map<String, Object?> _object(Map<String, Object?> json, String key) {

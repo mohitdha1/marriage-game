@@ -16,6 +16,8 @@ import '../table/suit_icon.dart';
 import '../table/table_screen.dart';
 import '../theme/table_felt.dart';
 import 'player_data_provider.dart';
+import 'economy_config_provider.dart';
+import 'entry_fee.dart';
 import 'game_setup.dart';
 import 'hourly_gift_button.dart';
 import 'stake_table_picker.dart';
@@ -45,6 +47,7 @@ class HomeScreen extends ConsumerWidget {
     final coins = playerData?.coins;
     final stakeTables = ref.watch(stakeTablesProvider).value;
     final saved = ref.watch(savedMatchProvider);
+    final economy = ref.watch(economyConfigProvider).value;
     // Quick Play deals the stake table last chosen, once the tables and the
     // player's coins have loaded.
     final quickPlay = stakeTables == null || playerData == null
@@ -111,7 +114,18 @@ class HomeScreen extends ConsumerWidget {
                                         ),
                                         builder: (pickerContext) =>
                                             StakeTablePickerScreen(
-                                              onPlay: (setup) {
+                                              onPlay: (setup) async {
+                                                // Short of gems, the player
+                                                // stays on the picker.
+                                                if (!await payEntryFee(
+                                                      pickerContext,
+                                                      ref,
+                                                      setup.stake,
+                                                    ) ||
+                                                    !pickerContext.mounted ||
+                                                    !context.mounted) {
+                                                  return;
+                                                }
                                                 Navigator.of(
                                                   pickerContext,
                                                 ).pop();
@@ -153,14 +167,30 @@ class HomeScreen extends ConsumerWidget {
                                   _QuickPlayButton(
                                     setup: quickPlay == null
                                         ? ''
-                                        : describeSetup(quickPlay),
+                                        : [
+                                            describeSetup(quickPlay),
+                                            if (economy?.entryFee.gemsFor(
+                                                  quickPlay.stake,
+                                                )
+                                                case final gems? when gems > 0)
+                                              gemsText(gems),
+                                          ].join(' · '),
                                     onPressed: quickPlay == null
                                         ? null
-                                        : () => _startMatch(
-                                            context,
-                                            ref,
-                                            quickPlay,
-                                          ),
+                                        : () async {
+                                            if (await payEntryFee(
+                                                  context,
+                                                  ref,
+                                                  quickPlay.stake,
+                                                ) &&
+                                                context.mounted) {
+                                              _startMatch(
+                                                context,
+                                                ref,
+                                                quickPlay,
+                                              );
+                                            }
+                                          },
                                   ),
                                 ],
                               ),
@@ -207,7 +237,7 @@ class HomeScreen extends ConsumerWidget {
     }
   }
 
-  /// Opens a fresh match with [setup], under the house rules in settings.
+  /// Opens a fresh match with [setup], its entry fee already paid, under the house rules in settings.
   void _startMatch(BuildContext context, WidgetRef ref, MatchSetup setup) {
     final settings = ref.read(settingsProvider);
     startMatchWith(ref, setup.withRules(settings.rules));

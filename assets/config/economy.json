@@ -1,5 +1,6 @@
 {
   "startingGems": 3,
   "hourlyGift": {"coins": 500, "minutes": 60, "gems": 1, "gemEvery": 4},
-  "rewardedAd": {"coins": 1000, "perDay": 5, "seconds": 30}
+  "rewardedAd": {"coins": 1000, "perDay": 5, "seconds": 30},
+  "entryFee": {"gems": 1, "aboveStake": 100}
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/economy_config.dart';
 import '../../data/player_data.dart';
 import '../../data/stake_tables.dart';
 import '../settings/house_rules_screen.dart';
@@ -8,6 +9,8 @@ import '../settings/settings.dart';
 import '../state/table_controller.dart';
 import '../theme/table_felt.dart';
 import '../theme/table_theme.dart';
+import 'economy_config_provider.dart';
+import 'entry_fee.dart';
 import 'game_setup.dart';
 import 'home_screen.dart';
 import 'mode_picker.dart';
@@ -119,7 +122,9 @@ class _Picker extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(settingsProvider.notifier);
+    final fee = ref.watch(economyConfigProvider).value?.entryFee;
     final chosen = tables.withStake(settings.stake) ?? tables.tiers.first;
+    final chosenFee = fee?.gemsFor(chosen.stake) ?? 0;
     final reason = whyNotJoin(tables, chosen, data);
     const white = TextStyle(color: Colors.white);
 
@@ -130,6 +135,7 @@ class _Picker extends ConsumerWidget {
           tables: tables,
           data: data,
           chosen: chosen,
+          fee: fee,
           onChoose: (tier) => controller.setStake(tier.stake),
         ),
         const Spacer(),
@@ -138,7 +144,8 @@ class _Picker extends ConsumerWidget {
           fit: BoxFit.scaleDown,
           child: Text(
             'Each point is worth ${formatCoins(chosen.stake)} coins · '
-            '${describeDifficulty(chosen.difficulty)}',
+            '${describeDifficulty(chosen.difficulty)}'
+            '${chosenFee == 0 ? '' : ' · ${gemsText(chosenFee)} a game'}',
             key: const Key('stake-summary'),
             maxLines: 1,
             style: white,
@@ -228,12 +235,16 @@ class _TileRow extends StatefulWidget {
     required this.tables,
     required this.data,
     required this.chosen,
+    required this.fee,
     required this.onChoose,
   });
 
   final StakeTables tables;
   final PlayerData data;
   final StakeTable chosen;
+
+  /// What a match costs in gems, or `null` while it loads.
+  final EntryFee? fee;
   final ValueChanged<StakeTable> onChoose;
 
   @override
@@ -274,6 +285,7 @@ class _TileRowState extends State<_TileRow> {
           tier: tier,
           progress: widget.tables.unlockProgress(tier, widget.data),
           affordable: widget.data.coins >= tier.minBalance,
+          gems: widget.fee?.gemsFor(tier.stake) ?? 0,
           chosen: tier == widget.chosen,
           width: _tileWidth,
           onTap: () => widget.onChoose(tier),
@@ -283,13 +295,14 @@ class _TileRowState extends State<_TileRow> {
   );
 }
 
-/// One stake table: its stake, and below it the minimum balance, or a lock
-/// with the games played toward unlocking it.
+/// One stake table: its stake, and below it the minimum balance, the gems a
+/// match costs if any, and a lock with the games played toward unlocking it.
 class _StakeTile extends StatelessWidget {
   const _StakeTile({
     required this.tier,
     required this.progress,
     required this.affordable,
+    required this.gems,
     required this.chosen,
     required this.width,
     required this.onTap,
@@ -298,6 +311,9 @@ class _StakeTile extends StatelessWidget {
   final StakeTable tier;
   final ({int played, int needed})? progress;
   final bool affordable;
+
+  /// The entry fee, in gems: 0 at a free table.
+  final int gems;
   final bool chosen;
   final double width;
   final VoidCallback onTap;
@@ -318,6 +334,7 @@ class _StakeTile extends StatelessWidget {
       selected: chosen,
       label:
           '${formatStake(tier.stake)} coins a point'
+          '${gems == 0 ? '' : ', ${gemsText(gems)} a game'}'
           '${locked ? ', locked' : ''}',
       child: GestureDetector(
         key: Key('stake-${tier.stake}'),
@@ -366,6 +383,16 @@ class _StakeTile extends StatelessWidget {
                     fontWeight: affordable ? null : FontWeight.w700,
                   ),
                 ),
+                if (gems > 0)
+                  Row(
+                    key: Key('stake-${tier.stake}-fee'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const GemIcon(size: 13),
+                      const SizedBox(width: 3),
+                      Text(gemsText(gems), style: small),
+                    ],
+                  ),
                 if (progress case (:final played, :final needed))
                   Row(
                     key: Key('stake-${tier.stake}-lock'),

@@ -90,6 +90,43 @@ class PlayerDataController extends AsyncNotifier<PlayerData> {
     return ad.coins;
   }
 
+  /// The gems a match at [stake] costs to start, or 0 before the economy's
+  /// amounts have loaded.
+  int entryFeeFor(int? stake) =>
+      ref.read(economyConfigProvider).value?.entryFee.gemsFor(stake) ?? 0;
+
+  /// Pays the gems a match at [stake] costs to start, and returns whether
+  /// it's paid: `true` straight away when it's free, `false`, spending
+  /// nothing, when there aren't enough gems.
+  Future<bool> payEntryFee(int? stake) async {
+    final gems = entryFeeFor(stake);
+    if (gems == 0) return true;
+    if ((state.value?.gems ?? 0) < gems) return false;
+    try {
+      await _update((repository) => repository.spendGems(gems));
+    } on StateError {
+      return false;
+    }
+    return true;
+  }
+
+  /// Counts a rewarded ad just watched in place of a match's entry fee,
+  /// and returns whether it counted: `false` if the day's ads were already
+  /// used up.
+  Future<bool> claimAdEntry() async {
+    final economy = ref.read(economyConfigProvider).value;
+    if (economy == null || adsLeftToday() == 0) return false;
+    final now = ref.read(clockProvider)();
+    try {
+      await _update(
+        (repository) => repository.claimAdEntry(economy.rewardedAd, now),
+      );
+    } on StateError {
+      return false;
+    }
+    return true;
+  }
+
   /// Gives a new player their starting gems; a player who has had them
   /// keeps the gems they have.
   Future<void> giveStartingGems(int gems) =>

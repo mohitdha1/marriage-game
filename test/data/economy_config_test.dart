@@ -8,6 +8,9 @@ import 'package:marriage_game/ui/home/economy_config_provider.dart';
 EconomyConfig appEconomy() =>
     EconomyConfig.fromJson(File(EconomyConfig.asset).readAsStringSync());
 
+/// A valid entry fee, for files testing the other amounts.
+const fee = '"entryFee": {"gems": 1, "aboveStake": 100}';
+
 void main() {
   group("The app's data file", () {
     testWidgets('is bundled with the app and loads', (tester) async {
@@ -26,6 +29,13 @@ void main() {
       expect(ad.coins, 1000);
       expect(ad.perDay, 5);
       expect(ad.length, const Duration(seconds: 30));
+    });
+
+    test('charges 1 gem a match at tables above 100 a point', () {
+      final fee = appEconomy().entryFee;
+
+      expect(fee.gems, 1);
+      expect(fee.aboveStake, 100);
     });
 
     test('gives 500 coins an hour, and a gem every 4th time', () {
@@ -61,7 +71,8 @@ void main() {
     });
 
     test('a missing gift, or one with no wait or no gem cycle, is refused', () {
-      const ad = '"rewardedAd": {"coins": 1000, "perDay": 5, "seconds": 30}';
+      const ad =
+          '"rewardedAd": {"coins": 1000, "perDay": 5, "seconds": 30}, $fee';
       for (final (json, problem) in [
         ('{"startingGems": 3, $ad}', '"hourlyGift"'),
         (
@@ -98,7 +109,7 @@ void main() {
   test('a missing rewarded ad, or one with no length, is refused', () {
     const gift =
         '"hourlyGift": {"coins": 500, "minutes": 60, "gems": 1, '
-        '"gemEvery": 4}';
+        '"gemEvery": 4}, $fee';
     for (final (json, problem) in [
       ('{"startingGems": 3, $gift}', '"rewardedAd"'),
       (
@@ -126,6 +137,45 @@ void main() {
     }
   });
 
+  group('The entry fee', () {
+    const fee = EntryFee(gems: 1, aboveStake: 100);
+
+    test('is charged only above its stake, and never off a stake table', () {
+      expect(fee.gemsFor(100), 0);
+      expect(fee.gemsFor(5), 0);
+      expect(fee.gemsFor(250), 1);
+      expect(fee.gemsFor(100000), 1);
+      expect(fee.gemsFor(null), 0);
+    });
+
+    test('a missing fee, or one without a stake, is refused', () {
+      const rest =
+          '"startingGems": 3, "hourlyGift": {"coins": 500, "minutes": 60, '
+          '"gems": 1, "gemEvery": 4}, "rewardedAd": {"coins": 1000, '
+          '"perDay": 5, "seconds": 30}';
+      for (final (json, problem) in [
+        ('{$rest}', '"entryFee"'),
+        ('{$rest, "entryFee": {"gems": 1}}', '"entryFee.aboveStake"'),
+        (
+          '{$rest, "entryFee": {"gems": -1, "aboveStake": 100}}',
+          '"entryFee.gems"',
+        ),
+      ]) {
+        expect(
+          () => EconomyConfig.fromJson(json),
+          throwsA(
+            isA<FormatException>().having(
+              (e) => e.message,
+              'message',
+              contains(problem),
+            ),
+          ),
+          reason: json,
+        );
+      }
+    });
+  });
+
   group('Reading the amounts', () {
     test('a malformed file names the problem', () {
       expect(
@@ -145,7 +195,7 @@ void main() {
       const gift =
           '"hourlyGift": {"coins": 500, "minutes": 60, "gems": 1, '
           '"gemEvery": 4}, "rewardedAd": {"coins": 1000, "perDay": 5, '
-          '"seconds": 30}';
+          '"seconds": 30}, $fee';
       for (final json in [
         '{$gift}',
         '{"startingGems": -1, $gift}',

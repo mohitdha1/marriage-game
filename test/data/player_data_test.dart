@@ -30,6 +30,15 @@ void main() {
     expect(data.withGemsAdded(-9).gems, 0);
   });
 
+  test('gems are spent only when there are enough', () {
+    const data = PlayerData(coins: 700, gems: 2);
+
+    expect(data.withGemsSpent(2).gems, 0);
+    expect(data.withGemsSpent(1).coins, 700);
+    expect(() => data.withGemsSpent(3), throwsStateError);
+    expect(() => data.withGemsSpent(-1), throwsArgumentError);
+  });
+
   test('changing one balance keeps everything else', () {
     const data = PlayerData(
       coins: 500,
@@ -247,6 +256,19 @@ void main() {
       expect(watched.giftsCollected, 2);
       expect(watched, data.withAdReward(ad, morning));
       expect(watched, isNot(watched.withAdReward(ad, morning)));
+    });
+
+    test('an ad in place of an entry fee counts toward the limit, unpaid', () {
+      var data = const PlayerData(coins: 0, gems: 0);
+      data = data.withAdWatched(ad, morning).withAdReward(ad, morning);
+
+      expect(data.coins, 1000);
+      expect(data.gems, 0);
+      expect(data.adsLeft(ad, morning), 3);
+      for (var i = 0; i < 3; i++) {
+        data = data.withAdWatched(ad, morning);
+      }
+      expect(() => data.withAdWatched(ad, morning), throwsStateError);
     });
   });
 }

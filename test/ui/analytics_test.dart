@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/engine/card.dart';
@@ -86,6 +87,7 @@ class _Launcher extends StatelessWidget {
 Future<RecordingAnalytics> pumpTable(
   WidgetTester tester, {
   MatchSetup setup = quickPlaySetup,
+  List<Override> overrides = const [],
 }) async {
   tester.view
     ..physicalSize = const Size(844, 390)
@@ -123,6 +125,7 @@ Future<RecordingAnalytics> pumpTable(
             firstSeat: seat,
           ),
         ),
+        ...overrides,
       ],
       child: const MarriageApp(home: _Launcher()),
     ),

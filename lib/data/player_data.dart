@@ -103,13 +103,18 @@ class PlayerData {
   /// This data with the reward for watching [ad] at [now] added, and the
   /// ad counted toward that day's limit. Throws a [StateError] once the
   /// day's ads are used up.
-  PlayerData withAdReward(RewardedAd ad, DateTime now) {
+  PlayerData withAdReward(RewardedAd ad, DateTime now) =>
+      withAdWatched(ad, now).withCoinsAdded(ad.coins);
+
+  /// This data with [ad], watched at [now] in place of a match's entry fee,
+  /// counted toward that day's limit; it pays no coins. Throws a
+  /// [StateError] once the day's ads are used up.
+  PlayerData withAdWatched(RewardedAd ad, DateTime now) {
     if (adsLeft(ad, now) == 0) {
       throw StateError('No more rewarded ads today');
     }
     final today = dayOf(now);
     return _copyWith(
-      coins: (coins + ad.coins).clamp(0, maxCoins),
       adDay: today,
       adsWatched: (adDay == today ? adsWatched : 0) + 1,
     );
@@ -155,6 +160,14 @@ class PlayerData {
   /// negative. The balance never goes below zero.
   PlayerData withGemsAdded(int amount) =>
       _copyWith(gems: (gems + amount).clamp(0, maxCoins));
+
+  /// This data with [amount] gems spent. Throws a [StateError] if there
+  /// aren't that many, leaving the balance as it was.
+  PlayerData withGemsSpent(int amount) {
+    if (amount < 0) throw ArgumentError.value(amount, 'amount');
+    if (gems < amount) throw StateError('Not enough gems');
+    return _copyWith(gems: gems - amount);
+  }
 
   /// This data with a finished round counted in the stats, and, when it
   /// was played at a stake table, as a game at that [stake].

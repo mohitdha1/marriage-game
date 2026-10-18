@@ -7,7 +7,8 @@ import 'player_data.dart';
 /// touching it.
 ///
 /// Every change goes through [addCoins], [addGems], [giveStartingGems],
-/// [collectGift], [claimAdReward] or [recordGameResult], which apply
+/// [spendGems], [collectGift], [claimAdReward], [claimAdEntry] or
+/// [recordGameResult], which apply
 /// the rules in [PlayerData] to the stored data and return the result, so a
 /// store shared between devices can make each change in one step.
 abstract interface class PlayerDataRepository {
@@ -25,6 +26,11 @@ abstract interface class PlayerDataRepository {
   /// the data as it now stands.
   Future<PlayerData> addGems(int amount);
 
+  /// Spends [amount] gems (see [PlayerData.withGemsSpent]) and returns the
+  /// data as it now stands. Throws a [StateError] if there aren't that
+  /// many, spending none.
+  Future<PlayerData> spendGems(int amount);
+
   /// Adds the [gems] every player starts with, the first time it's called
   /// for this player and never again, and returns the data as it now
   /// stands.
@@ -39,6 +45,11 @@ abstract interface class PlayerDataRepository {
   /// [PlayerData.withAdReward]) and returns the data as it now stands.
   /// Throws a [StateError] once the day's ads are used up.
   Future<PlayerData> claimAdReward(RewardedAd ad, DateTime now);
+
+  /// Counts [ad], watched at [now] in place of a match's entry fee, toward
+  /// the day's limit (see [PlayerData.withAdWatched]) and returns the data
+  /// as it now stands. Throws a [StateError] once the day's ads are used up.
+  Future<PlayerData> claimAdEntry(RewardedAd ad, DateTime now);
 
   /// Counts a finished round: whether the player [won] it, the [points] it
   /// won or lost them, and the [stake] of the table, if it was played at

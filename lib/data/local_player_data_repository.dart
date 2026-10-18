@@ -60,12 +60,20 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
       _change((data) => data.withGemsAdded(amount));
 
   @override
+  Future<PlayerData> spendGems(int amount) =>
+      _change((data) => data.withGemsSpent(amount));
+
+  @override
   Future<PlayerData> collectGift(HourlyGift gift, DateTime now) =>
       _change((data) => data.withGiftCollected(gift, now));
 
   @override
   Future<PlayerData> claimAdReward(RewardedAd ad, DateTime now) =>
       _change((data) => data.withAdReward(ad, now));
+
+  @override
+  Future<PlayerData> claimAdEntry(RewardedAd ad, DateTime now) =>
+      _change((data) => data.withAdWatched(ad, now));
 
   @override
   Future<PlayerData> giveStartingGems(int gems) async {

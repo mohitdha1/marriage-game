@@ -197,5 +197,27 @@ void main() {
       );
       expect(await LocalPlayerDataRepository(store).load(), reopened);
     });
+
+    test('an ad in place of an entry fee is counted and saved', () async {
+      final store = InMemoryPreferences();
+      await LocalPlayerDataRepository(store).claimAdEntry(ad, morning);
+
+      final reopened = await LocalPlayerDataRepository(store).load();
+      expect(reopened.coins, PlayerData.startingCoins);
+      expect(reopened.adsLeft(ad, morning), 4);
+    });
   });
+
+  test(
+    'gems spent are saved; spending more than there are spends none',
+    () async {
+      final store = InMemoryPreferences();
+      final repository = LocalPlayerDataRepository(store);
+      await repository.addGems(2);
+
+      expect((await repository.spendGems(1)).gems, 1);
+      await expectLater(repository.spendGems(2), throwsStateError);
+      expect((await LocalPlayerDataRepository(store).load()).gems, 1);
+    },
+  );
 }

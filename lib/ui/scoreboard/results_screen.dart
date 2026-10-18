@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/scoring.dart';
+import '../home/entry_fee.dart';
 import '../state/table_controller.dart';
 import '../table/win_celebration.dart';
 import '../theme/table_felt.dart';
@@ -11,7 +12,7 @@ import 'scoreboard_screen.dart' show signed;
 /// The end of a match: a banner naming the winner, then how the match went
 /// (rounds played, the player's coins or points, their best round) and where
 /// everyone finished. Rematch starts a new match at the same table with the
-/// same players and rules; Home goes back to the home screen.
+/// same players and rules, for the table's entry fee; Home goes back to the home screen.
 ///
 /// When several people share the device, the summary is the table's rather
 /// than one player's.
@@ -108,7 +109,17 @@ class ResultsScreen extends ConsumerWidget {
                                           0xFF1A1A1A,
                                         ),
                                       ),
-                                      onPressed: () {
+                                      onPressed: () async {
+                                        // A rematch is a new match, with
+                                        // its own entry fee.
+                                        if (!await payEntryFee(
+                                              context,
+                                              ref,
+                                              controller.stake,
+                                            ) ||
+                                            !context.mounted) {
+                                          return;
+                                        }
                                         controller.startNewMatch();
                                         Navigator.of(context).pop();
                                       },

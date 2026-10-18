@@ -53,6 +53,18 @@ class RecordingRepository implements PlayerDataRepository {
   }
 
   @override
+  Future<PlayerData> spendGems(int amount) async {
+    calls.add('spendGems $amount');
+    return data = data.withGemsSpent(amount);
+  }
+
+  @override
+  Future<PlayerData> claimAdEntry(RewardedAd ad, DateTime now) async {
+    calls.add('claimAdEntry');
+    return data = data.withAdWatched(ad, now);
+  }
+
+  @override
   Future<PlayerData> collectGift(HourlyGift gift, DateTime now) async {
     calls.add('collectGift');
     return data = data.withGiftCollected(gift, now);
@@ -90,6 +102,7 @@ const testEconomy = EconomyConfig(
     gemEvery: 4,
   ),
   rewardedAd: RewardedAd(coins: 1000, perDay: 2, length: Duration(seconds: 30)),
+  entryFee: EntryFee(gems: 1, aboveStake: 100),
 );
 
 /// A container using [repository]. The economy's amounts arrive when
@@ -264,6 +277,71 @@ void main() {
     expect(controller.adsLeftToday(), 0);
     expect(await controller.claimAdReward(), isNull);
     expect(repository.calls.where((c) => c == 'claimAdReward'), hasLength(2));
+  });
+
+  group('The entry fee', () {
+    Future<(RecordingRepository, PlayerDataController)> ready(
+      PlayerData data,
+    ) async {
+      final repository = RecordingRepository(data)..startingGemsGiven = true;
+      final container = containerWith(
+        repository,
+        economy: Future.value(testEconomy),
+        clock: () => DateTime(2026, 10, 17, 9),
+      );
+      await container.read(playerDataProvider.future);
+      await container.read(economyConfigProvider.future);
+      await pumpEventQueue();
+      return (repository, container.read(playerDataProvider.notifier));
+    }
+
+    test('is a gem above the 100 table, and nothing at or below it, or off '
+        'a stake table', () async {
+      final (repository, controller) = await ready(const PlayerData(gems: 2));
+
+      expect(controller.entryFeeFor(250), 1);
+      expect(await controller.payEntryFee(100), isTrue);
+      expect(await controller.payEntryFee(null), isTrue);
+      expect(repository.data.gems, 2, reason: 'free tables cost nothing');
+      expect(await controller.payEntryFee(250), isTrue);
+      expect(repository.data.gems, 1);
+      expect(repository.calls, contains('spendGems 1'));
+    });
+
+    test(
+      'without the gems, nothing is spent and the match is refused',
+      () async {
+        final (repository, controller) = await ready(const PlayerData(gems: 1));
+
+        expect(await controller.payEntryFee(500), isTrue);
+        expect(await controller.payEntryFee(500), isFalse);
+        expect(repository.data.gems, 0);
+        expect(repository.calls.where((c) => c.startsWith('spendGems')), [
+          'spendGems 1',
+        ]);
+      },
+    );
+
+    test('an ad can stand in for it, within the day\'s ads', () async {
+      final (repository, controller) = await ready(const PlayerData(gems: 0));
+
+      expect(await controller.claimAdEntry(), isTrue);
+      expect(await controller.claimAdEntry(), isTrue);
+      expect(await controller.claimAdEntry(), isFalse);
+      expect(repository.data.coins, PlayerData.startingCoins);
+      expect(controller.adsLeftToday(), 0);
+    });
+
+    test('is free before the economy has loaded', () async {
+      final repository = RecordingRepository(const PlayerData(gems: 0));
+      final container = containerWith(repository);
+      await container.read(playerDataProvider.future);
+
+      expect(
+        await container.read(playerDataProvider.notifier).payEntryFee(250),
+        isTrue,
+      );
+    });
   });
 
   group('on the device by default', () {
