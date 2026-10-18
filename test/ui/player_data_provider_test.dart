@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/data/economy_config.dart';
+import 'package:marriage_game/data/gift_session.dart';
 import 'package:marriage_game/data/player_data.dart';
 import 'package:marriage_game/data/player_data_repository.dart';
 import 'package:marriage_game/ui/home/economy_config_provider.dart';
@@ -65,9 +67,44 @@ class RecordingRepository implements PlayerDataRepository {
   }
 
   @override
-  Future<PlayerData> collectGift(HourlyGift gift, DateTime now) async {
-    calls.add('collectGift');
-    return data = data.withGiftCollected(gift, now);
+  Future<PlayerData> collectGift(
+    HourlyGift gift,
+    DateTime now,
+    GiftPick pick,
+  ) async {
+    calls.add('collectGift ${pick.card}');
+    return data = data.withGiftCollected(gift, now, pick);
+  }
+
+  @override
+  Future<PlayerData> doubleGift(
+    HourlyGift gift,
+    RewardedAd ad,
+    DateTime now,
+  ) async {
+    calls.add('doubleGift');
+    return data = data.withGiftDoubled(gift, ad, now);
+  }
+
+  @override
+  Future<PlayerData> pickExtraGiftCard(
+    HourlyGift gift,
+    RewardedAd ad,
+    DateTime now,
+    GiftPick pick,
+  ) async {
+    calls.add('pickExtraGiftCard ${pick.card}');
+    return data = data.withGiftExtraPick(gift, ad, now, pick);
+  }
+
+  @override
+  Future<PlayerData> claimGiftBonus(
+    HourlyGift gift,
+    RewardedAd ad,
+    DateTime now,
+  ) async {
+    calls.add('claimGiftBonus');
+    return data = data.withGiftBonus(gift, ad, now);
   }
 
   var startingGemsGiven = false;
@@ -96,10 +133,13 @@ class RecordingRepository implements PlayerDataRepository {
 const testEconomy = EconomyConfig(
   startingGems: 3,
   hourlyGift: HourlyGift(
-    coins: 500,
     interval: Duration(hours: 1),
-    gems: 1,
-    gemEvery: 4,
+    cards: [
+      GiftCard(Reward(coins: 250), 3),
+      GiftCard(Reward(coins: 5000), 1),
+      GiftCard(Reward(gems: 1), 1),
+    ],
+    bonus: Reward(gems: 1),
   ),
   rewardedAd: RewardedAd(coins: 1000, perDay: 2, length: Duration(seconds: 30)),
   entryFee: EntryFee(gems: 1, aboveStake: 100),
@@ -111,10 +151,12 @@ ProviderContainer containerWith(
   PlayerDataRepository repository, {
   Future<EconomyConfig>? economy,
   DateTime Function()? clock,
+  Random? random,
 }) {
   final container = ProviderContainer(
     overrides: [
       if (clock != null) clockProvider.overrideWithValue(clock),
+      if (random != null) giftRandomProvider.overrideWithValue(random),
       playerDataRepositoryProvider.overrideWithValue(repository),
       economyConfigProvider.overrideWith(
         (ref) => economy ?? Completer<EconomyConfig>().future,
@@ -218,43 +260,119 @@ void main() {
   });
 
   group('The hourly gift', () {
-    test('is collected through the repository, at the clock\'s time, and '
-        'says what it gave', () async {
-      var now = DateTime(2026, 10, 17, 12);
-      final repository = RecordingRepository();
+    late DateTime now;
+    late RecordingRepository repository;
+
+    Future<PlayerDataController> ready({int seed = 1}) async {
+      now = DateTime(2026, 10, 17, 12);
+      repository = RecordingRepository()..startingGemsGiven = true;
       final container = containerWith(
         repository,
         economy: Future.value(testEconomy),
         clock: () => now,
+        random: Random(seed),
       );
       await container.read(playerDataProvider.future);
       await container.read(economyConfigProvider.future);
       await pumpEventQueue();
-      final controller = container.read(playerDataProvider.notifier);
+      return container.read(playerDataProvider.notifier);
+    }
 
-      expect(await controller.collectGift(), (coins: 500, gems: 0));
+    test('a card is drawn by the weights when it\'s tapped, whichever card '
+        'it is, and saved through the repository', () async {
+      final controller = await ready(seed: 5);
+      final expected = testEconomy.hourlyGift.draw(Random(5));
+
+      final reward = await controller.collectGift(8);
+
+      expect(reward, expected);
+      expect(repository.calls.last, 'collectGift 8');
       expect(repository.data.giftCollectedAt, now);
-      expect(container.read(playerDataProvider).value, repository.data);
+      expect(repository.data.giftSession?.pick.reward, reward);
+      expect(controller.openGiftSession(), repository.data.giftSession);
+    });
 
-      // Not again until an hour has passed.
+    test('the same seed draws the same cards, wherever they lie', () async {
+      final first = <Reward?>[];
+      final second = <Reward?>[];
+      for (final (draws, cards) in [
+        (first, [0, 1, 2, 3]),
+        (second, [9, 5, 7, 6]),
+      ]) {
+        final controller = await ready(seed: 11);
+        for (final card in cards) {
+          draws.add(await controller.collectGift(card));
+          now = now.add(const Duration(hours: 1));
+        }
+      }
+
+      expect(first, second);
+    });
+
+    test('over many hours, the cards come up by their weights', () async {
+      final controller = await ready(seed: 3);
+      final counts = <Reward, int>{};
+      const hours = 2000;
+      for (var i = 0; i < hours; i++) {
+        final reward = (await controller.collectGift(i % 10))!;
+        counts.update(reward, (n) => n + 1, ifAbsent: () => 1);
+        now = now.add(const Duration(hours: 1));
+      }
+
+      expect(counts[const Reward(coins: 250)]! / hours, closeTo(0.6, 0.04));
+      expect(counts[const Reward(coins: 5000)]! / hours, closeTo(0.2, 0.03));
+      expect(counts[const Reward(gems: 1)]! / hours, closeTo(0.2, 0.03));
+    });
+
+    test('only one free pick an hour, however fast the taps', () async {
+      final controller = await ready();
+
+      final taps = await Future.wait([
+        controller.collectGift(0),
+        controller.collectGift(1),
+        controller.collectGift(2),
+      ]);
+      expect(taps.nonNulls, hasLength(1));
       now = now.add(const Duration(minutes: 59));
-      expect(await controller.collectGift(), isNull);
-      expect(repository.calls.where((c) => c == 'collectGift'), hasLength(1));
+      expect(await controller.collectGift(4), isNull);
+      expect(repository.data.giftsCollected, 1);
 
       now = now.add(const Duration(minutes: 1));
-      expect(await controller.collectGift(), (coins: 500, gems: 0));
+      expect(await controller.collectGift(4), isNotNull);
+      expect(repository.data.giftsCollected, 2);
+    });
+
+    test('the extras each pay once, within the day\'s ads, and leave the '
+        'timer alone', () async {
+      final controller = await ready(seed: 2);
+      final free = (await controller.collectGift(0))!;
+      final coins = repository.data.coins;
+      final gems = repository.data.gems;
+      now = now.add(const Duration(minutes: 5));
+
+      expect(await controller.doubleGift(), free);
+      expect(await controller.doubleGift(), isNull);
+      expect(await controller.pickExtraGiftCard(0), isNull, reason: 'taken');
+      final extra = (await controller.pickExtraGiftCard(6))!;
+      expect(await controller.pickExtraGiftCard(7), isNull);
+      // The test economy allows 2 ads a day, both now watched.
+      expect(await controller.claimGiftBonus(), isNull);
+      expect(controller.openGiftSession()!.bonusTaken, isFalse);
+
+      expect(repository.data.coins, coins + free.coins + extra.coins);
+      expect(repository.data.gems, gems + free.gems + extra.gems);
+      expect(repository.data.giftCollectedAt, DateTime(2026, 10, 17, 12));
     });
 
     test('nothing is collected before the economy has loaded', () async {
       final repository = RecordingRepository();
       final container = containerWith(repository);
       await container.read(playerDataProvider.future);
+      final controller = container.read(playerDataProvider.notifier);
 
-      expect(
-        await container.read(playerDataProvider.notifier).collectGift(),
-        isNull,
-      );
-      expect(repository.calls, isNot(contains('collectGift')));
+      expect(await controller.collectGift(0), isNull);
+      expect(controller.openGiftSession(), isNull);
+      expect(repository.calls, isNot(contains(startsWith('collectGift'))));
     });
   });
 

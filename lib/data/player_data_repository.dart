@@ -1,4 +1,5 @@
 import 'economy_config.dart';
+import 'gift_session.dart';
 import 'player_data.dart';
 
 /// Where the player's coins, gems and stats live. The rest of the app reads and
@@ -7,8 +8,8 @@ import 'player_data.dart';
 /// touching it.
 ///
 /// Every change goes through [addCoins], [addGems], [giveStartingGems],
-/// [spendGems], [collectGift], [claimAdReward], [claimAdEntry] or
-/// [recordGameResult], which apply
+/// [spendGems], [collectGift], [doubleGift], [pickExtraGiftCard],
+/// [claimGiftBonus], [claimAdReward], [claimAdEntry] or [recordGameResult], which apply
 /// the rules in [PlayerData] to the stored data and return the result, so a
 /// store shared between devices can make each change in one step.
 abstract interface class PlayerDataRepository {
@@ -36,10 +37,32 @@ abstract interface class PlayerDataRepository {
   /// stands.
   Future<PlayerData> giveStartingGems(int gems);
 
-  /// Collects the hourly [gift] at [now] (see
+  /// Collects the hourly [gift] at [now] with the card [pick] (see
   /// [PlayerData.withGiftCollected]) and returns the data as it now stands.
   /// Throws a [StateError] if it isn't ready yet.
-  Future<PlayerData> collectGift(HourlyGift gift, DateTime now);
+  Future<PlayerData> collectGift(HourlyGift gift, DateTime now, GiftPick pick);
+
+  /// Doubles the open gift's free pick, for [ad] watched at [now] (see
+  /// [PlayerData.withGiftDoubled]), and returns the data as it now stands.
+  Future<PlayerData> doubleGift(HourlyGift gift, RewardedAd ad, DateTime now);
+
+  /// Takes a second card, [pick], from the open gift, for [ad] watched at
+  /// [now] (see [PlayerData.withGiftExtraPick]), and returns the data as it
+  /// now stands.
+  Future<PlayerData> pickExtraGiftCard(
+    HourlyGift gift,
+    RewardedAd ad,
+    DateTime now,
+    GiftPick pick,
+  );
+
+  /// Adds the open gift's bonus, for [ad] watched at [now] (see
+  /// [PlayerData.withGiftBonus]), and returns the data as it now stands.
+  Future<PlayerData> claimGiftBonus(
+    HourlyGift gift,
+    RewardedAd ad,
+    DateTime now,
+  );
 
   /// Pays the reward for watching [ad] at [now] (see
   /// [PlayerData.withAdReward]) and returns the data as it now stands.

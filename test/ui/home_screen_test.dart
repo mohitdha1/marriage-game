@@ -133,22 +133,15 @@ void main() {
     String label(WidgetTester tester) =>
         tester.widget<Text>(find.byKey(const Key('gift-label'))).data!;
 
-    testWidgets('a new player\'s first gift is ready; collecting it pays '
-        '500 coins and starts the hour', (tester) async {
-      var now = noon;
-      await pumpHome(tester, clock: () => now);
+    testWidgets('a new player\'s first gift is ready, and tapping it opens '
+        'the cards', (tester) async {
+      await pumpHome(tester, clock: () => noon);
       expect(label(tester), 'Collect');
 
       await tester.tap(find.byKey(const Key('hourly-gift')));
-      await tester.pump();
-      await tester.pump();
-      expect(find.text('+500 coins'), findsOneWidget);
-      expect(find.text('10,500'), findsOneWidget);
-      expect(label(tester), '1:00:00');
+      await tester.pumpAndSettle();
 
-      now = now.add(const Duration(seconds: 1));
-      await tester.pump(const Duration(seconds: 1));
-      expect(label(tester), '59:59');
+      expect(find.byKey(const Key('gift-cards')), findsOneWidget);
     });
 
     testWidgets('the wait carries on from the last collection, even with '
@@ -168,40 +161,14 @@ void main() {
       );
       expect(label(tester), '40:00');
 
-      // Tapping before it's ready collects nothing.
+      // Tapping before it's ready opens nothing.
       await tester.tap(find.byKey(const Key('hourly-gift')));
-      await tester.pump();
-      expect(find.byKey(const Key('gift-collected')), findsNothing);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('gift-cards')), findsNothing);
 
       now = now.add(const Duration(minutes: 40));
       await tester.pump(const Duration(seconds: 1));
       expect(label(tester), 'Collect');
-    });
-
-    testWidgets('every 4th gift comes with a gem', (tester) async {
-      await pumpHome(
-        tester,
-        clock: () => noon,
-        saved: {
-          'gift.collectedAt': noon
-              .subtract(const Duration(hours: 2))
-              .millisecondsSinceEpoch,
-          'gift.count': 3,
-        },
-      );
-
-      await tester.tap(find.byKey(const Key('hourly-gift')));
-      await tester.pump();
-      await tester.pump();
-
-      expect(find.text('+500 coins and 1 gem'), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('gem-balance')),
-          matching: find.text('4'),
-        ),
-        findsOneWidget,
-      );
     });
 
     testWidgets('screen readers hear whether it\'s ready', (tester) async {
@@ -230,12 +197,6 @@ void main() {
         countdownText(const Duration(hours: 1, minutes: 2, seconds: 5)),
         '1:02:05',
       );
-    });
-
-    test('the reward reads as coins, then any gems', () {
-      expect(giftRewardText((coins: 500, gems: 0)), '+500 coins');
-      expect(giftRewardText((coins: 1500, gems: 1)), '+1,500 coins and 1 gem');
-      expect(giftRewardText((coins: 500, gems: 2)), '+500 coins and 2 gems');
     });
   });
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/data/economy_config.dart';
@@ -10,6 +11,11 @@ EconomyConfig appEconomy() =>
 
 /// A valid entry fee, for files testing the other amounts.
 const fee = '"entryFee": {"gems": 1, "aboveStake": 100}';
+
+/// A valid hourly gift, for files testing the other amounts.
+const validGift =
+    '"hourlyGift": {"minutes": 60, "cards": [{"coins": 500, "weight": 1}], '
+    '"bonus": {"gems": 1}}';
 
 void main() {
   group("The app's data file", () {
@@ -38,58 +44,115 @@ void main() {
       expect(fee.aboveStake, 100);
     });
 
-    test('gives 500 coins an hour, and a gem every 4th time', () {
+    test('lays out cards worth 250 to 5,000 coins, or 1 or 3 gems, by the '
+        'chosen chances, with a gem for the bonus', () {
       final gift = appEconomy().hourlyGift;
 
-      expect(gift.coins, 500);
       expect(gift.interval, const Duration(hours: 1));
-      expect(gift.gems, 1);
-      expect(gift.gemEvery, 4);
+      expect(
+        [for (final card in gift.cards) (card.reward, card.weight)],
+        [
+          (const Reward(coins: 250), 30),
+          (const Reward(coins: 500), 30),
+          (const Reward(coins: 1000), 20),
+          (const Reward(coins: 2500), 8),
+          (const Reward(coins: 5000), 2),
+          (const Reward(gems: 1), 8),
+          (const Reward(gems: 3), 2),
+        ],
+      );
+      expect(gift.bonus, const Reward(gems: 1));
     });
   });
 
   group('The hourly gift', () {
-    test('the gem comes on every gemEvery-th collection', () {
-      const gift = HourlyGift(
-        coins: 500,
+    const gift = HourlyGift(
+      interval: Duration(hours: 1),
+      cards: [
+        GiftCard(Reward(coins: 100), 6),
+        GiftCard(Reward(coins: 1000), 3),
+        GiftCard(Reward(gems: 1), 1),
+      ],
+      bonus: Reward(gems: 1),
+    );
+
+    test('cards turn up by their weights', () {
+      final random = Random(42);
+      final counts = <Reward, int>{};
+      const draws = 20000;
+      for (var i = 0; i < draws; i++) {
+        counts.update(gift.draw(random), (n) => n + 1, ifAbsent: () => 1);
+      }
+
+      expect(counts[const Reward(coins: 100)]! / draws, closeTo(0.6, 0.015));
+      expect(counts[const Reward(coins: 1000)]! / draws, closeTo(0.3, 0.015));
+      expect(counts[const Reward(gems: 1)]! / draws, closeTo(0.1, 0.01));
+    });
+
+    test('a card never comes up without weight, and one card always does', () {
+      const one = HourlyGift(
         interval: Duration(hours: 1),
-        gems: 2,
-        gemEvery: 3,
+        cards: [GiftCard(Reward(coins: 5), 1)],
+        bonus: Reward(gems: 1),
       );
+      final random = Random(7);
 
       expect(
-        [for (var n = 1; n <= 6; n++) gift.rewardFor(n)],
-        [
-          (coins: 500, gems: 0),
-          (coins: 500, gems: 0),
-          (coins: 500, gems: 2),
-          (coins: 500, gems: 0),
-          (coins: 500, gems: 0),
-          (coins: 500, gems: 2),
-        ],
+        {for (var i = 0; i < 50; i++) one.draw(random)},
+        {const Reward(coins: 5)},
       );
     });
 
-    test('a missing gift, or one with no wait or no gem cycle, is refused', () {
+    test('the board is ten cards, the same for the same seed', () {
+      expect(gift.board(3), hasLength(10));
+      expect(gift.board(3), gift.board(3));
+      expect({
+        for (var seed = 0; seed < 5; seed++) gift.board(seed).join(),
+      }, hasLength(greaterThan(1)));
+    });
+
+    test('a reward doubles, and reads back from what it writes', () {
+      const reward = Reward(coins: 250, gems: 1);
+
+      expect(reward.doubled, const Reward(coins: 500, gems: 2));
+      expect(Reward.fromJson(reward.toJson()), reward);
+      expect(const Reward(gems: 3).toJson(), {'gems': 3});
+    });
+
+    test('a missing gift, or one with no wait, no cards, an empty card or '
+        'no weight, is refused', () {
       const ad =
           '"rewardedAd": {"coins": 1000, "perDay": 5, "seconds": 30}, $fee';
+      String giftWith(String body) =>
+          '{"startingGems": 3, $ad, "hourlyGift": {$body}}';
+      const cards = '"cards": [{"coins": 500, "weight": 1}]';
+      const bonus = '"bonus": {"gems": 1}';
       for (final (json, problem) in [
         ('{"startingGems": 3, $ad}', '"hourlyGift"'),
         (
-          '{"startingGems": 3, $ad, "hourlyGift": {"coins": 500, '
-              '"minutes": 0, "gems": 1, "gemEvery": 4}}',
+          giftWith('"minutes": 0, $cards, $bonus'),
           '"hourlyGift.minutes", a whole number from 1',
         ),
+        (giftWith('"minutes": 60, $bonus'), '"hourlyGift.cards"'),
+        (giftWith('"minutes": 60, "cards": [], $bonus'), '"hourlyGift.cards"'),
         (
-          '{"startingGems": 3, $ad, "hourlyGift": {"coins": 500, '
-              '"minutes": 60, "gems": 1, "gemEvery": 0}}',
-          '"hourlyGift.gemEvery", a whole number from 1',
+          giftWith('"minutes": 60, "cards": [{"weight": 1}], $bonus'),
+          '"hourlyGift.cards[0]" to give coins or gems',
         ),
         (
-          '{"startingGems": 3, $ad, "hourlyGift": {"coins": -5, '
-              '"minutes": 60, "gems": 1, "gemEvery": 4}}',
-          '"hourlyGift.coins"',
+          giftWith(
+            '"minutes": 60, "cards": [{"coins": 5, "weight": 1}, '
+            '{"coins": 5, "weight": 0}], $bonus',
+          ),
+          '"hourlyGift.cards[1].weight", a whole number from 1',
         ),
+        (
+          giftWith(
+            '"minutes": 60, "cards": [{"coins": -5, "weight": 1}], $bonus',
+          ),
+          '"hourlyGift.cards[0].coins"',
+        ),
+        (giftWith('"minutes": 60, $cards'), '"hourlyGift.bonus"'),
       ]) {
         expect(
           () => EconomyConfig.fromJson(json),
@@ -107,9 +170,7 @@ void main() {
   });
 
   test('a missing rewarded ad, or one with no length, is refused', () {
-    const gift =
-        '"hourlyGift": {"coins": 500, "minutes": 60, "gems": 1, '
-        '"gemEvery": 4}, $fee';
+    const gift = '$validGift, $fee';
     for (final (json, problem) in [
       ('{"startingGems": 3, $gift}', '"rewardedAd"'),
       (
@@ -150,8 +211,7 @@ void main() {
 
     test('a missing fee, or one without a stake, is refused', () {
       const rest =
-          '"startingGems": 3, "hourlyGift": {"coins": 500, "minutes": 60, '
-          '"gems": 1, "gemEvery": 4}, "rewardedAd": {"coins": 1000, '
+          '"startingGems": 3, $validGift, "rewardedAd": {"coins": 1000, '
           '"perDay": 5, "seconds": 30}';
       for (final (json, problem) in [
         ('{$rest}', '"entryFee"'),
@@ -193,8 +253,7 @@ void main() {
 
     test('a missing or negative amount is refused', () {
       const gift =
-          '"hourlyGift": {"coins": 500, "minutes": 60, "gems": 1, '
-          '"gemEvery": 4}, "rewardedAd": {"coins": 1000, "perDay": 5, '
+          '$validGift, "rewardedAd": {"coins": 1000, "perDay": 5, '
           '"seconds": 30}, $fee';
       for (final json in [
         '{$gift}',

@@ -1,6 +1,18 @@
 {
   "startingGems": 3,
-  "hourlyGift": {"coins": 500, "minutes": 60, "gems": 1, "gemEvery": 4},
+  "hourlyGift": {
+    "minutes": 60,
+    "cards": [
+      {"coins": 250, "weight": 30},
+      {"coins": 500, "weight": 30},
+      {"coins": 1000, "weight": 20},
+      {"coins": 2500, "weight": 8},
+      {"coins": 5000, "weight": 2},
+      {"gems": 1, "weight": 8},
+      {"gems": 3, "weight": 2}
+    ],
+    "bonus": {"gems": 1}
+  },
   "rewardedAd": {"coins": 1000, "perDay": 5, "seconds": 30},
   "entryFee": {"gems": 1, "aboveStake": 100}
 }

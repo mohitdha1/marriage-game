@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/data/economy_config.dart';
+import 'package:marriage_game/data/gift_session.dart';
 import 'package:marriage_game/data/local_player_data_repository.dart';
 import 'package:marriage_game/data/player_data.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
@@ -121,11 +122,16 @@ void main() {
 
   group('Hourly gift', () {
     const gift = HourlyGift(
-      coins: 500,
       interval: Duration(hours: 1),
-      gems: 1,
-      gemEvery: 4,
+      cards: [GiftCard(Reward(coins: 500), 1)],
+      bonus: Reward(gems: 1),
     );
+    const ad = RewardedAd(
+      coins: 1000,
+      perDay: 5,
+      length: Duration(seconds: 30),
+    );
+    const pick = GiftPick(card: 4, reward: Reward(coins: 500));
     final noon = DateTime(2026, 10, 17, 12);
 
     test('a collection is saved, so the wait carries on after the app is '
@@ -133,7 +139,7 @@ void main() {
       final store = InMemoryPreferences();
       final collected = await LocalPlayerDataRepository(
         store,
-      ).collectGift(gift, noon);
+      ).collectGift(gift, noon, pick);
       expect(collected.coins, PlayerData.startingCoins + 500);
 
       // The app is opened again 45 minutes later: 15 to go.
@@ -148,28 +154,56 @@ void main() {
     test('a gift that isn\'t ready changes nothing', () async {
       final store = InMemoryPreferences();
       final repository = LocalPlayerDataRepository(store);
-      final first = await repository.collectGift(gift, noon);
+      final first = await repository.collectGift(gift, noon, pick);
 
       await expectLater(
-        repository.collectGift(gift, noon.add(const Duration(minutes: 5))),
+        repository.collectGift(
+          gift,
+          noon.add(const Duration(minutes: 5)),
+          pick,
+        ),
         throwsStateError,
       );
       expect(await LocalPlayerDataRepository(store).load(), first);
     });
 
-    test('the count of collections is kept, for the gem every 4th', () async {
-      final repository = LocalPlayerDataRepository(InMemoryPreferences());
-      for (var i = 0; i < 3; i++) {
-        await repository.collectGift(gift, noon.add(Duration(hours: i)));
-      }
-      final fourth = await repository.collectGift(
+    test('the extras taken are saved, so they\'re offered no more after '
+        'the app is closed', () async {
+      final store = InMemoryPreferences();
+      final repository = LocalPlayerDataRepository(store);
+      final soon = noon.add(const Duration(minutes: 3));
+      await repository.collectGift(gift, noon, pick);
+      await repository.doubleGift(gift, ad, soon);
+      await repository.pickExtraGiftCard(
         gift,
-        noon.add(const Duration(hours: 3)),
+        ad,
+        soon,
+        const GiftPick(card: 2, reward: Reward(gems: 3)),
       );
 
-      expect(fourth.giftsCollected, 4);
-      expect(fourth.gems, 1);
+      final reopened = LocalPlayerDataRepository(store);
+      final session = (await reopened.load()).openGiftSession(gift, soon)!;
+      expect(session.doubled, isTrue);
+      expect(session.extraPick?.card, 2);
+      expect(session.bonusTaken, isFalse);
+      await expectLater(reopened.doubleGift(gift, ad, soon), throwsStateError);
+      final withBonus = await reopened.claimGiftBonus(gift, ad, soon);
+      expect(withBonus.coins, PlayerData.startingCoins + 1000);
+      expect(withBonus.gems, 4);
+      expect(withBonus.adsLeft(ad, soon), 2);
     });
+
+    test(
+      'a session that can\'t be read is dropped, keeping the rest',
+      () async {
+        final store = InMemoryPreferences({'gift.session': '{"pick": 7}'});
+        await store.setInt('coins.balance', 1234);
+
+        final data = await LocalPlayerDataRepository(store).load();
+        expect(data.giftSession, isNull);
+        expect(data.coins, 1234);
+      },
+    );
   });
 
   group('Rewarded ads', () {

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../ui/settings/preferences.dart';
 import 'economy_config.dart';
+import 'gift_session.dart';
 import 'player_data.dart';
 import 'player_data_repository.dart';
 
@@ -17,6 +18,7 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
   static const _startingGemsGiven = 'gems.startingGiven';
   static const _giftCollectedAt = 'gift.collectedAt';
   static const _giftsCollected = 'gift.count';
+  static const _giftSession = 'gift.session';
   static const _adDay = 'ads.day';
   static const _adsWatched = 'ads.watched';
   static const _played = 'stats.roundsPlayed';
@@ -36,6 +38,8 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
       if (data.giftCollectedAt case final at?)
         _store.setInt(_giftCollectedAt, at.millisecondsSinceEpoch),
       _store.setInt(_giftsCollected, data.giftsCollected),
+      if (data.giftSession case final session?)
+        _store.setString(_giftSession, jsonEncode(session.toJson())),
       if (data.adDay case final day?) _store.setString(_adDay, day),
       _store.setInt(_adsWatched, data.adsWatched),
       _store.setInt(_played, data.stats.roundsPlayed),
@@ -64,8 +68,30 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
       _change((data) => data.withGemsSpent(amount));
 
   @override
-  Future<PlayerData> collectGift(HourlyGift gift, DateTime now) =>
-      _change((data) => data.withGiftCollected(gift, now));
+  Future<PlayerData> collectGift(
+    HourlyGift gift,
+    DateTime now,
+    GiftPick pick,
+  ) => _change((data) => data.withGiftCollected(gift, now, pick));
+
+  @override
+  Future<PlayerData> doubleGift(HourlyGift gift, RewardedAd ad, DateTime now) =>
+      _change((data) => data.withGiftDoubled(gift, ad, now));
+
+  @override
+  Future<PlayerData> pickExtraGiftCard(
+    HourlyGift gift,
+    RewardedAd ad,
+    DateTime now,
+    GiftPick pick,
+  ) => _change((data) => data.withGiftExtraPick(gift, ad, now, pick));
+
+  @override
+  Future<PlayerData> claimGiftBonus(
+    HourlyGift gift,
+    RewardedAd ad,
+    DateTime now,
+  ) => _change((data) => data.withGiftBonus(gift, ad, now));
 
   @override
   Future<PlayerData> claimAdReward(RewardedAd ad, DateTime now) =>
@@ -109,6 +135,7 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
       null => null,
     },
     giftsCollected: _store.getInt(_giftsCollected) ?? 0,
+    giftSession: _readGiftSession(),
     adDay: _store.getString(_adDay),
     adsWatched: _store.getInt(_adsWatched) ?? 0,
     stats: PlayerStats(
@@ -118,6 +145,18 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
     ),
     gamesAtStake: _readGamesAtStake(),
   );
+
+  /// The last gift's session; `null` if there's none, or it can't be read,
+  /// when the extras on offer are lost but nothing already given is.
+  GiftSession? _readGiftSession() {
+    final saved = _store.getString(_giftSession);
+    if (saved == null) return null;
+    try {
+      return GiftSession.fromJson(jsonDecode(saved) as Map<String, Object?>);
+    } on Object {
+      return null;
+    }
+  }
 
   Map<int, int> _readGamesAtStake() {
     final saved = _store.getString(_gamesAtStake);

@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/economy_config.dart';
+import '../../data/gift_session.dart';
 import '../../data/local_player_data_repository.dart';
 import '../../data/player_data.dart';
 import '../../data/player_data_repository.dart';
@@ -18,6 +21,9 @@ final playerDataRepositoryProvider = Provider<PlayerDataRepository>(
 
 /// The time now. Tests replace it to move time on without waiting.
 final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
+/// Draws the hourly gift's cards. Tests replace it with a seeded one.
+final giftRandomProvider = Provider<Random>((ref) => Random());
 
 /// The player's coins, gems and stats, loaded from [playerDataRepositoryProvider].
 /// Screens watch it; changes go through [PlayerDataController], which passes
@@ -48,18 +54,97 @@ class PlayerDataController extends AsyncNotifier<PlayerData> {
     return loading;
   }
 
-  /// Collects the hourly gift and returns what it gave, or `null` if it
-  /// wasn't ready (or the economy's amounts haven't loaded).
-  Future<({int coins, int gems})?> collectGift() async {
-    final economy = ref.read(economyConfigProvider).value;
+  /// Collects the hourly gift by picking the [card] at that place on the
+  /// board, and returns what it turned up, drawn by the weights; `null` if
+  /// the gift wasn't ready (or the economy's amounts haven't loaded). The
+  /// reward is saved before this returns, so nothing shown afterwards can
+  /// lose or repeat it.
+  Future<Reward?> collectGift(int card) async {
+    final gift = ref.read(economyConfigProvider).value?.hourlyGift;
     final data = state.value;
-    if (economy == null || data == null) return null;
-    final gift = economy.hourlyGift;
+    if (gift == null || data == null) return null;
     final now = ref.read(clockProvider)();
     if (data.giftWait(gift, now) > Duration.zero) return null;
-    final reward = gift.rewardFor(data.giftsCollected + 1);
+    final pick = GiftPick(
+      card: card,
+      reward: gift.draw(ref.read(giftRandomProvider)),
+    );
+    return _giftChange(
+      (repository) => repository.collectGift(gift, now, pick),
+      pick.reward,
+    );
+  }
+
+  /// The last gift's session while its extras can still be taken, or
+  /// `null` if there isn't one.
+  GiftSession? openGiftSession() {
+    final gift = ref.read(economyConfigProvider).value?.hourlyGift;
+    if (gift == null) return null;
+    return state.value?.openGiftSession(gift, ref.read(clockProvider)());
+  }
+
+  /// Doubles the open gift's free pick, for a rewarded ad just watched, and
+  /// returns what was added; `null` if it can't be (see
+  /// [PlayerData.withGiftDoubled]).
+  Future<Reward?> doubleGift() async {
+    final economy = ref.read(economyConfigProvider).value;
+    final session = openGiftSession();
+    if (economy == null || session == null || session.doubled) return null;
+    final now = ref.read(clockProvider)();
+    return _giftChange(
+      (repository) =>
+          repository.doubleGift(economy.hourlyGift, economy.rewardedAd, now),
+      session.pick.reward,
+    );
+  }
+
+  /// Picks the [card] at that place as well, for a rewarded ad just
+  /// watched, and returns what it turned up; `null` if it can't be picked
+  /// (see [PlayerData.withGiftExtraPick]).
+  Future<Reward?> pickExtraGiftCard(int card) async {
+    final economy = ref.read(economyConfigProvider).value;
+    final session = openGiftSession();
+    if (economy == null || session == null || session.extraPick != null) {
+      return null;
+    }
+    final gift = economy.hourlyGift;
+    final pick = GiftPick(
+      card: card,
+      reward: gift.draw(ref.read(giftRandomProvider)),
+    );
+    final now = ref.read(clockProvider)();
+    return _giftChange(
+      (repository) =>
+          repository.pickExtraGiftCard(gift, economy.rewardedAd, now, pick),
+      pick.reward,
+    );
+  }
+
+  /// Adds the open gift's bonus, for a rewarded ad just watched, and
+  /// returns it; `null` if it can't be (see [PlayerData.withGiftBonus]).
+  Future<Reward?> claimGiftBonus() async {
+    final economy = ref.read(economyConfigProvider).value;
+    final session = openGiftSession();
+    if (economy == null || session == null || session.bonusTaken) return null;
+    final now = ref.read(clockProvider)();
+    return _giftChange(
+      (repository) => repository.claimGiftBonus(
+        economy.hourlyGift,
+        economy.rewardedAd,
+        now,
+      ),
+      economy.hourlyGift.bonus,
+    );
+  }
+
+  /// Makes a gift [change] and returns its [reward], or `null` if the
+  /// repository refused it.
+  Future<Reward?> _giftChange(
+    Future<PlayerData> Function(PlayerDataRepository) change,
+    Reward reward,
+  ) async {
     try {
-      await _update((repository) => repository.collectGift(gift, now));
+      await _update(change);
     } on StateError {
       return null;
     }

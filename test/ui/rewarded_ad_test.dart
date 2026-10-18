@@ -1,28 +1,69 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/data/economy_config.dart';
 import 'package:marriage_game/ui/ads/rewarded_ad_service.dart';
 import 'package:marriage_game/ui/ads/watch_ad.dart';
-
-import 'home_screen_test.dart' show pumpHome;
+import 'package:marriage_game/ui/home/economy_config_provider.dart';
+import 'package:marriage_game/ui/home/player_data_provider.dart';
+import 'package:marriage_game/ui/settings/preferences.dart';
 
 final noon = DateTime(2026, 10, 17, 12);
 
-/// Collects the hourly gift on the home screen, which offers an ad while
-/// there are any left today.
-Future<void> collectGift(WidgetTester tester) async {
-  await tester.tap(find.byKey(const Key('hourly-gift')));
-  await tester.pump();
-  await tester.pump();
+/// Stands in for an ad network with nothing to show.
+class _NoAds implements RewardedAdService {
+  const _NoAds();
+
+  @override
+  Future<AdResult> show(BuildContext context) async => AdResult.unavailable;
+}
+
+/// A screen with a Watch button that offers an ad for coins, at noon, with
+/// the app's own amounts. Returns the providers' container.
+Future<ProviderContainer> pumpAdHost(
+  WidgetTester tester, {
+  Map<String, Object>? saved,
+  RewardedAdService ads = const FakeRewardedAdService(),
+}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        preferencesProvider.overrideWithValue(InMemoryPreferences(saved)),
+        economyConfigProvider.overrideWith(
+          (ref) => EconomyConfig.fromJson(
+            File(EconomyConfig.asset).readAsStringSync(),
+          ),
+        ),
+        clockProvider.overrideWithValue(() => noon),
+        rewardedAdServiceProvider.overrideWithValue(ads),
+      ],
+      child: MaterialApp(
+        home: Scaffold(
+          body: Consumer(
+            builder: (context, ref, _) => TextButton(
+              onPressed: () => watchAdForCoins(context, ref),
+              child: const Text('Watch'),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  final container = ProviderScope.containerOf(
+    tester.element(find.text('Watch')),
+  );
+  await container.read(playerDataProvider.future);
+  return container;
 }
 
 /// A screen with a button that shows the test ad and keeps the result.
 class _AdLauncher extends StatelessWidget {
   const _AdLauncher(this.onResult);
 
-  final void Function(bool) onResult;
+  final void Function(AdResult) onResult;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -37,7 +78,7 @@ class _AdLauncher extends StatelessWidget {
 void main() {
   group('The test ad', () {
     testWidgets('pays out after 3 seconds', (tester) async {
-      bool? watched;
+      AdResult? watched;
       await tester.pumpWidget(
         MaterialApp(home: _AdLauncher((result) => watched = result)),
       );
@@ -51,12 +92,12 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
 
-      expect(watched, isTrue);
+      expect(watched, AdResult.watched);
       expect(find.text('Test ad'), findsNothing);
     });
 
     testWidgets('closed early, it pays nothing', (tester) async {
-      bool? watched;
+      AdResult? watched;
       await tester.pumpWidget(
         MaterialApp(home: _AdLauncher((result) => watched = result)),
       );
@@ -66,22 +107,14 @@ void main() {
       await tester.tap(find.byKey(const Key('ad-close')));
       await tester.pumpAndSettle();
 
-      expect(watched, isFalse);
+      expect(watched, AdResult.skipped);
     });
   });
 
-  group('After the hourly gift', () {
-    testWidgets('an ad is offered, and watching it pays 1,000 coins', (
-      tester,
-    ) async {
-      await pumpHome(tester, clock: () => noon);
-      await collectGift(tester);
-
-      expect(
-        find.text('Want more? Watch a 30s ad for 1,000 coins (5 left today).'),
-        findsOneWidget,
-      );
-      await tester.tap(find.byKey(const Key('gift-watch-ad')));
+  group('Watching an ad for coins', () {
+    testWidgets('pays 1,000 coins once watched to the end', (tester) async {
+      final container = await pumpAdHost(tester);
+      await tester.tap(find.text('Watch'));
       await tester.pumpAndSettle();
       expect(find.text('Test ad'), findsOneWidget);
 
@@ -89,57 +122,50 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('+1,000 coins'), findsOneWidget);
-      // 10,000 to start, 500 from the gift and 1,000 from the ad.
-      expect(find.text('11,500'), findsOneWidget);
+      expect(container.read(playerDataProvider).value!.coins, 11000);
     });
 
-    testWidgets('No thanks shows no ad', (tester) async {
-      await pumpHome(tester, clock: () => noon);
-      await collectGift(tester);
-
-      await tester.tap(find.byKey(const Key('gift-no-ad')));
+    testWidgets('closed early, pays nothing', (tester) async {
+      final container = await pumpAdHost(tester);
+      await tester.tap(find.text('Watch'));
       await tester.pumpAndSettle();
-
-      expect(find.text('Test ad'), findsNothing);
-      expect(find.text('10,500'), findsOneWidget);
-    });
-
-    testWidgets('an ad closed early pays nothing', (tester) async {
-      await pumpHome(tester, clock: () => noon);
-      await collectGift(tester);
-      await tester.tap(find.byKey(const Key('gift-watch-ad')));
-      await tester.pumpAndSettle();
-
       await tester.tap(find.byKey(const Key('ad-close')));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('ad-reward')), findsNothing);
-      expect(find.text('10,500'), findsOneWidget);
+      expect(container.read(playerDataProvider).value!.coins, 10000);
+      expect(container.read(playerDataProvider.notifier).adsLeftToday(), 5);
     });
 
-    testWidgets('once the day\'s 5 ads are used, none is offered', (
-      tester,
-    ) async {
-      await pumpHome(
+    testWidgets('with no ad to show, says so and pays nothing', (tester) async {
+      final container = await pumpAdHost(tester, ads: const _NoAds());
+      await tester.tap(find.text('Watch'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(noAdText), findsOneWidget);
+      expect(container.read(playerDataProvider).value!.coins, 10000);
+    });
+
+    testWidgets('once the day\'s 5 ads are used, says to come back '
+        'tomorrow', (tester) async {
+      await pumpAdHost(
         tester,
-        clock: () => noon,
         saved: {'ads.day': '2026-10-17', 'ads.watched': 5},
       );
-      await collectGift(tester);
+      await tester.tap(find.text('Watch'));
+      await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('gift-watch-ad')), findsNothing);
-      expect(find.text('+500 coins'), findsOneWidget);
+      expect(find.text('Test ad'), findsNothing);
+      expect(find.text(noAdsLeftText), findsOneWidget);
     });
 
     testWidgets('a new day brings the ads back', (tester) async {
-      await pumpHome(
+      final container = await pumpAdHost(
         tester,
-        clock: () => noon,
         saved: {'ads.day': '2026-10-16', 'ads.watched': 5},
       );
-      await collectGift(tester);
 
-      expect(find.byKey(const Key('gift-watch-ad')), findsOneWidget);
+      expect(container.read(playerDataProvider.notifier).adsLeftToday(), 5);
     });
   });
 

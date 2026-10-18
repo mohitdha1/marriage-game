@@ -1,4 +1,5 @@
 import 'economy_config.dart';
+import 'gift_session.dart';
 
 /// The player's record over every round they've finished.
 class PlayerStats {
@@ -50,6 +51,7 @@ class PlayerData {
     this.gamesAtStake = const {},
     this.giftCollectedAt,
     this.giftsCollected = 0,
+    this.giftSession,
     this.adDay,
     this.adsWatched = 0,
   });
@@ -76,9 +78,12 @@ class PlayerData {
   /// been, when the first one is ready straight away.
   final DateTime? giftCollectedAt;
 
-  /// How many hourly gifts have been collected, which decides when one
-  /// comes with gems.
+  /// How many hourly gifts have been collected.
   final int giftsCollected;
+
+  /// What became of the last hourly gift collected, or `null` before the
+  /// first.
+  final GiftSession? giftSession;
 
   /// The local day of the last rewarded ad, as [dayOf] writes it, or
   /// `null` before the first.
@@ -132,21 +137,83 @@ class PlayerData {
     return left > gift.interval ? gift.interval : left;
   }
 
-  /// This data with [gift] collected at [now]: its coins, and gems when
-  /// this collection earns them, added, and the wait started again.
-  /// Throws a [StateError] if the gift isn't ready yet.
-  PlayerData withGiftCollected(HourlyGift gift, DateTime now) {
+  /// The last gift's session while its extras can still be taken: from
+  /// its collection until the next [gift] is ready.
+  GiftSession? openGiftSession(HourlyGift gift, DateTime now) =>
+      giftWait(gift, now) > Duration.zero ? giftSession : null;
+
+  /// This data with [gift] collected at [now] by picking a card: [pick]'s
+  /// reward added, a new session begun and the wait started again. Throws
+  /// a [StateError] if the gift isn't ready yet.
+  PlayerData withGiftCollected(HourlyGift gift, DateTime now, GiftPick pick) {
     if (giftWait(gift, now) > Duration.zero) {
       throw StateError('The gift isn\'t ready yet');
     }
-    final reward = gift.rewardFor(giftsCollected + 1);
-    return _copyWith(
-      coins: (coins + reward.coins).clamp(0, maxCoins),
-      gems: (gems + reward.gems).clamp(0, maxCoins),
+    _checkOnBoard(pick);
+    return _withReward(pick.reward)._copyWith(
       giftCollectedAt: now,
       giftsCollected: giftsCollected + 1,
+      giftSession: GiftSession(pick: pick),
     );
   }
+
+  /// This data with the free pick of the open gift session given again,
+  /// for [ad] watched at [now]. Throws a [StateError] if there's no open
+  /// session, it has already been doubled, or the day's ads are used up.
+  PlayerData withGiftDoubled(HourlyGift gift, RewardedAd ad, DateTime now) {
+    final session = _openSession(gift, now);
+    if (session.doubled) throw StateError('The gift is already doubled');
+    return withAdWatched(ad, now)
+        ._withReward(session.pick.reward)
+        ._copyWith(giftSession: session.copyWith(doubled: true));
+  }
+
+  /// This data with a second card, [pick], taken in the open gift session
+  /// for [ad] watched at [now]. Throws a [StateError] if there's no open
+  /// session, a second card has been taken already, [pick] is the card
+  /// picked first, or the day's ads are used up.
+  PlayerData withGiftExtraPick(
+    HourlyGift gift,
+    RewardedAd ad,
+    DateTime now,
+    GiftPick pick,
+  ) {
+    final session = _openSession(gift, now);
+    if (session.extraPick != null) {
+      throw StateError('Another card was already picked');
+    }
+    _checkOnBoard(pick);
+    if (pick.card == session.pick.card) {
+      throw StateError('That card was already picked');
+    }
+    return withAdWatched(ad, now)
+        ._withReward(pick.reward)
+        ._copyWith(giftSession: session.copyWith(extraPick: pick));
+  }
+
+  /// This data with [gift]'s bonus added in the open gift session, for
+  /// [ad] watched at [now]. Throws a [StateError] if there's no open
+  /// session, the bonus was taken already, or the day's ads are used up.
+  PlayerData withGiftBonus(HourlyGift gift, RewardedAd ad, DateTime now) {
+    final session = _openSession(gift, now);
+    if (session.bonusTaken) throw StateError('The bonus was already taken');
+    return withAdWatched(ad, now)
+        ._withReward(gift.bonus)
+        ._copyWith(giftSession: session.copyWith(bonusTaken: true));
+  }
+
+  static void _checkOnBoard(GiftPick pick) {
+    if (pick.card < 0 || pick.card >= HourlyGift.boardSize) {
+      throw RangeError.range(pick.card, 0, HourlyGift.boardSize - 1, 'card');
+    }
+  }
+
+  GiftSession _openSession(HourlyGift gift, DateTime now) =>
+      openGiftSession(gift, now) ??
+      (throw StateError('No gift is open to add to'));
+
+  PlayerData _withReward(Reward reward) =>
+      withCoinsAdded(reward.coins).withGemsAdded(reward.gems);
 
   /// Games played at the table with [stake].
   int gamesAt(int stake) => gamesAtStake[stake] ?? 0;
@@ -189,6 +256,7 @@ class PlayerData {
     Map<int, int>? gamesAtStake,
     DateTime? giftCollectedAt,
     int? giftsCollected,
+    GiftSession? giftSession,
     String? adDay,
     int? adsWatched,
   }) => PlayerData(
@@ -198,6 +266,7 @@ class PlayerData {
     gamesAtStake: gamesAtStake ?? this.gamesAtStake,
     giftCollectedAt: giftCollectedAt ?? this.giftCollectedAt,
     giftsCollected: giftsCollected ?? this.giftsCollected,
+    giftSession: giftSession ?? this.giftSession,
     adDay: adDay ?? this.adDay,
     adsWatched: adsWatched ?? this.adsWatched,
   );
@@ -209,6 +278,7 @@ class PlayerData {
       other.gems == gems &&
       other.giftCollectedAt == giftCollectedAt &&
       other.giftsCollected == giftsCollected &&
+      other.giftSession == giftSession &&
       other.adDay == adDay &&
       other.adsWatched == adsWatched &&
       other.stats == stats &&
@@ -221,6 +291,7 @@ class PlayerData {
     gems,
     giftCollectedAt,
     giftsCollected,
+    giftSession,
     adDay,
     adsWatched,
     stats,

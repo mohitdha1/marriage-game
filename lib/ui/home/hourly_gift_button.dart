@@ -3,16 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../ads/watch_ad.dart';
 import 'economy_config_provider.dart';
-import 'home_screen.dart' show formatCoins;
+import 'gift_cards_screen.dart';
 import 'player_data_provider.dart';
 
 /// The hourly gift on the home screen: a gift icon with the time left until
-/// it can be collected, or, once it's ready, a glowing button that collects
-/// it. While there are rewarded ads left today, collecting offers one for
-/// more coins. Hidden until the player's data and the economy's amounts
-/// have loaded.
+/// it can be collected, or, once it's ready, a glowing button that opens
+/// its cards to pick from. While the last gift's rewarded-ad extras are
+/// still on offer, tapping the countdown opens them again. Hidden until the
+/// player's data and the economy's amounts have loaded.
 class HourlyGiftButton extends ConsumerStatefulWidget {
   const HourlyGiftButton({super.key});
 
@@ -25,7 +24,7 @@ class _HourlyGiftButtonState extends ConsumerState<HourlyGiftButton> {
   /// moves; stopped once it's ready, when nothing changes until it's
   /// collected.
   Timer? _ticker;
-  bool _collecting = false;
+  bool _opening = false;
 
   @override
   void dispose() {
@@ -44,49 +43,10 @@ class _HourlyGiftButtonState extends ConsumerState<HourlyGiftButton> {
     }
   }
 
-  Future<void> _collect() async {
-    setState(() => _collecting = true);
-    final reward = await ref.read(playerDataProvider.notifier).collectGift();
-    if (!mounted) return;
-    setState(() => _collecting = false);
-    if (reward == null) return;
-    final economy = ref.read(economyConfigProvider).value;
-    final adsLeft = ref.read(playerDataProvider.notifier).adsLeftToday();
-    if (economy == null || adsLeft == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          key: const Key('gift-collected'),
-          content: Text(giftRewardText(reward)),
-        ),
-      );
-      return;
-    }
-    // With ads left today, the gift comes with an offer of more.
-    final watch = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        key: const Key('gift-collected'),
-        title: Text(giftRewardText(reward)),
-        content: Text(
-          'Want more? ${adOfferText(economy.rewardedAd)} '
-          '(${adsLeftText(adsLeft)}).',
-        ),
-        actions: [
-          TextButton(
-            key: const Key('gift-no-ad'),
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('No thanks'),
-          ),
-          FilledButton.icon(
-            key: const Key('gift-watch-ad'),
-            onPressed: () => Navigator.of(context).pop(true),
-            icon: const Icon(Icons.play_circle_outline),
-            label: const Text('Watch ad'),
-          ),
-        ],
-      ),
-    );
-    if (watch == true && mounted) await watchAdForCoins(context, ref);
+  Future<void> _open() async {
+    setState(() => _opening = true);
+    await openGiftCards(context);
+    if (mounted) setState(() => _opening = false);
   }
 
   @override
@@ -95,18 +55,24 @@ class _HourlyGiftButtonState extends ConsumerState<HourlyGiftButton> {
     final data = ref.watch(playerDataProvider).value;
     if (economy == null || data == null) return const SizedBox.shrink();
 
-    final wait = data.giftWait(economy.hourlyGift, ref.read(clockProvider)());
+    final now = ref.read(clockProvider)();
+    final wait = data.giftWait(economy.hourlyGift, now);
     final ready = wait == Duration.zero;
+    // While the last gift's extras are still on offer, it opens again.
+    final reopens =
+        !ready &&
+        !(data.openGiftSession(economy.hourlyGift, now)?.isFinished ?? true);
     // Starting or stopping the ticker doesn't rebuild anything, so it's
     // safe to do while building.
     _tickWhile(!ready);
 
     final accent = Theme.of(context).colorScheme;
     return Semantics(
-      button: ready,
+      button: ready || reopens,
       label: ready
-          ? 'Hourly gift ready: tap to collect'
-          : 'Next hourly gift in ${countdownText(wait)}',
+          ? 'Hourly gift ready: tap to pick a card'
+          : 'Next hourly gift in ${countdownText(wait)}'
+                '${reopens ? ': tap for its extras' : ''}',
       excludeSemantics: true,
       child: Material(
         key: const Key('hourly-gift'),
@@ -116,7 +82,7 @@ class _HourlyGiftButtonState extends ConsumerState<HourlyGiftButton> {
         shadowColor: const Color(0xFFFFC107),
         child: InkWell(
           customBorder: const StadiumBorder(),
-          onTap: ready && !_collecting ? _collect : null,
+          onTap: (ready || reopens) && !_opening ? _open : null,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 4, 12, 4),
             child: Row(
@@ -128,6 +94,16 @@ class _HourlyGiftButtonState extends ConsumerState<HourlyGiftButton> {
                   color: ready ? accent.onPrimaryContainer : Colors.white,
                 ),
                 const SizedBox(width: 6),
+                // Extras still on offer from the last gift.
+                if (reopens) ...[
+                  const Icon(
+                    Icons.play_circle,
+                    key: Key('gift-extras-waiting'),
+                    size: 16,
+                    color: Color(0xFFFFC107),
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 Text(
                   ready ? 'Collect' : countdownText(wait),
                   key: const Key('gift-label'),
@@ -157,14 +133,4 @@ String countdownText(Duration wait) {
   return hours > 0
       ? '$hours:${two(minutes)}:${two(seconds)}'
       : '$minutes:${two(seconds)}';
-}
-
-/// What collecting a gift gave: "+500 coins", or "+500 coins and 1 gem".
-String giftRewardText(({int coins, int gems}) reward) {
-  final coins = '+${formatCoins(reward.coins)} coins';
-  return switch (reward.gems) {
-    0 => coins,
-    1 => '$coins and 1 gem',
-    final gems => '$coins and $gems gems',
-  };
 }

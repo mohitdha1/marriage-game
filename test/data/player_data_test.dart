@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/data/economy_config.dart';
+import 'package:marriage_game/data/gift_session.dart';
 import 'package:marriage_game/data/player_data.dart';
 
 void main() {
@@ -120,12 +121,18 @@ void main() {
 
   group('Hourly gift', () {
     const gift = HourlyGift(
-      coins: 500,
       interval: Duration(hours: 1),
-      gems: 1,
-      gemEvery: 4,
+      cards: [GiftCard(Reward(coins: 500), 1)],
+      bonus: Reward(gems: 1),
     );
+    const ad = RewardedAd(
+      coins: 1000,
+      perDay: 5,
+      length: Duration(seconds: 30),
+    );
+    const pick = GiftPick(card: 3, reward: Reward(coins: 500));
     final noon = DateTime(2026, 10, 17, 12);
+    final soon = noon.add(const Duration(minutes: 10));
 
     test('the first gift is ready straight away', () {
       expect(const PlayerData().giftWait(gift, noon), Duration.zero);
@@ -133,7 +140,7 @@ void main() {
 
     test('after collecting, the next is an interval away, counting from the '
         'collection', () {
-      final data = const PlayerData().withGiftCollected(gift, noon);
+      final data = const PlayerData().withGiftCollected(gift, noon, pick);
 
       expect(data.giftWait(gift, noon), const Duration(hours: 1));
       expect(
@@ -153,7 +160,7 @@ void main() {
     test(
       'a clock turned back never makes the wait longer than one interval',
       () {
-        final data = const PlayerData().withGiftCollected(gift, noon);
+        final data = const PlayerData().withGiftCollected(gift, noon, pick);
 
         expect(
           data.giftWait(gift, noon.subtract(const Duration(days: 1))),
@@ -162,29 +169,153 @@ void main() {
       },
     );
 
-    test('each collection pays the coins, and every 4th a gem', () {
-      var data = const PlayerData(coins: 0);
-      final gems = <int>[];
-      for (var i = 0; i < 8; i++) {
-        final before = data.gems;
-        data = data.withGiftCollected(gift, noon.add(Duration(hours: i)));
-        gems.add(data.gems - before);
-      }
+    test('the free pick pays its card and opens a session', () {
+      final data = const PlayerData(coins: 0, gems: 0).withGiftCollected(
+        gift,
+        noon,
+        const GiftPick(card: 0, reward: Reward(coins: 250, gems: 3)),
+      );
 
-      expect(data.coins, 8 * 500);
-      expect(gems, [0, 0, 0, 1, 0, 0, 0, 1]);
-      expect(data.giftsCollected, 8);
-      expect(data.giftCollectedAt, noon.add(const Duration(hours: 7)));
+      expect(data.coins, 250);
+      expect(data.gems, 3);
+      expect(data.giftsCollected, 1);
+      expect(data.giftCollectedAt, noon);
+      expect(
+        data.openGiftSession(gift, soon),
+        const GiftSession(
+          pick: GiftPick(card: 0, reward: Reward(coins: 250, gems: 3)),
+        ),
+      );
     });
 
-    test('a gift that isn\'t ready can\'t be collected', () {
-      final data = const PlayerData().withGiftCollected(gift, noon);
+    test('only one free pick an hour', () {
+      final data = const PlayerData().withGiftCollected(gift, noon, pick);
 
       expect(
-        () =>
-            data.withGiftCollected(gift, noon.add(const Duration(minutes: 59))),
+        () => data.withGiftCollected(
+          gift,
+          noon.add(const Duration(minutes: 59)),
+          pick,
+        ),
         throwsStateError,
       );
+      expect(
+        data
+            .withGiftCollected(gift, noon.add(const Duration(hours: 1)), pick)
+            .giftsCollected,
+        2,
+      );
+    });
+
+    test('a card off the board can\'t be picked', () {
+      expect(
+        () => const PlayerData().withGiftCollected(
+          gift,
+          noon,
+          const GiftPick(card: 10, reward: Reward(coins: 5)),
+        ),
+        throwsRangeError,
+      );
+    });
+
+    test('an ad doubles the free pick once, counting the ad, and leaves the '
+        'wait alone', () {
+      final picked = const PlayerData(
+        coins: 0,
+      ).withGiftCollected(gift, noon, pick);
+      final doubled = picked.withGiftDoubled(gift, ad, soon);
+
+      expect(doubled.coins, 1000);
+      expect(doubled.adsLeft(ad, soon), 4);
+      expect(doubled.giftCollectedAt, noon);
+      expect(doubled.openGiftSession(gift, soon)!.doubled, isTrue);
+      expect(() => doubled.withGiftDoubled(gift, ad, soon), throwsStateError);
+    });
+
+    test('an ad picks one more card, never the same one, and the double '
+        'stays the free pick\'s', () {
+      final picked = const PlayerData(
+        coins: 0,
+      ).withGiftCollected(gift, noon, pick);
+      const extra = GiftPick(card: 7, reward: Reward(gems: 3));
+
+      expect(
+        () => picked.withGiftExtraPick(
+          gift,
+          ad,
+          soon,
+          const GiftPick(card: 3, reward: Reward(gems: 3)),
+        ),
+        throwsStateError,
+      );
+      final both = picked
+          .withGiftExtraPick(gift, ad, soon, extra)
+          .withGiftDoubled(gift, ad, soon);
+      expect(both.coins, 1000, reason: 'the free 500, doubled');
+      expect(both.gems, 3, reason: 'the extra card, not doubled');
+      expect(both.openGiftSession(gift, soon)!.extraPick, extra);
+      expect(
+        () => both.withGiftExtraPick(
+          gift,
+          ad,
+          soon,
+          const GiftPick(card: 8, reward: Reward(coins: 5)),
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('an ad adds the bonus once', () {
+      final picked = const PlayerData(
+        gems: 0,
+      ).withGiftCollected(gift, noon, pick);
+      final bonus = picked.withGiftBonus(gift, ad, soon);
+
+      expect(bonus.gems, 1);
+      expect(bonus.openGiftSession(gift, soon)!.bonusTaken, isTrue);
+      expect(() => bonus.withGiftBonus(gift, ad, soon), throwsStateError);
+    });
+
+    test('the extras can be taken in any order, and then the session is '
+        'finished', () {
+      final picked = const PlayerData().withGiftCollected(gift, noon, pick);
+      const extra = GiftPick(card: 1, reward: Reward(coins: 500));
+      final orders = <PlayerData Function(PlayerData)>[
+        (d) => d.withGiftBonus(gift, ad, soon),
+        (d) => d.withGiftExtraPick(gift, ad, soon, extra),
+        (d) => d.withGiftDoubled(gift, ad, soon),
+      ];
+      final forwards = orders.fold(picked, (d, take) => take(d));
+      final backwards = orders.reversed.fold(picked, (d, take) => take(d));
+
+      expect(forwards.coins, backwards.coins);
+      expect(forwards.gems, backwards.gems);
+      expect(forwards.openGiftSession(gift, soon)!.isFinished, isTrue);
+      expect(forwards.adsLeft(ad, soon), 2);
+    });
+
+    test('the extras end when the next gift is ready, and need a gift', () {
+      final picked = const PlayerData().withGiftCollected(gift, noon, pick);
+      final later = noon.add(const Duration(hours: 1));
+
+      expect(picked.openGiftSession(gift, later), isNull);
+      expect(() => picked.withGiftBonus(gift, ad, later), throwsStateError);
+      expect(
+        () => const PlayerData().withGiftDoubled(gift, ad, noon),
+        throwsStateError,
+      );
+    });
+
+    test('with the day\'s ads used up, no extra is given', () {
+      var data = const PlayerData().withGiftCollected(gift, noon, pick);
+      for (var i = 0; i < 5; i++) {
+        data = data.withAdReward(ad, soon);
+      }
+      final before = data;
+
+      expect(() => data.withGiftDoubled(gift, ad, soon), throwsStateError);
+      expect(() => data.withGiftBonus(gift, ad, soon), throwsStateError);
+      expect(data, before);
     });
 
     test('collecting keeps everything else, and counts toward equality', () {
@@ -193,17 +324,38 @@ void main() {
         stats: PlayerStats(roundsPlayed: 1),
         gamesAtStake: {5: 1},
       );
-      final collected = data.withGiftCollected(gift, noon);
+      final collected = data.withGiftCollected(gift, noon, pick);
 
       expect(collected.stats, data.stats);
       expect(collected.gamesAtStake, data.gamesAtStake);
       expect(collected.gems, 2);
-      expect(collected, data.withGiftCollected(gift, noon));
-      expect(collected.hashCode, data.withGiftCollected(gift, noon).hashCode);
-      expect(collected, isNot(data.withGiftCollected(gift, DateTime(2027))));
+      expect(collected, data.withGiftCollected(gift, noon, pick));
       expect(
-        PlayerData(giftCollectedAt: noon, giftsCollected: 1),
-        isNot(PlayerData(giftCollectedAt: noon, giftsCollected: 2)),
+        collected.hashCode,
+        data.withGiftCollected(gift, noon, pick).hashCode,
+      );
+      expect(
+        collected,
+        isNot(data.withGiftCollected(gift, DateTime(2027), pick)),
+      );
+      expect(
+        collected,
+        isNot(collected.withGiftBonus(gift, ad, soon).withGemsAdded(-1)),
+        reason: 'the session counts too',
+      );
+    });
+
+    test('a session reads back from what it writes', () {
+      const session = GiftSession(
+        pick: pick,
+        doubled: true,
+        extraPick: GiftPick(card: 9, reward: Reward(gems: 1)),
+      );
+
+      expect(GiftSession.fromJson(session.toJson()), session);
+      expect(
+        GiftSession.fromJson(const GiftSession(pick: pick).toJson()),
+        const GiftSession(pick: pick),
       );
     });
   });

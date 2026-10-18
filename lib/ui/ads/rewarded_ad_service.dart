@@ -3,6 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// How showing a rewarded ad went.
+enum AdResult {
+  /// Watched to the end: the reward is earned.
+  watched,
+
+  /// Closed before the end: no reward.
+  skipped,
+
+  /// No ad could be shown, such as when none has loaded: no reward.
+  unavailable;
+
+  bool get earned => this == watched;
+}
+
 /// Shows rewarded ads: the player watches one to the end to earn a reward.
 /// An interface so a real ad network can replace [FakeRewardedAdService]
 /// later without touching the screens that offer ads.
@@ -10,9 +24,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Ads are only ever offered away from the table (the home screen, the
 /// shop), never during a hand.
 abstract interface class RewardedAdService {
-  /// Shows an ad over [context], and completes with whether it was watched
-  /// to the end, so the reward is earned.
-  Future<bool> show(BuildContext context);
+  /// Shows an ad over [context], and completes with how it went: only an
+  /// ad [AdResult.watched] to the end earns the reward.
+  Future<AdResult> show(BuildContext context);
 }
 
 /// Stands in for a real ad network: a test screen that runs for [length]
@@ -23,14 +37,15 @@ class FakeRewardedAdService implements RewardedAdService {
   final Duration length;
 
   @override
-  Future<bool> show(BuildContext context) async =>
-      await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          fullscreenDialog: true,
-          builder: (_) => FakeAdScreen(length: length),
-        ),
-      ) ??
-      false;
+  Future<AdResult> show(BuildContext context) async {
+    final watched = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => FakeAdScreen(length: length),
+      ),
+    );
+    return watched ?? false ? AdResult.watched : AdResult.skipped;
+  }
 }
 
 /// The test ad: a countdown, then it closes with the reward earned.

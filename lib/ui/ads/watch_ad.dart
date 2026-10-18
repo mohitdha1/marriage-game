@@ -10,6 +10,12 @@ import 'rewarded_ad_service.dart';
 String adOfferText(RewardedAd ad) =>
     'Watch a ${ad.length.inSeconds}s ad for ${formatCoins(ad.coins)} coins';
 
+/// Said when no ad could be shown.
+const noAdText = 'No ad is ready right now. Please try again in a moment.';
+
+/// Said once the day's ads are used up.
+const noAdsLeftText = 'No more ads today. Come back tomorrow.';
+
 /// How many ads are left today: "3 left today".
 String adsLeftText(int left) => '$left left today';
 
@@ -20,13 +26,14 @@ Future<void> watchAdForCoins(BuildContext context, WidgetRef ref) async {
   final controller = ref.read(playerDataProvider.notifier);
   final messenger = ScaffoldMessenger.of(context);
   if (controller.adsLeftToday() == 0) {
-    messenger.showSnackBar(
-      const SnackBar(content: Text('No more ads today. Come back tomorrow.')),
-    );
+    messenger.showSnackBar(const SnackBar(content: Text(noAdsLeftText)));
     return;
   }
-  final watched = await ref.read(rewardedAdServiceProvider).show(context);
-  if (!watched) return;
+  final result = await ref.read(rewardedAdServiceProvider).show(context);
+  if (result == AdResult.unavailable) {
+    messenger.showSnackBar(const SnackBar(content: Text(noAdText)));
+  }
+  if (!result.earned) return;
   final coins = await controller.claimAdReward();
   if (coins == null) return;
   messenger.showSnackBar(
