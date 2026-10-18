@@ -160,20 +160,26 @@ class PlayerDataController extends AsyncNotifier<PlayerData> {
     return data.adsLeft(economy.rewardedAd, ref.read(clockProvider)());
   }
 
-  /// Pays the reward for a rewarded ad just watched, and returns the coins
-  /// it gave, or `null` if the day's ads were already used up.
-  Future<int?> claimAdReward() async {
+  /// Pays the reward for a rewarded ad just watched, in [currency], and
+  /// returns what it gave, or `null` if the day's ads were already used up.
+  Future<Reward?> claimAdReward([Currency currency = Currency.coins]) async {
     final economy = ref.read(economyConfigProvider).value;
     if (economy == null || adsLeftToday() == 0) return null;
     final ad = economy.rewardedAd;
     final now = ref.read(clockProvider)();
     try {
-      await _update((repository) => repository.claimAdReward(ad, now));
+      await _update(
+        (repository) => repository.claimAdReward(ad, now, currency),
+      );
     } on StateError {
       return null;
     }
-    return ad.coins;
+    return ad.rewardIn(currency);
   }
+
+  /// Adds [pack], just bought.
+  Future<void> addPurchase(ShopPack pack) =>
+      _update((repository) => repository.addPurchase(pack));
 
   /// The gems a match at [stake] costs to start, or 0 before the economy's
   /// amounts have loaded.

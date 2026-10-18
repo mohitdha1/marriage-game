@@ -94,8 +94,15 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
   ) => _change((data) => data.withGiftBonus(gift, ad, now));
 
   @override
-  Future<PlayerData> claimAdReward(RewardedAd ad, DateTime now) =>
-      _change((data) => data.withAdReward(ad, now));
+  Future<PlayerData> claimAdReward(
+    RewardedAd ad,
+    DateTime now, [
+    Currency currency = Currency.coins,
+  ]) => _change((data) => data.withAdReward(ad, now, currency));
+
+  @override
+  Future<PlayerData> addPurchase(ShopPack pack) =>
+      _change((data) => data.withPurchase(pack));
 
   @override
   Future<PlayerData> claimAdEntry(RewardedAd ad, DateTime now) =>

@@ -80,18 +80,54 @@ class HourlyGift {
   }
 }
 
+/// The game's two currencies.
+enum Currency { coins, gems }
+
 /// The rewarded ad: watching one ([length] long, as told to the player)
-/// pays [coins], up to [perDay] times a day.
+/// pays [coins], or [gems] when watched for gems, up to [perDay] times a
+/// day.
 class RewardedAd {
   const RewardedAd({
     required this.coins,
+    this.gems = 0,
     required this.perDay,
     required this.length,
   });
 
   final int coins;
+  final int gems;
   final int perDay;
   final Duration length;
+
+  /// What watching one pays in [currency].
+  Reward rewardIn(Currency currency) => switch (currency) {
+    Currency.coins => Reward(coins: coins),
+    Currency.gems => Reward(gems: gems),
+  };
+}
+
+/// A pack sold in the shop: its store [id], the [reward] it gives, and its
+/// [price] as shown until the store gives its own.
+class ShopPack {
+  const ShopPack({required this.id, required this.reward, required this.price});
+
+  final String id;
+  final Reward reward;
+  final String price;
+}
+
+/// The packs on sale, coins and gems.
+class Shop {
+  const Shop({required this.coinPacks, required this.gemPacks});
+
+  final List<ShopPack> coinPacks;
+  final List<ShopPack> gemPacks;
+
+  /// The packs of [currency].
+  List<ShopPack> packsOf(Currency currency) => switch (currency) {
+    Currency.coins => coinPacks,
+    Currency.gems => gemPacks,
+  };
 }
 
 /// The gems it costs to start a match at a stake table: [gems] at any
@@ -117,6 +153,7 @@ class EconomyConfig {
     required this.hourlyGift,
     required this.rewardedAd,
     required this.entryFee,
+    required this.shop,
   });
 
   /// Reads the amounts from the data file's JSON:
@@ -129,8 +166,12 @@ class EconomyConfig {
   ///     "cards": [{"coins": 500, "weight": 30}, {"gems": 1, "weight": 8}],
   ///     "bonus": {"gems": 1}
   ///   },
-  ///   "rewardedAd": {"coins": 1000, "perDay": 5, "seconds": 30},
-  ///   "entryFee": {"gems": 1, "aboveStake": 100}
+  ///   "rewardedAd": {"coins": 1000, "gems": 1, "perDay": 5, "seconds": 30},
+  ///   "entryFee": {"gems": 1, "aboveStake": 100},
+  ///   "shop": {
+  ///     "coins": [{"id": "coins_25k", "coins": 25000, "price": "\$0.99"}],
+  ///     "gems": [{"id": "gems_10", "gems": 10, "price": "\$0.99"}]
+  ///   }
   /// }
   /// ```
   ///
@@ -149,6 +190,7 @@ class EconomyConfig {
     final gift = _object(decoded, 'hourlyGift');
     final ad = _object(decoded, 'rewardedAd');
     final fee = _object(decoded, 'entryFee');
+    final shop = _object(decoded, 'shop');
     return EconomyConfig(
       startingGems: _count(decoded, 'startingGems'),
       hourlyGift: HourlyGift(
@@ -163,6 +205,9 @@ class EconomyConfig {
       ),
       rewardedAd: RewardedAd(
         coins: _count(ad, 'coins', within: 'rewardedAd'),
+        gems: ad.containsKey('gems')
+            ? _count(ad, 'gems', within: 'rewardedAd')
+            : 0,
         perDay: _count(ad, 'perDay', within: 'rewardedAd'),
         length: Duration(
           seconds: _count(ad, 'seconds', within: 'rewardedAd', least: 1),
@@ -171,6 +216,10 @@ class EconomyConfig {
       entryFee: EntryFee(
         gems: _count(fee, 'gems', within: 'entryFee'),
         aboveStake: _count(fee, 'aboveStake', within: 'entryFee'),
+      ),
+      shop: Shop(
+        coinPacks: _packs(shop, 'coins'),
+        gemPacks: _packs(shop, 'gems'),
       ),
     );
   }
@@ -184,6 +233,36 @@ class EconomyConfig {
   final HourlyGift hourlyGift;
   final RewardedAd rewardedAd;
   final EntryFee entryFee;
+  final Shop shop;
+
+  /// The shop's packs of [kind], "coins" or "gems": each with an id, a
+  /// price, and an amount of that kind.
+  static List<ShopPack> _packs(Map<String, Object?> shop, String kind) {
+    final packs = shop[kind];
+    if (packs is! List<Object?>) {
+      throw FormatException('The economy needs "shop.$kind", a list of packs');
+    }
+    return List.unmodifiable([
+      for (final (i, pack) in packs.indexed)
+        if (pack case {'id': final String id, 'price': final String price})
+          ShopPack(
+            id: id,
+            price: price,
+            reward: Reward.fromJson({
+              kind: _count(
+                pack as Map<String, Object?>,
+                kind,
+                within: 'shop.$kind[$i]',
+                least: 1,
+              ),
+            }),
+          )
+        else
+          throw FormatException(
+            'The economy needs "shop.$kind[$i]" to have an id and a price',
+          ),
+    ]);
+  }
 
   /// The gift's cards: a list of rewards, each with a weight from 1.
   static List<GiftCard> _giftCards(Map<String, Object?> gift) {

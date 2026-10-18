@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/economy_config.dart';
 import '../ads/rewarded_ad_service.dart';
-import '../ads/watch_ad.dart' show noAdText;
-import '../shop/shop_screen.dart';
+import '../ads/watch_ad.dart' show noAdText, showRewardedAd;
+import '../shop/shop_sheet.dart';
 import 'economy_config_provider.dart';
 import 'player_data_provider.dart';
 import 'stake_table_picker.dart' show formatStake;
@@ -89,17 +89,17 @@ Future<bool> payEntryFee(
   if (!context.mounted) return false;
   switch (choice) {
     case _ShortOfGems.shop:
-      await openShop(context);
+      await openShop(context, tab: Currency.gems);
       // Gems bought in the shop pay the fee on the way back.
       return context.mounted && await controller.payEntryFee(stake);
     case _ShortOfGems.ad:
-      final result = await ref.read(rewardedAdServiceProvider).show(context);
+      final result = await showRewardedAd(context, ref);
       if (result == AdResult.unavailable && context.mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text(noAdText)));
       }
-      return result.earned && await controller.claimAdEntry();
+      return (result?.earned ?? false) && await controller.claimAdEntry();
     case null:
       return false;
   }

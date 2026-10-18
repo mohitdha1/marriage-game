@@ -49,9 +49,19 @@ class RecordingRepository implements PlayerDataRepository {
   }
 
   @override
-  Future<PlayerData> claimAdReward(RewardedAd ad, DateTime now) async {
-    calls.add('claimAdReward');
-    return data = data.withAdReward(ad, now);
+  Future<PlayerData> claimAdReward(
+    RewardedAd ad,
+    DateTime now, [
+    Currency currency = Currency.coins,
+  ]) async {
+    calls.add('claimAdReward ${currency.name}');
+    return data = data.withAdReward(ad, now, currency);
+  }
+
+  @override
+  Future<PlayerData> addPurchase(ShopPack pack) async {
+    calls.add('addPurchase ${pack.id}');
+    return data = data.withPurchase(pack);
   }
 
   @override
@@ -141,8 +151,21 @@ const testEconomy = EconomyConfig(
     ],
     bonus: Reward(gems: 1),
   ),
-  rewardedAd: RewardedAd(coins: 1000, perDay: 2, length: Duration(seconds: 30)),
+  rewardedAd: RewardedAd(
+    coins: 1000,
+    gems: 1,
+    perDay: 2,
+    length: Duration(seconds: 30),
+  ),
   entryFee: EntryFee(gems: 1, aboveStake: 100),
+  shop: Shop(
+    coinPacks: [
+      ShopPack(id: 'coins_25k', reward: Reward(coins: 25000), price: r'$0.99'),
+    ],
+    gemPacks: [
+      ShopPack(id: 'gems_10', reward: Reward(gems: 10), price: r'$0.99'),
+    ],
+  ),
 );
 
 /// A container using [repository]. The economy's amounts arrive when
@@ -376,9 +399,9 @@ void main() {
     });
   });
 
-  test('rewarded ads pay through the repository, until the day\'s are '
-      'used up', () async {
-    final repository = RecordingRepository();
+  test('rewarded ads pay coins or gems through the repository, until the '
+      'day\'s are used up', () async {
+    final repository = RecordingRepository()..startingGemsGiven = true;
     final container = containerWith(
       repository,
       economy: Future.value(testEconomy),
@@ -390,11 +413,19 @@ void main() {
     final controller = container.read(playerDataProvider.notifier);
 
     expect(controller.adsLeftToday(), 2);
-    expect(await controller.claimAdReward(), 1000);
-    expect(await controller.claimAdReward(), 1000);
+    expect(await controller.claimAdReward(), const Reward(coins: 1000));
+    expect(
+      await controller.claimAdReward(Currency.gems),
+      const Reward(gems: 1),
+    );
     expect(controller.adsLeftToday(), 0);
     expect(await controller.claimAdReward(), isNull);
-    expect(repository.calls.where((c) => c == 'claimAdReward'), hasLength(2));
+    expect(repository.calls.where((c) => c.startsWith('claimAdReward')), [
+      'claimAdReward coins',
+      'claimAdReward gems',
+    ]);
+    expect(repository.data.coins, PlayerData.startingCoins + 1000);
+    expect(repository.data.gems, 1);
   });
 
   group('The entry fee', () {
@@ -460,6 +491,20 @@ void main() {
         isTrue,
       );
     });
+  });
+
+  test('a pack bought is added through the repository', () async {
+    final repository = RecordingRepository(const PlayerData(coins: 5, gems: 0));
+    final container = containerWith(repository);
+    await container.read(playerDataProvider.future);
+    final controller = container.read(playerDataProvider.notifier);
+
+    await controller.addPurchase(testEconomy.shop.coinPacks.single);
+    await controller.addPurchase(testEconomy.shop.gemPacks.single);
+
+    expect(repository.calls, contains('addPurchase coins_25k'));
+    expect(container.read(playerDataProvider).value?.coins, 25005);
+    expect(container.read(playerDataProvider).value?.gems, 10);
   });
 
   group('on the device by default', () {

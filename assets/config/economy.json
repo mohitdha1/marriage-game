@@ -13,6 +13,18 @@
     ],
     "bonus": {"gems": 1}
   },
-  "rewardedAd": {"coins": 1000, "perDay": 5, "seconds": 30},
-  "entryFee": {"gems": 1, "aboveStake": 100}
+  "rewardedAd": {"coins": 1000, "gems": 1, "perDay": 5, "seconds": 30},
+  "entryFee": {"gems": 1, "aboveStake": 100},
+  "shop": {
+    "coins": [
+      {"id": "coins_25k", "coins": 25000, "price": "$0.99"},
+      {"id": "coins_150k", "coins": 150000, "price": "$4.99"},
+      {"id": "coins_400k", "coins": 400000, "price": "$9.99"}
+    ],
+    "gems": [
+      {"id": "gems_10", "gems": 10, "price": "$0.99"},
+      {"id": "gems_60", "gems": 60, "price": "$4.99"},
+      {"id": "gems_150", "gems": 150, "price": "$9.99"}
+    ]
+  }
 }

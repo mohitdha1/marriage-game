@@ -105,11 +105,17 @@ class PlayerData {
     return (ad.perDay - watched).clamp(0, ad.perDay);
   }
 
-  /// This data with the reward for watching [ad] at [now] added, and the
-  /// ad counted toward that day's limit. Throws a [StateError] once the
+  /// This data with the reward for watching [ad] at [now] added, in
+  /// [currency], and the ad counted toward that day's limit. Throws a [StateError] once the
   /// day's ads are used up.
-  PlayerData withAdReward(RewardedAd ad, DateTime now) =>
-      withAdWatched(ad, now).withCoinsAdded(ad.coins);
+  PlayerData withAdReward(
+    RewardedAd ad,
+    DateTime now, [
+    Currency currency = Currency.coins,
+  ]) => withAdWatched(ad, now)._withReward(ad.rewardIn(currency));
+
+  /// This data with [pack], just bought, added.
+  PlayerData withPurchase(ShopPack pack) => _withReward(pack.reward);
 
   /// This data with [ad], watched at [now] in place of a match's entry fee,
   /// counted toward that day's limit; it pays no coins. Throws a

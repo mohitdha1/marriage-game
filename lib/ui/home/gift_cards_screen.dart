@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/economy_config.dart';
 import '../../data/gift_session.dart';
 import '../ads/rewarded_ad_service.dart';
-import '../ads/watch_ad.dart' show noAdText, noAdsLeftText;
+import '../ads/watch_ad.dart';
 import '../sound/sound_effects.dart';
 import '../table/card_view.dart';
 import '../theme/table_felt.dart';
@@ -24,15 +24,7 @@ Future<void> openGiftCards(BuildContext context) => Navigator.of(context).push(
 );
 
 /// A reward as a line: "+500 coins", "+1 gem", or "+500 coins and 1 gem".
-String rewardText(Reward reward) {
-  String gems(int n) => '$n ${n == 1 ? 'gem' : 'gems'}';
-  return switch (reward) {
-    Reward(coins: 0, gems: final g) => '+${gems(g)}',
-    Reward(coins: final c, gems: 0) => '+${formatCoins(c)} coins',
-    Reward(coins: final c, gems: final g) =>
-      '+${formatCoins(c)} coins and ${gems(g)}',
-  };
-}
+String rewardText(Reward reward) => '+${amountText(reward)}';
 
 /// The hourly gift: ten face-down cards in two rows, in the current card
 /// back. The player taps one, it turns over to show what it gave, and the
@@ -138,14 +130,17 @@ class _GiftCardsScreenState extends ConsumerState<GiftCardsScreen> {
   /// Says why not when no ad could be shown.
   Future<bool> _watchAd() async {
     setState(() => _note = null);
-    if (_controller.adsLeftToday() == 0) {
-      _say(noAdsLeftText);
-      return false;
-    }
-    final result = await ref.read(rewardedAdServiceProvider).show(context);
+    final result = await showRewardedAd(context, ref);
     if (!mounted) return false;
-    if (result == AdResult.unavailable) _say(noAdText);
-    return result.earned;
+    switch (result) {
+      case null:
+        _say(noAdsLeftText);
+      case AdResult.unavailable:
+        _say(noAdText);
+      case AdResult.watched || AdResult.skipped:
+        break;
+    }
+    return result?.earned ?? false;
   }
 
   Future<void> _double(GiftSession session) async {

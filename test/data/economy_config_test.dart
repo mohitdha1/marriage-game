@@ -9,8 +9,11 @@ import 'package:marriage_game/ui/home/economy_config_provider.dart';
 EconomyConfig appEconomy() =>
     EconomyConfig.fromJson(File(EconomyConfig.asset).readAsStringSync());
 
-/// A valid entry fee, for files testing the other amounts.
-const fee = '"entryFee": {"gems": 1, "aboveStake": 100}';
+/// A valid entry fee and shop, for files testing the other amounts.
+const fee = '"entryFee": {"gems": 1, "aboveStake": 100}, $emptyShop';
+
+/// A shop with nothing on sale.
+const emptyShop = '"shop": {"coins": [], "gems": []}';
 
 /// A valid hourly gift, for files testing the other amounts.
 const validGift =
@@ -29,12 +32,29 @@ void main() {
       expect(appEconomy().startingGems, 3);
     });
 
-    test('pays 1,000 coins for a 30-second ad, 5 times a day', () {
+    test('pays 1,000 coins, or a gem, for a 30-second ad, 5 times a day', () {
       final ad = appEconomy().rewardedAd;
 
       expect(ad.coins, 1000);
+      expect(ad.gems, 1);
       expect(ad.perDay, 5);
       expect(ad.length, const Duration(seconds: 30));
+    });
+
+    test('sells the starter packs of coins and gems', () {
+      final shop = appEconomy().shop;
+      String pack(ShopPack p) => '${p.id} ${p.reward} ${p.price}';
+
+      expect(shop.coinPacks.map(pack), [
+        'coins_25k ${const Reward(coins: 25000)} \$0.99',
+        'coins_150k ${const Reward(coins: 150000)} \$4.99',
+        'coins_400k ${const Reward(coins: 400000)} \$9.99',
+      ]);
+      expect(shop.gemPacks.map(pack), [
+        'gems_10 ${const Reward(gems: 10)} \$0.99',
+        'gems_60 ${const Reward(gems: 60)} \$4.99',
+        'gems_150 ${const Reward(gems: 150)} \$9.99',
+      ]);
     });
 
     test('charges 1 gem a match at tables above 100 a point', () {
@@ -212,13 +232,67 @@ void main() {
     test('a missing fee, or one without a stake, is refused', () {
       const rest =
           '"startingGems": 3, $validGift, "rewardedAd": {"coins": 1000, '
-          '"perDay": 5, "seconds": 30}';
+          '"perDay": 5, "seconds": 30}, $emptyShop';
       for (final (json, problem) in [
         ('{$rest}', '"entryFee"'),
         ('{$rest, "entryFee": {"gems": 1}}', '"entryFee.aboveStake"'),
         (
           '{$rest, "entryFee": {"gems": -1, "aboveStake": 100}}',
           '"entryFee.gems"',
+        ),
+      ]) {
+        expect(
+          () => EconomyConfig.fromJson(json),
+          throwsA(
+            isA<FormatException>().having(
+              (e) => e.message,
+              'message',
+              contains(problem),
+            ),
+          ),
+          reason: json,
+        );
+      }
+    });
+  });
+
+  group('The shop', () {
+    const rest =
+        '"startingGems": 3, $validGift, "rewardedAd": {"coins": 1000, '
+        '"perDay": 5, "seconds": 30}, "entryFee": {"gems": 1, '
+        '"aboveStake": 100}';
+
+    test('reads its packs, and the ad\'s gems default to none', () {
+      final economy = EconomyConfig.fromJson(
+        '{$rest, "shop": {"coins": [{"id": "c1", "coins": 500, '
+        '"price": "\$1"}], "gems": [{"id": "g1", "gems": 2, "price": "\$2"}]}}',
+      );
+
+      final coins = economy.shop.packsOf(Currency.coins).single;
+      expect(coins.id, 'c1');
+      expect(coins.reward, const Reward(coins: 500));
+      expect(coins.price, r'$1');
+      expect(
+        economy.shop.packsOf(Currency.gems).single.reward,
+        const Reward(gems: 2),
+      );
+      expect(economy.rewardedAd.rewardIn(Currency.gems), const Reward());
+    });
+
+    test('a missing shop, or a pack without an id, price or amount, is '
+        'refused', () {
+      for (final (json, problem) in [
+        ('{$rest}', '"shop"'),
+        ('{$rest, "shop": {"coins": []}}', '"shop.gems"'),
+        (
+          '{$rest, "shop": {"coins": [{"coins": 5, "price": "1"}], '
+              '"gems": []}}',
+          '"shop.coins[0]" to have an id and a price',
+        ),
+        (
+          '{$rest, "shop": {"coins": [], "gems": [{"id": "g", '
+              '"price": "1", "gems": 0}]}}',
+          '"shop.gems[0].gems", a whole number from 1',
         ),
       ]) {
         expect(

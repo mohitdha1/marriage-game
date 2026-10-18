@@ -15,6 +15,8 @@ import '../state/table_controller.dart';
 import '../table/suit_icon.dart';
 import '../table/table_screen.dart';
 import '../theme/table_felt.dart';
+import '../../data/economy_config.dart';
+import '../shop/shop_sheet.dart';
 import 'player_data_provider.dart';
 import 'economy_config_provider.dart';
 import 'entry_fee.dart';
@@ -75,9 +77,12 @@ class HomeScreen extends ConsumerWidget {
                         const Spacer(),
                         const HourlyGiftButton(),
                         const SizedBox(width: 8),
-                        GemPill(gems: playerData?.gems),
+                        GemPill(
+                          gems: playerData?.gems,
+                          onTap: () => openShop(context, tab: Currency.gems),
+                        ),
                         const SizedBox(width: 8),
-                        CoinPill(coins: coins),
+                        CoinPill(coins: coins, onTap: () => openShop(context)),
                         const SizedBox(width: 8),
                         IconButton.filledTonal(
                           key: const Key('settings-button'),
@@ -404,84 +409,147 @@ class _PlayerBadge extends StatelessWidget {
   }
 }
 
-/// The coin balance in a pill, with a drawn coin.
+/// The coin balance in a pill, with a drawn coin. Given [onTap], it's a
+/// button with a "+" that opens the shop.
 class CoinPill extends StatelessWidget {
-  const CoinPill({super.key, required this.coins});
+  const CoinPill({super.key, required this.coins, this.onTap});
 
   /// The balance, or `null` while it loads.
   final int? coins;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => _BalancePill(
     key: const Key('coin-balance'),
+    plusKey: const Key('coin-plus'),
     icon: const CoinIcon(size: 22),
     balance: coins,
     unit: 'coins',
+    onTap: onTap,
   );
 }
 
-/// The gem balance in a pill, with a drawn gem.
+/// The gem balance in a pill, with a drawn gem. Given [onTap], it's a
+/// button with a "+" that opens the shop.
 class GemPill extends StatelessWidget {
-  const GemPill({super.key, required this.gems});
+  const GemPill({super.key, required this.gems, this.onTap});
 
   /// The balance, or `null` while it loads.
   final int? gems;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => _BalancePill(
     key: const Key('gem-balance'),
+    plusKey: const Key('gem-plus'),
     icon: const GemIcon(size: 22),
     balance: gems,
     unit: 'gems',
+    onTap: onTap,
   );
 }
 
+/// A balance in a pill. When it changes, the number counts to the new
+/// balance and the icon swells while it does, so a reward is seen arriving.
 class _BalancePill extends StatelessWidget {
   const _BalancePill({
     super.key,
+    required this.plusKey,
     required this.icon,
     required this.balance,
     required this.unit,
+    required this.onTap,
   });
 
+  /// How long the count takes.
+  static const countTime = Duration(milliseconds: 900);
+
+  final Key plusKey;
   final Widget icon;
   final int? balance;
 
   /// What the balance counts, for screen readers: "10,255 coins".
   final String unit;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final text = switch (balance) {
-      null => '…',
-      final balance => formatCoins(balance),
-    };
-    return Semantics(
-      label: balance == null ? null : '$text $unit',
-      excludeSemantics: balance != null,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(6, 4, 12, 4),
-        decoration: BoxDecoration(
-          color: const Color(0x66000000),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            icon,
-            const SizedBox(width: 6),
-            Text(
-              text,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
+    final balance = this.balance;
+    final animate = !MediaQuery.disableAnimationsOf(context);
+    final pill = Container(
+      padding: EdgeInsets.fromLTRB(6, 4, onTap == null ? 12 : 4, 4),
+      decoration: BoxDecoration(
+        color: const Color(0x66000000),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: balance == null
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [icon, const SizedBox(width: 6), _number('…')],
+            )
+          : TweenAnimationBuilder<int>(
+              // Only the end matters after the first build: a new balance
+              // counts on from wherever the number is showing.
+              tween: IntTween(begin: balance, end: balance),
+              duration: animate ? countTime : Duration.zero,
+              curve: Curves.easeOutCubic,
+              builder: (context, shown, _) => Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedScale(
+                    scale: shown == balance ? 1 : 1.25,
+                    duration: const Duration(milliseconds: 150),
+                    child: icon,
+                  ),
+                  const SizedBox(width: 6),
+                  _number(formatCoins(shown)),
+                  if (onTap != null) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      key: plusKey,
+                      width: 20,
+                      height: 20,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF43A047),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+    );
+    return Semantics(
+      label: balance == null ? null : '${formatCoins(balance)} $unit',
+      hint: onTap == null ? null : 'Opens the shop',
+      button: onTap != null,
+      excludeSemantics: balance != null,
+      child: onTap == null
+          ? pill
+          : Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: onTap,
+                child: pill,
+              ),
+            ),
     );
   }
+
+  Widget _number(String text) => Text(
+    text,
+    style: const TextStyle(
+      color: Colors.white,
+      fontWeight: FontWeight.w700,
+      fontFeatures: [FontFeature.tabularFigures()],
+    ),
+  );
 }
 
 /// [coins] with thousands separated by commas: 12,345.

@@ -9,7 +9,7 @@ import 'package:marriage_game/ui/home/entry_fee.dart';
 import 'package:marriage_game/ui/home/player_data_provider.dart';
 import 'package:marriage_game/ui/scoreboard/results_screen.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
-import 'package:marriage_game/ui/shop/shop_screen.dart';
+import 'package:marriage_game/ui/shop/shop_sheet.dart';
 import 'package:marriage_game/ui/state/house_rules.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
@@ -192,9 +192,8 @@ void main() {
       expect(find.textContaining('come back tomorrow'), findsOneWidget);
     });
 
-    testWidgets('the shop opens, and coming back without gems starts nothing', (
-      tester,
-    ) async {
+    testWidgets('the shop opens on gems, and coming back without any starts '
+        'nothing', (tester) async {
       await pumpHome(tester, saved: at250With(gems: 0), clock: () => noon);
       await openPicker(tester);
       await tester.tap(find.byKey(const Key('setup-play')));
@@ -202,15 +201,16 @@ void main() {
 
       await tester.tap(find.byKey(const Key('gems-shop')));
       await tester.pumpAndSettle();
-      expect(find.byType(ShopScreen), findsOneWidget);
-      await tester.pageBack();
+      expect(find.byType(ShopSheet), findsOneWidget);
+      expect(find.byKey(const Key('shop-packs-gems')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('shop-close')));
       await tester.pumpAndSettle();
 
       expect(find.byType(TableScreen), findsNothing);
       expect(find.byKey(const Key('setup-play')), findsOneWidget);
     });
 
-    testWidgets('gems got in the shop pay the fee on the way back', (
+    testWidgets('gems bought in the shop pay the fee on the way back', (
       tester,
     ) async {
       final container = await pumpHome(
@@ -224,8 +224,9 @@ void main() {
       await tester.tap(find.byKey(const Key('gems-shop')));
       await tester.pumpAndSettle();
 
-      await container.read(playerDataProvider.notifier).addGems(10);
-      await tester.pageBack();
+      await tester.tap(find.byKey(const Key('buy-gems_10')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('shop-close')));
       await tester.pumpAndSettle();
 
       expect(find.byType(TableScreen), findsOneWidget);

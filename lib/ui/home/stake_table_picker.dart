@@ -5,6 +5,7 @@ import '../../data/economy_config.dart';
 import '../../data/player_data.dart';
 import '../../data/stake_tables.dart';
 import '../settings/house_rules_screen.dart';
+import '../shop/shop_sheet.dart';
 import '../settings/settings.dart';
 import '../state/table_controller.dart';
 import '../theme/table_felt.dart';
@@ -81,11 +82,17 @@ class StakeTablePickerScreen extends ConsumerWidget {
         actions: [
           const HouseRulesButton(onDark: true),
           if (data != null) ...[
-            GemPill(gems: data.gems),
+            GemPill(
+              gems: data.gems,
+              onTap: () => openShop(context, tab: Currency.gems),
+            ),
             const SizedBox(width: 8),
             Padding(
               padding: const EdgeInsets.only(right: 12),
-              child: CoinPill(coins: data.coins),
+              child: CoinPill(
+                coins: data.coins,
+                onTap: () => openShop(context),
+              ),
             ),
           ],
         ],
