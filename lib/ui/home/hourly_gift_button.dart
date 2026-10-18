@@ -3,14 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../ads/watch_ad.dart';
 import 'economy_config_provider.dart';
 import 'home_screen.dart' show formatCoins;
 import 'player_data_provider.dart';
 
 /// The hourly gift on the home screen: a gift icon with the time left until
 /// it can be collected, or, once it's ready, a glowing button that collects
-/// it. Hidden until the player's data and the economy's amounts have
-/// loaded.
+/// it. While there are rewarded ads left today, collecting offers one for
+/// more coins. Hidden until the player's data and the economy's amounts
+/// have loaded.
 class HourlyGiftButton extends ConsumerStatefulWidget {
   const HourlyGiftButton({super.key});
 
@@ -48,12 +50,43 @@ class _HourlyGiftButtonState extends ConsumerState<HourlyGiftButton> {
     if (!mounted) return;
     setState(() => _collecting = false);
     if (reward == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+    final economy = ref.read(economyConfigProvider).value;
+    final adsLeft = ref.read(playerDataProvider.notifier).adsLeftToday();
+    if (economy == null || adsLeft == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          key: const Key('gift-collected'),
+          content: Text(giftRewardText(reward)),
+        ),
+      );
+      return;
+    }
+    // With ads left today, the gift comes with an offer of more.
+    final watch = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
         key: const Key('gift-collected'),
-        content: Text(giftRewardText(reward)),
+        title: Text(giftRewardText(reward)),
+        content: Text(
+          'Want more? ${adOfferText(economy.rewardedAd)} '
+          '(${adsLeftText(adsLeft)}).',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('gift-no-ad'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('No thanks'),
+          ),
+          FilledButton.icon(
+            key: const Key('gift-watch-ad'),
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.play_circle_outline),
+            label: const Text('Watch ad'),
+          ),
+        ],
       ),
     );
+    if (watch == true && mounted) await watchAdForCoins(context, ref);
   }
 
   @override

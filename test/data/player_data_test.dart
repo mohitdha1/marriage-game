@@ -198,4 +198,55 @@ void main() {
       );
     });
   });
+
+  group('Rewarded ads', () {
+    const ad = RewardedAd(
+      coins: 1000,
+      perDay: 5,
+      length: Duration(seconds: 30),
+    );
+    final morning = DateTime(2026, 10, 17, 9);
+
+    test('the day is written as year, month and day', () {
+      expect(PlayerData.dayOf(DateTime(2026, 3, 7, 23, 59)), '2026-03-07');
+    });
+
+    test('each ad pays its coins, up to 5 a day', () {
+      var data = const PlayerData(coins: 0);
+      expect(data.adsLeft(ad, morning), 5);
+      for (var i = 0; i < 5; i++) {
+        data = data.withAdReward(ad, morning.add(Duration(minutes: i)));
+      }
+
+      expect(data.coins, 5000);
+      expect(data.adsLeft(ad, morning), 0);
+      expect(() => data.withAdReward(ad, morning), throwsStateError);
+    });
+
+    test('the count starts again at midnight', () {
+      var data = const PlayerData();
+      for (var i = 0; i < 5; i++) {
+        data = data.withAdReward(ad, morning);
+      }
+      final lateNight = DateTime(2026, 10, 17, 23, 59);
+      final justAfter = DateTime(2026, 10, 18, 0, 1);
+
+      expect(data.adsLeft(ad, lateNight), 0);
+      expect(data.adsLeft(ad, justAfter), 5);
+      final next = data.withAdReward(ad, justAfter);
+      expect(next.adsWatched, 1);
+      expect(next.adDay, '2026-10-18');
+      expect(next.adsLeft(ad, justAfter), 4);
+    });
+
+    test('an ad keeps everything else, and counts toward equality', () {
+      const data = PlayerData(gems: 4, giftsCollected: 2);
+      final watched = data.withAdReward(ad, morning);
+
+      expect(watched.gems, 4);
+      expect(watched.giftsCollected, 2);
+      expect(watched, data.withAdReward(ad, morning));
+      expect(watched, isNot(watched.withAdReward(ad, morning)));
+    });
+  });
 }

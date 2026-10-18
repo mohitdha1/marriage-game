@@ -66,6 +66,30 @@ class PlayerDataController extends AsyncNotifier<PlayerData> {
     return reward;
   }
 
+  /// How many more rewarded ads can pay out today, or 0 before the
+  /// economy's amounts have loaded.
+  int adsLeftToday() {
+    final economy = ref.read(economyConfigProvider).value;
+    final data = state.value;
+    if (economy == null || data == null) return 0;
+    return data.adsLeft(economy.rewardedAd, ref.read(clockProvider)());
+  }
+
+  /// Pays the reward for a rewarded ad just watched, and returns the coins
+  /// it gave, or `null` if the day's ads were already used up.
+  Future<int?> claimAdReward() async {
+    final economy = ref.read(economyConfigProvider).value;
+    if (economy == null || adsLeftToday() == 0) return null;
+    final ad = economy.rewardedAd;
+    final now = ref.read(clockProvider)();
+    try {
+      await _update((repository) => repository.claimAdReward(ad, now));
+    } on StateError {
+      return null;
+    }
+    return ad.coins;
+  }
+
   /// Gives a new player their starting gems; a player who has had them
   /// keeps the gems they have.
   Future<void> giveStartingGems(int gems) =>

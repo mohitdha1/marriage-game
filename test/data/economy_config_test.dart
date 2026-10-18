@@ -20,6 +20,14 @@ void main() {
       expect(appEconomy().startingGems, 3);
     });
 
+    test('pays 1,000 coins for a 30-second ad, 5 times a day', () {
+      final ad = appEconomy().rewardedAd;
+
+      expect(ad.coins, 1000);
+      expect(ad.perDay, 5);
+      expect(ad.length, const Duration(seconds: 30));
+    });
+
     test('gives 500 coins an hour, and a gem every 4th time', () {
       final gift = appEconomy().hourlyGift;
 
@@ -53,21 +61,22 @@ void main() {
     });
 
     test('a missing gift, or one with no wait or no gem cycle, is refused', () {
+      const ad = '"rewardedAd": {"coins": 1000, "perDay": 5, "seconds": 30}';
       for (final (json, problem) in [
-        ('{"startingGems": 3}', '"hourlyGift"'),
+        ('{"startingGems": 3, $ad}', '"hourlyGift"'),
         (
-          '{"startingGems": 3, "hourlyGift": {"coins": 500, "minutes": 0, '
-              '"gems": 1, "gemEvery": 4}}',
+          '{"startingGems": 3, $ad, "hourlyGift": {"coins": 500, '
+              '"minutes": 0, "gems": 1, "gemEvery": 4}}',
           '"hourlyGift.minutes", a whole number from 1',
         ),
         (
-          '{"startingGems": 3, "hourlyGift": {"coins": 500, "minutes": 60, '
-              '"gems": 1, "gemEvery": 0}}',
+          '{"startingGems": 3, $ad, "hourlyGift": {"coins": 500, '
+              '"minutes": 60, "gems": 1, "gemEvery": 0}}',
           '"hourlyGift.gemEvery", a whole number from 1',
         ),
         (
-          '{"startingGems": 3, "hourlyGift": {"coins": -5, "minutes": 60, '
-              '"gems": 1, "gemEvery": 4}}',
+          '{"startingGems": 3, $ad, "hourlyGift": {"coins": -5, '
+              '"minutes": 60, "gems": 1, "gemEvery": 4}}',
           '"hourlyGift.coins"',
         ),
       ]) {
@@ -84,6 +93,37 @@ void main() {
         );
       }
     });
+  });
+
+  test('a missing rewarded ad, or one with no length, is refused', () {
+    const gift =
+        '"hourlyGift": {"coins": 500, "minutes": 60, "gems": 1, '
+        '"gemEvery": 4}';
+    for (final (json, problem) in [
+      ('{"startingGems": 3, $gift}', '"rewardedAd"'),
+      (
+        '{"startingGems": 3, $gift, "rewardedAd": {"coins": 1000, '
+            '"perDay": 5, "seconds": 0}}',
+        '"rewardedAd.seconds", a whole number from 1',
+      ),
+      (
+        '{"startingGems": 3, $gift, "rewardedAd": {"coins": 1000, '
+            '"seconds": 30}}',
+        '"rewardedAd.perDay"',
+      ),
+    ]) {
+      expect(
+        () => EconomyConfig.fromJson(json),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains(problem),
+          ),
+        ),
+        reason: json,
+      );
+    }
   });
 
   group('Reading the amounts', () {
@@ -104,7 +144,8 @@ void main() {
     test('a missing or negative amount is refused', () {
       const gift =
           '"hourlyGift": {"coins": 500, "minutes": 60, "gems": 1, '
-          '"gemEvery": 4}';
+          '"gemEvery": 4}, "rewardedAd": {"coins": 1000, "perDay": 5, '
+          '"seconds": 30}';
       for (final json in [
         '{$gift}',
         '{"startingGems": -1, $gift}',

@@ -47,6 +47,12 @@ class RecordingRepository implements PlayerDataRepository {
   }
 
   @override
+  Future<PlayerData> claimAdReward(RewardedAd ad, DateTime now) async {
+    calls.add('claimAdReward');
+    return data = data.withAdReward(ad, now);
+  }
+
+  @override
   Future<PlayerData> collectGift(HourlyGift gift, DateTime now) async {
     calls.add('collectGift');
     return data = data.withGiftCollected(gift, now);
@@ -83,6 +89,7 @@ const testEconomy = EconomyConfig(
     gems: 1,
     gemEvery: 4,
   ),
+  rewardedAd: RewardedAd(coins: 1000, perDay: 2, length: Duration(seconds: 30)),
 );
 
 /// A container using [repository]. The economy's amounts arrive when
@@ -236,6 +243,27 @@ void main() {
       );
       expect(repository.calls, isNot(contains('collectGift')));
     });
+  });
+
+  test('rewarded ads pay through the repository, until the day\'s are '
+      'used up', () async {
+    final repository = RecordingRepository();
+    final container = containerWith(
+      repository,
+      economy: Future.value(testEconomy),
+      clock: () => DateTime(2026, 10, 17, 9),
+    );
+    await container.read(playerDataProvider.future);
+    await container.read(economyConfigProvider.future);
+    await pumpEventQueue();
+    final controller = container.read(playerDataProvider.notifier);
+
+    expect(controller.adsLeftToday(), 2);
+    expect(await controller.claimAdReward(), 1000);
+    expect(await controller.claimAdReward(), 1000);
+    expect(controller.adsLeftToday(), 0);
+    expect(await controller.claimAdReward(), isNull);
+    expect(repository.calls.where((c) => c == 'claimAdReward'), hasLength(2));
   });
 
   group('on the device by default', () {

@@ -21,18 +21,37 @@ class HourlyGift {
       (coins: coins, gems: collection % gemEvery == 0 ? gems : 0);
 }
 
+/// The rewarded ad: watching one ([length] long, as told to the player)
+/// pays [coins], up to [perDay] times a day.
+class RewardedAd {
+  const RewardedAd({
+    required this.coins,
+    required this.perDay,
+    required this.length,
+  });
+
+  final int coins;
+  final int perDay;
+  final Duration length;
+}
+
 /// Every amount in the game's coin and gem economy, read from the data file
 /// `assets/config/economy.json`, so the amounts can be tuned there without
 /// touching the code.
 class EconomyConfig {
-  const EconomyConfig({required this.startingGems, required this.hourlyGift});
+  const EconomyConfig({
+    required this.startingGems,
+    required this.hourlyGift,
+    required this.rewardedAd,
+  });
 
   /// Reads the amounts from the data file's JSON:
   ///
   /// ```json
   /// {
   ///   "startingGems": 3,
-  ///   "hourlyGift": {"coins": 500, "minutes": 60, "gems": 1, "gemEvery": 4}
+  ///   "hourlyGift": {"coins": 500, "minutes": 60, "gems": 1, "gemEvery": 4},
+  ///   "rewardedAd": {"coins": 1000, "perDay": 5, "seconds": 30}
   /// }
   /// ```
   ///
@@ -48,10 +67,8 @@ class EconomyConfig {
     if (decoded is! Map<String, Object?>) {
       throw const FormatException('The economy needs a JSON object');
     }
-    final gift = decoded['hourlyGift'];
-    if (gift is! Map<String, Object?>) {
-      throw const FormatException('The economy needs an "hourlyGift" object');
-    }
+    final gift = _object(decoded, 'hourlyGift');
+    final ad = _object(decoded, 'rewardedAd');
     return EconomyConfig(
       startingGems: _count(decoded, 'startingGems'),
       hourlyGift: HourlyGift(
@@ -61,6 +78,13 @@ class EconomyConfig {
         ),
         gems: _count(gift, 'gems', within: 'hourlyGift'),
         gemEvery: _count(gift, 'gemEvery', within: 'hourlyGift', least: 1),
+      ),
+      rewardedAd: RewardedAd(
+        coins: _count(ad, 'coins', within: 'rewardedAd'),
+        perDay: _count(ad, 'perDay', within: 'rewardedAd'),
+        length: Duration(
+          seconds: _count(ad, 'seconds', within: 'rewardedAd', least: 1),
+        ),
       ),
     );
   }
@@ -72,6 +96,13 @@ class EconomyConfig {
   final int startingGems;
 
   final HourlyGift hourlyGift;
+  final RewardedAd rewardedAd;
+
+  /// The object under [key] in [json].
+  static Map<String, Object?> _object(Map<String, Object?> json, String key) {
+    if (json[key] case final Map<String, Object?> object) return object;
+    throw FormatException('The economy needs a "$key" object');
+  }
 
   /// The whole number, [least] or more, under [key] in [json], which is the
   /// object named [within] if given.

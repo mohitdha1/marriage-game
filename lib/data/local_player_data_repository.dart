@@ -17,6 +17,8 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
   static const _startingGemsGiven = 'gems.startingGiven';
   static const _giftCollectedAt = 'gift.collectedAt';
   static const _giftsCollected = 'gift.count';
+  static const _adDay = 'ads.day';
+  static const _adsWatched = 'ads.watched';
   static const _played = 'stats.roundsPlayed';
   static const _won = 'stats.roundsWon';
   static const _best = 'stats.bestRound';
@@ -34,6 +36,8 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
       if (data.giftCollectedAt case final at?)
         _store.setInt(_giftCollectedAt, at.millisecondsSinceEpoch),
       _store.setInt(_giftsCollected, data.giftsCollected),
+      if (data.adDay case final day?) _store.setString(_adDay, day),
+      _store.setInt(_adsWatched, data.adsWatched),
       _store.setInt(_played, data.stats.roundsPlayed),
       _store.setInt(_won, data.stats.roundsWon),
       if (best != null) _store.setInt(_best, best),
@@ -58,6 +62,10 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
   @override
   Future<PlayerData> collectGift(HourlyGift gift, DateTime now) =>
       _change((data) => data.withGiftCollected(gift, now));
+
+  @override
+  Future<PlayerData> claimAdReward(RewardedAd ad, DateTime now) =>
+      _change((data) => data.withAdReward(ad, now));
 
   @override
   Future<PlayerData> giveStartingGems(int gems) async {
@@ -93,6 +101,8 @@ class LocalPlayerDataRepository implements PlayerDataRepository {
       null => null,
     },
     giftsCollected: _store.getInt(_giftsCollected) ?? 0,
+    adDay: _store.getString(_adDay),
+    adsWatched: _store.getInt(_adsWatched) ?? 0,
     stats: PlayerStats(
       roundsPlayed: _store.getInt(_played) ?? 0,
       roundsWon: _store.getInt(_won) ?? 0,

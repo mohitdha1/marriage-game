@@ -41,7 +41,7 @@ class PlayerStats {
 
 /// Everything the app keeps about the player's progress: their play-money
 /// coins and gems, their stats, how many games they've played at each
-/// stake, and their hourly gifts.
+/// stake, their hourly gifts and today's rewarded ads.
 class PlayerData {
   const PlayerData({
     this.coins = startingCoins,
@@ -50,6 +50,8 @@ class PlayerData {
     this.gamesAtStake = const {},
     this.giftCollectedAt,
     this.giftsCollected = 0,
+    this.adDay,
+    this.adsWatched = 0,
   });
 
   /// What a new player starts with.
@@ -77,6 +79,41 @@ class PlayerData {
   /// How many hourly gifts have been collected, which decides when one
   /// comes with gems.
   final int giftsCollected;
+
+  /// The local day of the last rewarded ad, as [dayOf] writes it, or
+  /// `null` before the first.
+  final String? adDay;
+
+  /// Rewarded ads watched on [adDay].
+  final int adsWatched;
+
+  /// The local day [time] falls on, as "2026-10-07". A new day starts at
+  /// midnight on the device's clock.
+  static String dayOf(DateTime time) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${time.year}-${two(time.month)}-${two(time.day)}';
+  }
+
+  /// How many more rewarded [ad]s can pay out on the day of [now].
+  int adsLeft(RewardedAd ad, DateTime now) {
+    final watched = adDay == dayOf(now) ? adsWatched : 0;
+    return (ad.perDay - watched).clamp(0, ad.perDay);
+  }
+
+  /// This data with the reward for watching [ad] at [now] added, and the
+  /// ad counted toward that day's limit. Throws a [StateError] once the
+  /// day's ads are used up.
+  PlayerData withAdReward(RewardedAd ad, DateTime now) {
+    if (adsLeft(ad, now) == 0) {
+      throw StateError('No more rewarded ads today');
+    }
+    final today = dayOf(now);
+    return _copyWith(
+      coins: (coins + ad.coins).clamp(0, maxCoins),
+      adDay: today,
+      adsWatched: (adDay == today ? adsWatched : 0) + 1,
+    );
+  }
 
   /// How long until the next [gift] can be collected at [now]: zero once
   /// it's ready. The wait counts from the last collection, so it carries on
@@ -139,6 +176,8 @@ class PlayerData {
     Map<int, int>? gamesAtStake,
     DateTime? giftCollectedAt,
     int? giftsCollected,
+    String? adDay,
+    int? adsWatched,
   }) => PlayerData(
     coins: coins ?? this.coins,
     gems: gems ?? this.gems,
@@ -146,6 +185,8 @@ class PlayerData {
     gamesAtStake: gamesAtStake ?? this.gamesAtStake,
     giftCollectedAt: giftCollectedAt ?? this.giftCollectedAt,
     giftsCollected: giftsCollected ?? this.giftsCollected,
+    adDay: adDay ?? this.adDay,
+    adsWatched: adsWatched ?? this.adsWatched,
   );
 
   @override
@@ -155,6 +196,8 @@ class PlayerData {
       other.gems == gems &&
       other.giftCollectedAt == giftCollectedAt &&
       other.giftsCollected == giftsCollected &&
+      other.adDay == adDay &&
+      other.adsWatched == adsWatched &&
       other.stats == stats &&
       other.gamesAtStake.length == gamesAtStake.length &&
       gamesAtStake.entries.every((e) => other.gamesAtStake[e.key] == e.value);
@@ -165,6 +208,8 @@ class PlayerData {
     gems,
     giftCollectedAt,
     giftsCollected,
+    adDay,
+    adsWatched,
     stats,
     Object.hashAllUnordered(gamesAtStake.entries.map((e) => (e.key, e.value))),
   );

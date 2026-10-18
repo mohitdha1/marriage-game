@@ -7,7 +7,7 @@ import 'player_data.dart';
 /// touching it.
 ///
 /// Every change goes through [addCoins], [addGems], [giveStartingGems],
-/// [collectGift] or [recordGameResult], which apply
+/// [collectGift], [claimAdReward] or [recordGameResult], which apply
 /// the rules in [PlayerData] to the stored data and return the result, so a
 /// store shared between devices can make each change in one step.
 abstract interface class PlayerDataRepository {
@@ -34,6 +34,11 @@ abstract interface class PlayerDataRepository {
   /// [PlayerData.withGiftCollected]) and returns the data as it now stands.
   /// Throws a [StateError] if it isn't ready yet.
   Future<PlayerData> collectGift(HourlyGift gift, DateTime now);
+
+  /// Pays the reward for watching [ad] at [now] (see
+  /// [PlayerData.withAdReward]) and returns the data as it now stands.
+  /// Throws a [StateError] once the day's ads are used up.
+  Future<PlayerData> claimAdReward(RewardedAd ad, DateTime now);
 
   /// Counts a finished round: whether the player [won] it, the [points] it
   /// won or lost them, and the [stake] of the table, if it was played at

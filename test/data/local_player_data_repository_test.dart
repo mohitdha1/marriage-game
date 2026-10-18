@@ -171,4 +171,31 @@ void main() {
       expect(fourth.gems, 1);
     });
   });
+
+  group('Rewarded ads', () {
+    const ad = RewardedAd(
+      coins: 1000,
+      perDay: 5,
+      length: Duration(seconds: 30),
+    );
+    final morning = DateTime(2026, 10, 17, 9);
+
+    test('the day\'s count is saved, so the limit holds after the app is '
+        'closed', () async {
+      final store = InMemoryPreferences();
+      final repository = LocalPlayerDataRepository(store);
+      for (var i = 0; i < 5; i++) {
+        await repository.claimAdReward(ad, morning);
+      }
+
+      final reopened = await LocalPlayerDataRepository(store).load();
+      expect(reopened.coins, PlayerData.startingCoins + 5000);
+      expect(reopened.adsLeft(ad, morning), 0);
+      await expectLater(
+        LocalPlayerDataRepository(store).claimAdReward(ad, morning),
+        throwsStateError,
+      );
+      expect(await LocalPlayerDataRepository(store).load(), reopened);
+    });
+  });
 }
