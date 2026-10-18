@@ -46,7 +46,7 @@ The game is built in phases (see [`docs/roadmap.md`](docs/roadmap.md)):
 | `lib/net/` | Playing across devices: room codes, the messages phones send each other and their JSON form, the host's lobby over WebSockets, and the link a joining phone keeps to the host. Pure Dart, tested over real sockets on the loopback address. |
 | `lib/console/` | The terminal version of the game. It only turns commands into engine calls and engine state into text. |
 | `bin/marriage.dart` | Command-line entry point for the console game. |
-| `tool/generate_sounds.dart` | Synthesises the placeholder sound effects into `assets/sounds/` (run with `dart run tool/generate_sounds.dart`). |
+| `tool/import_sounds.dart` | Builds the sound effects in `assets/sounds/` from Kenney's sound packs: cuts, fades and levels each one (run on macOS with `dart run tool/import_sounds.dart <folder with the unzipped packs>`). |
 | `tool/render_branding.dart` | Draws the app icon and splash logo with the game's own card faces into `assets/branding/` (run with `flutter test tool/render_branding.dart`, then `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create`). |
 | `test/` | Unit tests for every engine rule and the bots, widget tests for the table screen, and tests that script whole console games. |
 | `tool/render_screenshots.dart` | Renders the store screenshots from the app's real screens into `docs/store/screenshots/` (run with `flutter test tool/render_screenshots.dart`). |
@@ -109,4 +109,17 @@ flutter analyze              # static analysis
   [WTFPL](http://www.wtfpl.net/) where public domain isn't recognised, and
   may be used in commercial software. The figure panels were cropped from
   the SVGs and resized; everything else on the cards is drawn in Flutter.
-- **Sound effects** are synthesised by `tool/generate_sounds.dart`.
+- **Sound effects** come from three packs by [Kenney](https://kenney.nl),
+  released under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+  (public domain, commercial use allowed, no credit required). Each was cut,
+  faded and levelled by `tool/import_sounds.dart`:
+
+  | Sound | Pack | File |
+  |---|---|---|
+  | Shuffle (the deal) | [Casino Audio](https://kenney.nl/assets/casino-audio) | `card-shuffle.ogg` |
+  | Card snap (draw and discard) | [Casino Audio](https://kenney.nl/assets/casino-audio) | `card-place-2.ogg` |
+  | Select | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | `select_001.ogg` |
+  | Your turn | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | `glass_001.ogg` |
+  | Joker reveal | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | `maximize_006.ogg` |
+  | Win | [Music Jingles](https://kenney.nl/assets/music-jingles) | `jingles_STEEL02.ogg` |
+  | Someone else wins | [Music Jingles](https://kenney.nl/assets/music-jingles) | `jingles_PIZZI01.ogg` |

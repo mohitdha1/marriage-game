@@ -6,14 +6,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../settings/settings.dart';
 
-/// The game's sound effects, each with its file in `assets/sounds/`.
+/// The game's sound effects, each with its file in `assets/sounds/`, made
+/// from Kenney's CC0 packs by `tool/import_sounds.dart`.
 enum Sfx {
   shuffle('shuffle.wav'),
   cardSnap('card_snap.wav'),
   select('select.wav'),
   win('win.wav'),
   roundOver('round_over.wav'),
-  yourTurn('your_turn.wav');
+  yourTurn('your_turn.wav'),
+  jokerReveal('joker_reveal.wav');
 
   const Sfx(this.file);
 
@@ -25,6 +27,10 @@ enum Sfx {
 abstract interface class SoundEffects {
   void play(Sfx sound);
 
+  /// Loads every sound ahead of time, so none is late the first time it
+  /// plays.
+  Future<void> preload();
+
   Future<void> dispose();
 }
 
@@ -34,6 +40,9 @@ class SilentSoundEffects implements SoundEffects {
 
   @override
   void play(Sfx sound) {}
+
+  @override
+  Future<void> preload() async {}
 
   @override
   Future<void> dispose() async {}
@@ -51,6 +60,11 @@ class GatedSoundEffects implements SoundEffects {
   void play(Sfx sound) {
     if (isOn()) inner.play(sound);
   }
+
+  /// Loads the sounds even while sound is off, so switching it on in
+  /// Settings needs no wait either.
+  @override
+  Future<void> preload() => inner.preload();
 
   @override
   Future<void> dispose() => inner.dispose();
@@ -77,6 +91,17 @@ class AudioPlayerSoundEffects implements SoundEffects {
   final _players = <Sfx, Future<AudioPlayer>>{};
 
   @override
+  Future<void> preload() async {
+    for (final sound in Sfx.values) {
+      try {
+        await _playerFor(sound);
+      } catch (e) {
+        debugPrint('Could not load $sound: $e');
+      }
+    }
+  }
+
+  @override
   void play(Sfx sound) {
     // A sound that fails to play is not worth interrupting the game for.
     unawaited(
@@ -87,7 +112,7 @@ class AudioPlayerSoundEffects implements SoundEffects {
   }
 
   /// The player for [sound], set up once with [soundEffectsAudioContext]
-  /// before it plays anything.
+  /// and given its sound to load before it plays anything.
   Future<AudioPlayer> _playerFor(Sfx sound) => _players[sound] ??= () async {
     // Nothing reads the position of a sound effect. Without this, the
     // player asks the platform for it on every frame and keeps frames
@@ -96,6 +121,7 @@ class AudioPlayerSoundEffects implements SoundEffects {
     final player = AudioPlayer()..positionUpdater = null;
     await player.setAudioContext(soundEffectsAudioContext());
     await player.setPlayerMode(PlayerMode.lowLatency);
+    await player.setSource(AssetSource('sounds/${sound.file}'));
     return player;
   }();
 

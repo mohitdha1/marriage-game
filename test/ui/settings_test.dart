@@ -20,6 +20,11 @@ class RecordingSoundEffects implements SoundEffects {
   @override
   void play(Sfx sound) => played.add(sound);
 
+  var preloads = 0;
+
+  @override
+  Future<void> preload() async => preloads++;
+
   @override
   Future<void> dispose() async {}
 }
@@ -135,6 +140,13 @@ void main() {
       gated.play(Sfx.win);
 
       expect(inner.played, [Sfx.select, Sfx.win]);
+    });
+
+    test('loads the sounds even while sound is off', () async {
+      final inner = RecordingSoundEffects();
+      await GatedSoundEffects(inner, isOn: () => false).preload();
+
+      expect(inner.preloads, 1);
     });
   });
 }

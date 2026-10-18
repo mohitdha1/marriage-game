@@ -15,8 +15,9 @@ Sfx? soundFor(TableEvent event, {required int yourSeat}) => switch (event) {
 };
 
 /// Plays the table's sounds as the game unfolds: a shuffle whenever a round
-/// is dealt, a sound for each new event in the round's public history, and
-/// a chime when another player's move makes it the human player's turn.
+/// is dealt, a sound for each new event in the round's public history, a
+/// chime when another player's move makes it the human player's turn, and a
+/// flourish as the joker is revealed to them.
 /// Sounds follow the engine's events, so bots' moves are heard too.
 class TableSounds extends ConsumerStatefulWidget {
   const TableSounds({super.key, required this.child});
@@ -45,6 +46,7 @@ class _TableSoundsState extends ConsumerState<TableSounds> {
           round: s.roundNumber,
           events: s.view.events,
           yourTurn: s.view.isYourTurn,
+          sawJoker: s.view.yourJokers != null,
           you: s.view.you.seat,
         ),
       ),
@@ -59,6 +61,11 @@ class _TableSoundsState extends ConsumerState<TableSounds> {
           if (sound != null) sounds.play(sound);
         }
         if (next.yourTurn && !previous.yourTurn) sounds.play(Sfx.yourTurn);
+        // Handing a shared device to a player who has already seen the
+        // joker reveals nothing new.
+        if (next.sawJoker && !previous.sawJoker && next.you == previous.you) {
+          sounds.play(Sfx.jokerReveal);
+        }
       },
     );
     return widget.child;

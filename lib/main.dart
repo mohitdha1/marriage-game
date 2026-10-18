@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -13,6 +15,7 @@ import 'ui/home/home_screen.dart';
 import 'ui/settings/about.dart';
 import 'ui/settings/preferences.dart';
 import 'ui/settings/settings.dart';
+import 'ui/sound/sound_effects.dart';
 import 'ui/telemetry/analytics.dart';
 import 'ui/telemetry/crash_reports.dart';
 import 'ui/theme/table_theme.dart';
@@ -55,14 +58,26 @@ Future<List<Override>> _startFirebase() async {
 }
 
 /// Root widget of the application, styled with the chosen [TableTheme].
-class MarriageApp extends ConsumerWidget {
+/// The sound effects load as it starts, so the first deal isn't silent.
+class MarriageApp extends ConsumerStatefulWidget {
   const MarriageApp({super.key, this.home = const HomeScreen()});
 
   /// The first screen. Tests start straight at [singlePlayerTable].
   final Widget home;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MarriageApp> createState() => _MarriageAppState();
+}
+
+class _MarriageAppState extends ConsumerState<MarriageApp> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(ref.read(soundEffectsProvider).preload());
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final table = ref.watch(settingsProvider.select((s) => s.tableTheme)).theme;
     return MaterialApp(
       title: 'Marriage',
@@ -72,7 +87,7 @@ class MarriageApp extends ConsumerWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: table.seed),
         extensions: [table],
       ),
-      home: home,
+      home: widget.home,
     );
   }
 }

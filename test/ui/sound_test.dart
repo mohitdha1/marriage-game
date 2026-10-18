@@ -19,6 +19,8 @@ import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_notifier.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
 
+import '../../tool/import_sounds.dart' show decodeWav, sampleRate;
+
 const c = PlayingCard.new;
 
 /// Remembers every sound it's asked to play, in order.
@@ -27,6 +29,11 @@ class RecordingSoundEffects implements SoundEffects {
 
   @override
   void play(Sfx sound) => played.add(sound);
+
+  var preloads = 0;
+
+  @override
+  Future<void> preload() async => preloads++;
 
   @override
   Future<void> dispose() async {}
@@ -176,6 +183,35 @@ void main() {
       ]);
     });
 
+    testWidgets('sounds are loaded as the app starts', (tester) async {
+      final sounds = await pumpTable(tester);
+
+      expect(sounds.preloads, 1);
+    });
+
+    testWidgets('seeing the joker plays the reveal, once', (tester) async {
+      final sounds = await pumpTable(tester);
+      final controller = controllerOf(tester)..draw(DrawSource.stock);
+      for (final set in [heartsRun, spadesRun, clubsRun]) {
+        for (final card in set) {
+          controller.toggleSelected(idOf(tester, card));
+        }
+        controller.groupSelected();
+      }
+      await tester.pump();
+      sounds.played.clear();
+
+      controller
+        ..showGroups()
+        ..pickTiplu(1);
+      await tester.pump();
+      expect(sounds.played, [Sfx.jokerReveal]);
+
+      controller.toggleSelected(idOf(tester, twoOfDiamonds));
+      await tester.pump();
+      expect(sounds.played.where((s) => s == Sfx.jokerReveal), hasLength(1));
+    });
+
     testWidgets('no chime when a round starts on your turn', (tester) async {
       final sounds = await pumpTable(tester);
 
@@ -268,6 +304,20 @@ void main() {
           greaterThan(44),
           reason: 'more than a header',
         );
+      }
+    });
+
+    test('every sound is short and well below full volume', () {
+      for (final sound in Sfx.values) {
+        final samples = decodeWav(
+          File('assets/sounds/${sound.file}').readAsBytesSync(),
+        );
+        final seconds = samples.length / sampleRate;
+        final peak = samples.fold(0.0, (loudest, s) => max(loudest, s.abs()));
+
+        expect(seconds, lessThanOrEqualTo(1.5), reason: '${sound.file} length');
+        // −3 dB below full scale, leaving the loudest a little headroom.
+        expect(peak, lessThanOrEqualTo(0.71), reason: '${sound.file} peak');
       }
     });
 
