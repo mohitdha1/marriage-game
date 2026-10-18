@@ -17,6 +17,7 @@ import '../table/table_screen.dart';
 import '../theme/table_felt.dart';
 import 'player_data_provider.dart';
 import 'game_setup.dart';
+import 'hourly_gift_button.dart';
 import 'stake_table_picker.dart';
 import 'stake_tables_provider.dart';
 import 'pass_and_play_setup.dart';
@@ -29,11 +30,11 @@ const singlePlayerTable = TableSounds(
   child: TableHaptics(child: LeaveGuard(child: TableScreen())),
 );
 
-/// The first screen: the player's avatar, name, gems and coins along the
-/// top, a settings gear, a large tile for each way to play (Single Player
-/// sets up a custom game), and a Quick Play button that starts a game
-/// against bots straight away. A match left unfinished can be picked up with the
-/// Continue button beside it.
+/// The first screen: the player's avatar and name, the hourly gift, gems
+/// and coins along the top, a settings gear, a large tile for each way to
+/// play (Single Player sets up a custom game), and a Quick Play button that
+/// starts a game against bots straight away. A match left unfinished can be
+/// picked up with the Continue button beside it.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -69,6 +70,8 @@ class HomeScreen extends ConsumerWidget {
                           onTap: () => showProfileDialog(context),
                         ),
                         const Spacer(),
+                        const HourlyGiftButton(),
+                        const SizedBox(width: 8),
                         GemPill(gems: playerData?.gems),
                         const SizedBox(width: 8),
                         CoinPill(coins: coins),

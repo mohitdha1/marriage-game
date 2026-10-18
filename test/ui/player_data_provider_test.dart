@@ -46,6 +46,12 @@ class RecordingRepository implements PlayerDataRepository {
     return data = data.withGemsAdded(amount);
   }
 
+  @override
+  Future<PlayerData> collectGift(HourlyGift gift, DateTime now) async {
+    calls.add('collectGift');
+    return data = data.withGiftCollected(gift, now);
+  }
+
   var startingGemsGiven = false;
 
   @override
@@ -69,14 +75,26 @@ class RecordingRepository implements PlayerDataRepository {
   }
 }
 
+const testEconomy = EconomyConfig(
+  startingGems: 3,
+  hourlyGift: HourlyGift(
+    coins: 500,
+    interval: Duration(hours: 1),
+    gems: 1,
+    gemEvery: 4,
+  ),
+);
+
 /// A container using [repository]. The economy's amounts arrive when
 /// [economy] completes, or never, so the starting gems stay out of the way.
 ProviderContainer containerWith(
   PlayerDataRepository repository, {
   Future<EconomyConfig>? economy,
+  DateTime Function()? clock,
 }) {
   final container = ProviderContainer(
     overrides: [
+      if (clock != null) clockProvider.overrideWithValue(clock),
       playerDataRepositoryProvider.overrideWithValue(repository),
       economyConfigProvider.overrideWith(
         (ref) => economy ?? Completer<EconomyConfig>().future,
@@ -173,10 +191,51 @@ void main() {
 
     expect((await container.read(playerDataProvider.future)).gems, 0);
 
-    economy.complete(const EconomyConfig(startingGems: 3));
+    economy.complete(testEconomy);
     await pumpEventQueue();
     expect(repository.calls, ['load', 'giveStartingGems 3']);
     expect(container.read(playerDataProvider).value?.gems, 3);
+  });
+
+  group('The hourly gift', () {
+    test('is collected through the repository, at the clock\'s time, and '
+        'says what it gave', () async {
+      var now = DateTime(2026, 10, 17, 12);
+      final repository = RecordingRepository();
+      final container = containerWith(
+        repository,
+        economy: Future.value(testEconomy),
+        clock: () => now,
+      );
+      await container.read(playerDataProvider.future);
+      await container.read(economyConfigProvider.future);
+      await pumpEventQueue();
+      final controller = container.read(playerDataProvider.notifier);
+
+      expect(await controller.collectGift(), (coins: 500, gems: 0));
+      expect(repository.data.giftCollectedAt, now);
+      expect(container.read(playerDataProvider).value, repository.data);
+
+      // Not again until an hour has passed.
+      now = now.add(const Duration(minutes: 59));
+      expect(await controller.collectGift(), isNull);
+      expect(repository.calls.where((c) => c == 'collectGift'), hasLength(1));
+
+      now = now.add(const Duration(minutes: 1));
+      expect(await controller.collectGift(), (coins: 500, gems: 0));
+    });
+
+    test('nothing is collected before the economy has loaded', () async {
+      final repository = RecordingRepository();
+      final container = containerWith(repository);
+      await container.read(playerDataProvider.future);
+
+      expect(
+        await container.read(playerDataProvider.notifier).collectGift(),
+        isNull,
+      );
+      expect(repository.calls, isNot(contains('collectGift')));
+    });
   });
 
   group('on the device by default', () {
@@ -184,9 +243,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           preferencesProvider.overrideWithValue(store),
-          economyConfigProvider.overrideWith(
-            (ref) => const EconomyConfig(startingGems: 3),
-          ),
+          economyConfigProvider.overrideWith((ref) => testEconomy),
         ],
       );
       addTearDown(container.dispose);

@@ -1,3 +1,5 @@
+import 'economy_config.dart';
+
 /// The player's record over every round they've finished.
 class PlayerStats {
   const PlayerStats({
@@ -38,14 +40,16 @@ class PlayerStats {
 }
 
 /// Everything the app keeps about the player's progress: their play-money
-/// coins and gems, their stats, and how many games they've played at each
-/// stake.
+/// coins and gems, their stats, how many games they've played at each
+/// stake, and their hourly gifts.
 class PlayerData {
   const PlayerData({
     this.coins = startingCoins,
     this.gems = 0,
     this.stats = const PlayerStats(),
     this.gamesAtStake = const {},
+    this.giftCollectedAt,
+    this.giftsCollected = 0,
   });
 
   /// What a new player starts with.
@@ -65,6 +69,42 @@ class PlayerData {
   /// Games played at each stake table, by its stake. Stakes not played
   /// yet are left out.
   final Map<int, int> gamesAtStake;
+
+  /// When the hourly gift was last collected, or `null` if it never has
+  /// been, when the first one is ready straight away.
+  final DateTime? giftCollectedAt;
+
+  /// How many hourly gifts have been collected, which decides when one
+  /// comes with gems.
+  final int giftsCollected;
+
+  /// How long until the next [gift] can be collected at [now]: zero once
+  /// it's ready. The wait counts from the last collection, so it carries on
+  /// while the app is closed. If the device's clock was turned back, the
+  /// wait is never longer than one [HourlyGift.interval].
+  Duration giftWait(HourlyGift gift, DateTime now) {
+    final last = giftCollectedAt;
+    if (last == null) return Duration.zero;
+    final left = gift.interval - now.difference(last);
+    if (left <= Duration.zero) return Duration.zero;
+    return left > gift.interval ? gift.interval : left;
+  }
+
+  /// This data with [gift] collected at [now]: its coins, and gems when
+  /// this collection earns them, added, and the wait started again.
+  /// Throws a [StateError] if the gift isn't ready yet.
+  PlayerData withGiftCollected(HourlyGift gift, DateTime now) {
+    if (giftWait(gift, now) > Duration.zero) {
+      throw StateError('The gift isn\'t ready yet');
+    }
+    final reward = gift.rewardFor(giftsCollected + 1);
+    return _copyWith(
+      coins: (coins + reward.coins).clamp(0, maxCoins),
+      gems: (gems + reward.gems).clamp(0, maxCoins),
+      giftCollectedAt: now,
+      giftsCollected: giftsCollected + 1,
+    );
+  }
 
   /// Games played at the table with [stake].
   int gamesAt(int stake) => gamesAtStake[stake] ?? 0;
@@ -97,11 +137,15 @@ class PlayerData {
     int? gems,
     PlayerStats? stats,
     Map<int, int>? gamesAtStake,
+    DateTime? giftCollectedAt,
+    int? giftsCollected,
   }) => PlayerData(
     coins: coins ?? this.coins,
     gems: gems ?? this.gems,
     stats: stats ?? this.stats,
     gamesAtStake: gamesAtStake ?? this.gamesAtStake,
+    giftCollectedAt: giftCollectedAt ?? this.giftCollectedAt,
+    giftsCollected: giftsCollected ?? this.giftsCollected,
   );
 
   @override
@@ -109,6 +153,8 @@ class PlayerData {
       other is PlayerData &&
       other.coins == coins &&
       other.gems == gems &&
+      other.giftCollectedAt == giftCollectedAt &&
+      other.giftsCollected == giftsCollected &&
       other.stats == stats &&
       other.gamesAtStake.length == gamesAtStake.length &&
       gamesAtStake.entries.every((e) => other.gamesAtStake[e.key] == e.value);
@@ -117,6 +163,8 @@ class PlayerData {
   int get hashCode => Object.hash(
     coins,
     gems,
+    giftCollectedAt,
+    giftsCollected,
     stats,
     Object.hashAllUnordered(gamesAtStake.entries.map((e) => (e.key, e.value))),
   );

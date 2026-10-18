@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:marriage_game/data/economy_config.dart';
 import 'package:marriage_game/data/local_player_data_repository.dart';
 import 'package:marriage_game/data/player_data.dart';
 import 'package:marriage_game/ui/settings/preferences.dart';
@@ -116,5 +117,58 @@ void main() {
 
     final loaded = await LocalPlayerDataRepository(store).load();
     expect(loaded.gamesAtStake, {5: 3, 10: 1});
+  });
+
+  group('Hourly gift', () {
+    const gift = HourlyGift(
+      coins: 500,
+      interval: Duration(hours: 1),
+      gems: 1,
+      gemEvery: 4,
+    );
+    final noon = DateTime(2026, 10, 17, 12);
+
+    test('a collection is saved, so the wait carries on after the app is '
+        'closed', () async {
+      final store = InMemoryPreferences();
+      final collected = await LocalPlayerDataRepository(
+        store,
+      ).collectGift(gift, noon);
+      expect(collected.coins, PlayerData.startingCoins + 500);
+
+      // The app is opened again 45 minutes later: 15 to go.
+      final reopened = await LocalPlayerDataRepository(store).load();
+      expect(reopened, collected);
+      expect(
+        reopened.giftWait(gift, noon.add(const Duration(minutes: 45))),
+        const Duration(minutes: 15),
+      );
+    });
+
+    test('a gift that isn\'t ready changes nothing', () async {
+      final store = InMemoryPreferences();
+      final repository = LocalPlayerDataRepository(store);
+      final first = await repository.collectGift(gift, noon);
+
+      await expectLater(
+        repository.collectGift(gift, noon.add(const Duration(minutes: 5))),
+        throwsStateError,
+      );
+      expect(await LocalPlayerDataRepository(store).load(), first);
+    });
+
+    test('the count of collections is kept, for the gem every 4th', () async {
+      final repository = LocalPlayerDataRepository(InMemoryPreferences());
+      for (var i = 0; i < 3; i++) {
+        await repository.collectGift(gift, noon.add(Duration(hours: i)));
+      }
+      final fourth = await repository.collectGift(
+        gift,
+        noon.add(const Duration(hours: 3)),
+      );
+
+      expect(fourth.giftsCollected, 4);
+      expect(fourth.gems, 1);
+    });
   });
 }

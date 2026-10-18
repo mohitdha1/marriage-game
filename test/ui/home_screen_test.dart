@@ -16,6 +16,8 @@ import 'package:marriage_game/bots/bot_player.dart';
 import 'package:marriage_game/ui/home/game_setup.dart';
 import 'package:marriage_game/ui/home/economy_config_provider.dart';
 import 'package:marriage_game/ui/home/home_screen.dart';
+import 'package:marriage_game/ui/home/hourly_gift_button.dart';
+import 'package:marriage_game/ui/home/player_data_provider.dart';
 import 'package:marriage_game/ui/home/pass_and_play_setup.dart';
 import 'package:marriage_game/ui/home/stake_table_picker.dart';
 import 'package:marriage_game/ui/home/stake_tables_provider.dart';
@@ -37,6 +39,7 @@ Future<ProviderContainer> pumpHome(
   WidgetTester tester, {
   Map<String, Object>? saved,
   List<Override> overrides = const [],
+  DateTime Function()? clock,
 }) async {
   tester.view
     ..physicalSize = const Size(844, 390)
@@ -61,6 +64,7 @@ Future<ProviderContainer> pumpHome(
             File(EconomyConfig.asset).readAsStringSync(),
           ),
         ),
+        if (clock != null) clockProvider.overrideWithValue(clock),
         ...overrides,
       ],
       child: const MarriageApp(),
@@ -122,6 +126,117 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  group('Hourly gift', () {
+    final noon = DateTime(2026, 10, 17, 12);
+    String label(WidgetTester tester) =>
+        tester.widget<Text>(find.byKey(const Key('gift-label'))).data!;
+
+    testWidgets('a new player\'s first gift is ready; collecting it pays '
+        '500 coins and starts the hour', (tester) async {
+      var now = noon;
+      await pumpHome(tester, clock: () => now);
+      expect(label(tester), 'Collect');
+
+      await tester.tap(find.byKey(const Key('hourly-gift')));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('+500 coins'), findsOneWidget);
+      expect(find.text('10,500'), findsOneWidget);
+      expect(label(tester), '1:00:00');
+
+      now = now.add(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(label(tester), '59:59');
+    });
+
+    testWidgets('the wait carries on from the last collection, even with '
+        'the app closed, and the gift is ready when it runs out', (
+      tester,
+    ) async {
+      var now = noon;
+      await pumpHome(
+        tester,
+        clock: () => now,
+        saved: {
+          'gift.collectedAt': noon
+              .subtract(const Duration(minutes: 20))
+              .millisecondsSinceEpoch,
+          'gift.count': 1,
+        },
+      );
+      expect(label(tester), '40:00');
+
+      // Tapping before it's ready collects nothing.
+      await tester.tap(find.byKey(const Key('hourly-gift')));
+      await tester.pump();
+      expect(find.byKey(const Key('gift-collected')), findsNothing);
+
+      now = now.add(const Duration(minutes: 40));
+      await tester.pump(const Duration(seconds: 1));
+      expect(label(tester), 'Collect');
+    });
+
+    testWidgets('every 4th gift comes with a gem', (tester) async {
+      await pumpHome(
+        tester,
+        clock: () => noon,
+        saved: {
+          'gift.collectedAt': noon
+              .subtract(const Duration(hours: 2))
+              .millisecondsSinceEpoch,
+          'gift.count': 3,
+        },
+      );
+
+      await tester.tap(find.byKey(const Key('hourly-gift')));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('+500 coins and 1 gem'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('gem-balance')),
+          matching: find.text('4'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('screen readers hear whether it\'s ready', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpHome(
+        tester,
+        clock: () => noon,
+        saved: {
+          'gift.collectedAt': noon
+              .subtract(const Duration(minutes: 50))
+              .millisecondsSinceEpoch,
+        },
+      );
+
+      expect(
+        find.bySemanticsLabel('Next hourly gift in 10:00'),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    });
+
+    test('countdowns read as minutes and seconds, or hours past an hour', () {
+      expect(countdownText(const Duration(minutes: 59, seconds: 7)), '59:07');
+      expect(countdownText(const Duration(milliseconds: 400)), '0:01');
+      expect(
+        countdownText(const Duration(hours: 1, minutes: 2, seconds: 5)),
+        '1:02:05',
+      );
+    });
+
+    test('the reward reads as coins, then any gems', () {
+      expect(giftRewardText((coins: 500, gems: 0)), '+500 coins');
+      expect(giftRewardText((coins: 1500, gems: 1)), '+1,500 coins and 1 gem');
+      expect(giftRewardText((coins: 500, gems: 2)), '+500 coins and 2 gems');
+    });
   });
 
   testWidgets('Quick Play opens a fresh table every time', (tester) async {

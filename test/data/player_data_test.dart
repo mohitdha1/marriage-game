@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:marriage_game/data/economy_config.dart';
 import 'package:marriage_game/data/player_data.dart';
 
 void main() {
@@ -106,5 +107,95 @@ void main() {
     );
 
     expect(data.withCoinsAdded(50).gamesAt(5), 1);
+  });
+
+  group('Hourly gift', () {
+    const gift = HourlyGift(
+      coins: 500,
+      interval: Duration(hours: 1),
+      gems: 1,
+      gemEvery: 4,
+    );
+    final noon = DateTime(2026, 10, 17, 12);
+
+    test('the first gift is ready straight away', () {
+      expect(const PlayerData().giftWait(gift, noon), Duration.zero);
+    });
+
+    test('after collecting, the next is an interval away, counting from the '
+        'collection', () {
+      final data = const PlayerData().withGiftCollected(gift, noon);
+
+      expect(data.giftWait(gift, noon), const Duration(hours: 1));
+      expect(
+        data.giftWait(gift, noon.add(const Duration(minutes: 20))),
+        const Duration(minutes: 40),
+      );
+      expect(
+        data.giftWait(gift, noon.add(const Duration(hours: 1))),
+        Duration.zero,
+      );
+      expect(
+        data.giftWait(gift, noon.add(const Duration(days: 3))),
+        Duration.zero,
+      );
+    });
+
+    test(
+      'a clock turned back never makes the wait longer than one interval',
+      () {
+        final data = const PlayerData().withGiftCollected(gift, noon);
+
+        expect(
+          data.giftWait(gift, noon.subtract(const Duration(days: 1))),
+          const Duration(hours: 1),
+        );
+      },
+    );
+
+    test('each collection pays the coins, and every 4th a gem', () {
+      var data = const PlayerData(coins: 0);
+      final gems = <int>[];
+      for (var i = 0; i < 8; i++) {
+        final before = data.gems;
+        data = data.withGiftCollected(gift, noon.add(Duration(hours: i)));
+        gems.add(data.gems - before);
+      }
+
+      expect(data.coins, 8 * 500);
+      expect(gems, [0, 0, 0, 1, 0, 0, 0, 1]);
+      expect(data.giftsCollected, 8);
+      expect(data.giftCollectedAt, noon.add(const Duration(hours: 7)));
+    });
+
+    test('a gift that isn\'t ready can\'t be collected', () {
+      final data = const PlayerData().withGiftCollected(gift, noon);
+
+      expect(
+        () =>
+            data.withGiftCollected(gift, noon.add(const Duration(minutes: 59))),
+        throwsStateError,
+      );
+    });
+
+    test('collecting keeps everything else, and counts toward equality', () {
+      const data = PlayerData(
+        gems: 2,
+        stats: PlayerStats(roundsPlayed: 1),
+        gamesAtStake: {5: 1},
+      );
+      final collected = data.withGiftCollected(gift, noon);
+
+      expect(collected.stats, data.stats);
+      expect(collected.gamesAtStake, data.gamesAtStake);
+      expect(collected.gems, 2);
+      expect(collected, data.withGiftCollected(gift, noon));
+      expect(collected.hashCode, data.withGiftCollected(gift, noon).hashCode);
+      expect(collected, isNot(data.withGiftCollected(gift, DateTime(2027))));
+      expect(
+        PlayerData(giftCollectedAt: noon, giftsCollected: 1),
+        isNot(PlayerData(giftCollectedAt: noon, giftsCollected: 2)),
+      );
+    });
   });
 }

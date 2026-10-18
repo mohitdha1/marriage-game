@@ -16,6 +16,9 @@ final playerDataRepositoryProvider = Provider<PlayerDataRepository>(
   (ref) => LocalPlayerDataRepository(ref.watch(preferencesProvider)),
 );
 
+/// The time now. Tests replace it to move time on without waiting.
+final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
 /// The player's coins, gems and stats, loaded from [playerDataRepositoryProvider].
 /// Screens watch it; changes go through [PlayerDataController], which passes
 /// them to the repository.
@@ -43,6 +46,24 @@ class PlayerDataController extends AsyncNotifier<PlayerData> {
           .catchError((Object e) => debugPrint('No starting gems: $e')),
     );
     return loading;
+  }
+
+  /// Collects the hourly gift and returns what it gave, or `null` if it
+  /// wasn't ready (or the economy's amounts haven't loaded).
+  Future<({int coins, int gems})?> collectGift() async {
+    final economy = ref.read(economyConfigProvider).value;
+    final data = state.value;
+    if (economy == null || data == null) return null;
+    final gift = economy.hourlyGift;
+    final now = ref.read(clockProvider)();
+    if (data.giftWait(gift, now) > Duration.zero) return null;
+    final reward = gift.rewardFor(data.giftsCollected + 1);
+    try {
+      await _update((repository) => repository.collectGift(gift, now));
+    } on StateError {
+      return null;
+    }
+    return reward;
   }
 
   /// Gives a new player their starting gems; a player who has had them

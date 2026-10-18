@@ -1,3 +1,4 @@
 {
-  "startingGems": 3
+  "startingGems": 3,
+  "hourlyGift": {"coins": 500, "minutes": 60, "gems": 1, "gemEvery": 4}
 }
