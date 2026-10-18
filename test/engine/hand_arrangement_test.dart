@@ -1,9 +1,12 @@
+import 'dart:math';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/hand_arrangement.dart';
 import 'package:marriage_game/engine/card.dart';
 import 'package:marriage_game/engine/joker.dart';
 import 'package:marriage_game/engine/melds.dart';
 import 'package:marriage_game/engine/player_hand.dart';
+import 'package:marriage_game/engine/win_check.dart';
 
 const c = PlayingCard.new;
 
@@ -202,6 +205,34 @@ void main() {
     });
   });
 
+  test('the badge\'s count never contradicts the win check', () {
+    // Random hands from a few suits and ranks, so many of them win.
+    final random = Random(7);
+    final pool = [
+      for (final suit in [Suit.hearts, Suit.spades])
+        for (final rank in Rank.values.take(7)) c(suit, rank),
+      c(Suit.hearts, Rank.seven), // the tiplu: wild
+      c(Suit.clubs, Rank.seven), // a 7 of another suit: wild
+    ];
+    var winners = 0;
+    for (var i = 0; i < 400; i++) {
+      final cards = [
+        for (var n = 0; n < 3 * (1 + random.nextInt(3)); n++)
+          pool[random.nextInt(pool.length)],
+      ];
+      final wins = canSplitIntoSets(cards, jokers);
+      final inSets = bestArrangement(
+        cards,
+        jokers,
+      ).fold(0, (total, set) => total + set.length);
+      if (wins) {
+        winners++;
+        expect(inSets, cards.length, reason: '$cards wins, so all fit sets');
+      }
+    }
+    expect(winners, greaterThan(20), reason: 'enough winning hands tried');
+  });
+
   group('handProgress', () {
     PlayerHand opened(List<PlayingCard> cards) =>
         PlayerHand(cards)
@@ -312,6 +343,19 @@ void main() {
         );
       });
 
+      test('a card that must be kept is never the winning discard', () {
+        // Every other card is in sets, so only the card drawn can go; if
+        // it came from the discard pile, it must be kept this turn.
+        final hand = shown(trial)..draw(loose[0]);
+
+        expect(setsToWin(hand), 0);
+        expect(
+          (handProgress(hand, jokers, mustKeep: loose[0]) as WinProgress)
+              .setsToWin,
+          1,
+        );
+      });
+
       test('after drawing, an unmatched card left over still needs a set', () {
         // Two unmatched cards: discarding one leaves the other alone.
         expect(setsToWin(shown([...trial, loose[0]])..draw(loose[1])), 1);
@@ -331,8 +375,11 @@ void main() {
         ])
           [c(Suit.clubs, rank), c(Suit.clubs, rank)],
       ];
+      // Two more cards that pair with nothing, so a discard still leaves
+      // cards to make the 8th doublee from.
+      final filler = [c(Suit.diamonds, Rank.queen), c(Suit.hearts, Rank.nine)];
       PlayerHand dubleeHand(List<PlayingCard> extras) =>
-          opened([...pairs.expand((p) => p), ...extras])
+          opened([...pairs.expand((p) => p), ...extras, ...filler])
             ..draw(c(Suit.spades, Rank.ace))
             ..showDoublees(pairs);
 
@@ -360,6 +407,32 @@ void main() {
               )
               as DubleeProgress;
       expect(withPair.doubleesToWin, 0);
+    });
+
+    test('on the dublee route, ready to win only if the 8th doublee '
+        'survives the discard', () {
+      // 7 doublees shown, then only K♠ and the K♠ just drawn: discarding
+      // either leaves one card, which is no doublee.
+      final pairs = [
+        for (final rank in [
+          Rank.two,
+          Rank.three,
+          Rank.four,
+          Rank.five,
+          Rank.nine,
+          Rank.ten,
+          Rank.jack,
+        ])
+          [c(Suit.clubs, rank), c(Suit.clubs, rank)],
+      ];
+      final hand =
+          opened([...pairs.expand((p) => p), c(Suit.spades, Rank.king)])
+            ..draw(c(Suit.spades, Rank.king))
+            ..showDoublees(pairs);
+
+      final progress = handProgress(hand, jokers) as DubleeProgress;
+      expect(progress.doublees, 8);
+      expect(progress.doubleesToWin, 1);
     });
   });
 }

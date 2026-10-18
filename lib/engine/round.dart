@@ -21,8 +21,9 @@ enum DrawSource { stock, discardPile }
 /// 2. **Opening shows:** every player shows their dealt tunnellas
 ///    ([showOpeningTunnellas]) before anyone draws.
 /// 3. **Turns,** starting at `firstSeat` and going round the table: [draw]
-///    from the stock or the discard pile, optionally show, then [discard] —
-///    or [declareWin] to finish the round with that final discard.
+///    from the stock or the discard pile, optionally show, then [discard].
+///    A discard that leaves a winning hand finishes the round, as does
+///    [declareWin], which only accepts one that does.
 ///
 /// The joker isn't chosen at the deal. The first player to show picks any
 /// card from the stock (`tipluPosition`, counted from the top) to be the
@@ -212,6 +213,19 @@ class Round {
   /// The seat that won, or `null` while the round is still being played.
   int? get winner => _winner;
 
+  /// The cards the current player could discard now to win the round (see
+  /// [winningDiscards]): empty before they've drawn and seen the joker,
+  /// and once the round is over.
+  List<PlayingCard> get currentWinningDiscards {
+    final jokers = _jokers;
+    if (isOver || jokers == null) return const [];
+    return winningDiscards(
+      _currentHand,
+      jokers,
+      mustKeep: _takenFromDiscardPile,
+    );
+  }
+
   /// Makes [seat]'s opening show of their dealt tunnellas. See
   /// [PlayerHand.showOpeningTunnellas].
   void showOpeningTunnellas(int seat, List<List<PlayingCard>> tunnellas) {
@@ -299,10 +313,15 @@ class Round {
   }
 
   /// Ends the current player's turn by discarding [card], and passes the
-  /// turn to the next seat.
+  /// turn to the next seat. If the discard leaves a winning hand, it
+  /// finishes the round instead, just as [declareWin] would.
   void discard(PlayingCard card) {
     _checkNotOver();
     _checkNoTipluPick();
+    if (currentWinningDiscards.contains(card)) {
+      _win(card);
+      return;
+    }
     _discardFromCurrentHand(card);
     _log.add(DiscardMove(card));
     _events.add(DiscardedCard(_currentSeat, card));
@@ -333,19 +352,19 @@ class Round {
       throw ArgumentError.value(card, 'card', 'is not in the hand');
     }
 
-    final jokers = _jokers!;
-    final isWinningHand = switch (hand.showKind!) {
-      ShowKind.pureSets => canSplitIntoSets(remaining, jokers),
-      ShowKind.doublees => containsDoubleeWithJokers(remaining, jokers),
-    };
-    if (!isWinningHand) {
+    if (!isWinningHand(remaining, hand.showKind!, _jokers!)) {
       throw ArgumentError.value(
         card,
         'card',
         'does not leave a winning hand when discarded',
       );
     }
+    _win(card);
+  }
 
+  /// Finishes the round with the current player discarding [card], which
+  /// leaves them a winning hand.
+  void _win(PlayingCard card) {
     _discardFromCurrentHand(card);
     _winner = _currentSeat;
     _log.add(WinMove(card));

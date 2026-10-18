@@ -65,7 +65,16 @@ void main() {
         const FakeAccessibilityFeatures(disableAnimations: true);
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 
-    final rest = [...Rank.values.map((r) => c(Suit.diamonds, r))];
+    // Twelve loose cards: each rank once, and three ranks apart in each
+    // suit, so they make no set even with a joker, and no discard wins.
+    final rest = [
+      for (final (suit, ranks) in [
+        (Suit.diamonds, [Rank.two, Rank.five, Rank.eight, Rank.jack]),
+        (Suit.spades, [Rank.three, Rank.six, Rank.nine, Rank.queen]),
+        (Suit.clubs, [Rank.four, Rank.seven, Rank.ten, Rank.ace]),
+      ])
+        for (final rank in ranks) c(suit, rank),
+    ];
     await tester.pumpWidget(
       ProviderScope(
         overrides: [

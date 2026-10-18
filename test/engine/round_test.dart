@@ -355,7 +355,7 @@ void main() {
 
     test('later players see the same tiplu and must not pick another', () {
       final round = seat0HasShown()
-        ..discard(c(Suit.diamonds, Rank.two))
+        ..discard(c(Suit.diamonds, Rank.ten))
         ..draw(DrawSource.stock);
 
       expect(
@@ -376,15 +376,17 @@ void main() {
         rest.remove(card);
       }
       fisherYatesShuffle(rest, Random(3));
-      final seat1 = rest.sublist(0, 10);
-      final pile = [rest[10]];
-      final stockCards = rest.sublist(11);
+      // Two loose cards keep seat 0 from ever holding a winning hand.
+      final loose = rest.sublist(0, 2);
+      final seat1 = rest.sublist(2, 12);
+      final pile = [rest[12]];
+      final stockCards = rest.sublist(13);
       final round =
           Round.fromCards(
               config: config,
               random: Random(3),
               hands: [
-                [...runA, ...runB, ...runC],
+                [...runA, ...runB, ...runC, ...loose],
                 seat1,
               ],
               stock: stockCards,
@@ -416,6 +418,63 @@ void main() {
       expect(round.isOver, isTrue);
       expect(round.winner, 0);
       expect(round.topDiscard, c(Suit.diamonds, Rank.two));
+    });
+
+    test('a discard that leaves a winning hand wins the round', () {
+      final round = seat0HasShown();
+      // 2♦ wins, and so does K♠: K♦ with 10♦ J♦ Q♦, and 2♦ 7♣ 8♥ a trial.
+      expect(
+        round.currentWinningDiscards,
+        unorderedEquals([
+          c(Suit.diamonds, Rank.two),
+          c(Suit.spades, Rank.king),
+        ]),
+      );
+
+      round.discard(c(Suit.diamonds, Rank.two));
+
+      expect(round.isOver, isTrue);
+      expect(round.winner, 0);
+      expect(round.topDiscard, c(Suit.diamonds, Rank.two));
+      expect(round.events.last, isA<WonRound>());
+      expect(round.currentWinningDiscards, isEmpty);
+      // Saved and played again, it's the same win.
+      final replayed = Round.replay(
+        config: round.config,
+        random: Random(0),
+        start: round.start,
+        log: round.log,
+      );
+      expect(replayed.winner, 0);
+    });
+
+    test('any other discard passes the turn as usual', () {
+      final round = seat0HasShown()..discard(c(Suit.diamonds, Rank.ten));
+
+      expect(round.isOver, isFalse);
+      expect(round.currentSeat, 1);
+      expect(round.events.last, isA<DiscardedCard>());
+    });
+
+    test('no winning discards before drawing or seeing the joker', () {
+      expect(table().currentWinningDiscards, isEmpty);
+      expect((table()..draw(DrawSource.stock)).currentWinningDiscards, isEmpty);
+    });
+
+    test('the card just taken from the discard pile is never a winning '
+        'discard, so discarding it is refused rather than winning', () {
+      // Seat 0 takes a second 2♦; discarding a 2♦ would win, but a card
+      // matching the one just taken must be kept this turn.
+      final round = table(discardPile: [c(Suit.diamonds, Rank.two)])
+        ..draw(DrawSource.discardPile)
+        ..showPureSets([runA, runB, runC], tipluPosition: 2);
+
+      expect(round.currentWinningDiscards, isEmpty);
+      expect(
+        () => round.discard(c(Suit.diamonds, Rank.two)),
+        throwsArgumentError,
+      );
+      expect(round.isOver, isFalse);
     });
 
     test('a discard that leaves an unsplittable hand is rejected', () {
@@ -531,7 +590,7 @@ void main() {
 
     test('an unseen player discarding a joker is not counted', () {
       final round = seat0HasShown()
-        ..discard(c(Suit.diamonds, Rank.two))
+        ..discard(c(Suit.diamonds, Rank.ten))
         ..draw(DrawSource.stock)
         ..discard(c(Suit.hearts, Rank.eight));
 

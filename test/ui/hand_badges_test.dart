@@ -23,9 +23,15 @@ void main() {
       );
     });
 
-    test('on the dublee route: 1 until the 8th doublee, then 0', () {
-      expect(toWinOf(const DubleeProgress(doublees: 7, maal: 0)), 1);
-      expect(toWinOf(const DubleeProgress(doublees: 8, maal: 0)), 0);
+    test('on the dublee route: 1 until the hand can win, then 0', () {
+      expect(
+        toWinOf(const DubleeProgress(doublees: 7, doubleesToWin: 1, maal: 0)),
+        1,
+      );
+      expect(
+        toWinOf(const DubleeProgress(doublees: 8, doubleesToWin: 0, maal: 0)),
+        0,
+      );
     });
   });
 
@@ -50,7 +56,10 @@ void main() {
         ),
         12,
       );
-      expect(maalOf(const DubleeProgress(doublees: 7, maal: 5)), 5);
+      expect(
+        maalOf(const DubleeProgress(doublees: 7, doubleesToWin: 1, maal: 5)),
+        5,
+      );
     });
   });
 }

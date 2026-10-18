@@ -464,9 +464,10 @@ Json? _progressToJson(HandProgress? progress) => switch (progress) {
       'setsToWin': setsToWin,
       'maal': maal,
     },
-  DubleeProgress(:final doublees, :final maal) => {
+  DubleeProgress(:final doublees, :final doubleesToWin, :final maal) => {
     'type': 'doublee',
     'doublees': doublees,
+    'doubleesToWin': doubleesToWin,
     'maal': maal,
   },
 };
@@ -486,6 +487,7 @@ HandProgress? _progressFromJson(Json? json) => switch (json?['type']) {
   ),
   'doublee' => DubleeProgress(
     doublees: json!['doublees']! as int,
+    doubleesToWin: json['doubleesToWin']! as int,
     maal: json['maal']! as int,
   ),
   final type => throw FormatException('unknown progress type $type'),

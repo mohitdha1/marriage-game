@@ -13,7 +13,6 @@ import '../../engine/melds.dart';
 import '../../engine/player_hand.dart';
 import '../../engine/round.dart';
 import '../../engine/scoring.dart';
-import '../../engine/win_check.dart';
 import '../../net/connection.dart';
 import '../../net/game_host.dart' show Rejoin;
 import '../../net/wire.dart';
@@ -943,11 +942,7 @@ class TableController extends TableNotifier {
       player.connection.send(
         SeatUpdate(
           view: _viewFor(seat),
-          handProgress: handProgress(
-            _round.hands[seat],
-            _round.jokersFor(seat),
-            alterIsMaal: _round.config.alterIsMaal,
-          ),
+          handProgress: _handProgressOf(seat),
           winningCards: _winningCardsFor(seat),
           roundNumber: _roundNumber,
           seatNames: [for (var s = 0; s < _round.hands.length; s++) _nameOf(s)],
@@ -1095,38 +1090,21 @@ class TableController extends TableNotifier {
   /// now. Empty unless it's their turn, they've drawn and they've seen the
   /// joker.
   List<PlayingCard> _winningCardsFor(int seat) {
-    final player = _round.hands[seat];
-    final jokers = _round.jokersFor(seat);
-    final route = player.showKind;
-    if (_round.isOver ||
-        _round.currentSeat != seat ||
-        !player.hasDrawn ||
-        jokers == null ||
-        route == null) {
-      return [];
-    }
-    bool isWinningHand(List<PlayingCard> cards) => switch (route) {
-      ShowKind.pureSets => canSplitIntoSets(cards, jokers),
-      ShowKind.doublees => containsDoubleeWithJokers(cards, jokers),
-    };
-
-    final held = player.cards;
-    return [
-      for (final (i, candidate) in held.indexed)
-        if (!held.take(i).contains(candidate) &&
-            isWinningHand([...held.take(i), ...held.skip(i + 1)]))
-          candidate,
-    ];
+    if (_round.currentSeat != seat) return [];
+    return _round.currentWinningDiscards;
   }
 
   /// [shown] brought in line with the cards the viewer holds.
   List<HandCard> _heldFrom(List<HandCard> shown) =>
       reconcile(_round.hands[_viewer].cards, shown);
 
-  HandProgress _handProgress() => handProgress(
-    _round.hands[_viewer],
-    _round.jokersFor(_viewer),
+  HandProgress _handProgress() => _handProgressOf(_viewer);
+
+  HandProgress _handProgressOf(int seat) => handProgress(
+    _round.hands[seat],
+    _round.jokersFor(seat),
     alterIsMaal: _round.config.alterIsMaal,
+    mustKeep: _round.currentSeat == seat ? _round.takenFromDiscardPile : null,
   );
 
   TableView _snapshot() => _viewFor(_viewer);

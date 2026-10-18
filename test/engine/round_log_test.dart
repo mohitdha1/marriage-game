@@ -100,7 +100,7 @@ void main() {
       final round = table()
         ..draw(DrawSource.stock)
         ..showPureSets([runA, runB, runC], tipluPosition: 1)
-        ..discard(c(Suit.diamonds, Rank.two))
+        ..discard(c(Suit.diamonds, Rank.ten))
         ..draw(DrawSource.discardPile);
 
       expect(round.log, [
@@ -116,7 +116,7 @@ void main() {
         isA<DiscardMove>().having(
           (m) => m.card,
           'card',
-          c(Suit.diamonds, Rank.two),
+          c(Suit.diamonds, Rank.ten),
         ),
         isA<DrawMove>().having(
           (m) => m.source,

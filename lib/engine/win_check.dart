@@ -1,6 +1,7 @@
 import 'card.dart';
 import 'joker.dart';
 import 'melds.dart';
+import 'player_hand.dart';
 
 /// Whether [cards] is one set that can finish a hand once the joker is seen:
 /// a sequence or trial (jokers allowed, at least one natural card) or a
@@ -77,6 +78,42 @@ bool containsDoubleeWithJokers(List<PlayingCard> cards, Jokers jokers) {
   if (cards.length < 2) return false;
   if (cards.any(jokers.isWild)) return true;
   return cards.toSet().length < cards.length;
+}
+
+/// Whether [remaining], the cards a player who showed by [route] holds
+/// after their final discard, finish the round: with pure sets shown, they
+/// all split into sets ([canSplitIntoSets]); with doublees shown, they hold
+/// an 8th doublee ([containsDoubleeWithJokers]).
+///
+/// The one win check: the engine, the bots, the Win button and the
+/// to-win badge all use it, so they can never disagree.
+bool isWinningHand(
+  List<PlayingCard> remaining,
+  ShowKind route,
+  Jokers jokers,
+) => switch (route) {
+  ShowKind.pureSets => canSplitIntoSets(remaining, jokers),
+  ShowKind.doublees => containsDoubleeWithJokers(remaining, jokers),
+};
+
+/// The cards [hand] could discard now to finish the round, each listed
+/// once: those that leave an [isWinningHand]. Empty unless the player has
+/// drawn, shown and seen the [jokers]. [mustKeep], a card taken from the
+/// discard pile this turn, can't be discarded, so is never one.
+List<PlayingCard> winningDiscards(
+  PlayerHand hand,
+  Jokers jokers, {
+  PlayingCard? mustKeep,
+}) {
+  final route = hand.showKind;
+  if (route == null || !hand.hasSeenJoker || !hand.hasDrawn) return const [];
+  final cards = hand.cards;
+  return [
+    for (final card in cards.toSet())
+      if (card != mustKeep &&
+          isWinningHand([...cards]..remove(card), route, jokers))
+        card,
+  ];
 }
 
 String _key(List<PlayingCard> cards) {

@@ -350,25 +350,17 @@ class BotPlayer {
     int seat,
     PlayingCard? mustKeep,
   ) {
-    final hand = round.hands[seat];
     final jokers = round.jokersFor(seat);
-    final route = hand.showKind;
-    if (jokers == null || route == null) return null;
+    if (jokers == null) return null;
     if (difficulty == BotDifficulty.easy &&
         _random.nextDouble() < _easyMissedWin) {
       return null;
     }
-
-    for (final card in hand.cards.toSet()) {
-      if (card == mustKeep) continue;
-      final rest = [...hand.cards]..remove(card);
-      final wins = switch (route) {
-        ShowKind.pureSets => canSplitIntoSets(rest, jokers),
-        ShowKind.doublees => containsDoubleeWithJokers(rest, jokers),
-      };
-      if (wins) return card;
-    }
-    return null;
+    return winningDiscards(
+      round.hands[seat],
+      jokers,
+      mustKeep: mustKeep,
+    ).firstOrNull;
   }
 
   /// Picks again for as long as the picks are printed jokers, which are

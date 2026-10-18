@@ -1006,15 +1006,16 @@ void main() {
         tester,
       ) async {
         await seeTheJoker(tester);
-        final king = c(Suit.spades, Rank.king);
-        select(tester, [king]);
+        // 10♦, since discarding 2♦ or K♠ would win the round.
+        final ten = c(Suit.diamonds, Rank.ten);
+        select(tester, [ten]);
         await tester.pump();
 
         await tester.tap(find.byKey(const Key('discard-pile')));
         await tester.pumpAndSettle();
 
         expect(dialog, findsNothing);
-        expect(inHand(tester, king), isFalse);
+        expect(inHand(tester, ten), isFalse);
       });
     });
 
@@ -1119,6 +1120,72 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ScoreboardScreen), findsOneWidget);
       expect(find.text('Round 1: You won'), findsOneWidget);
+    });
+
+    group('Ready to win', () {
+      /// Draws Q♦, shows the three runs and picks 7♥ as the tiplu, which
+      /// leaves 2♦ as the only card to spare: the badge says Ready to win.
+      Future<void> showAndSeeTheJoker(WidgetTester tester) async {
+        await pumpTable(tester, yourHand: winnableHand);
+        await tester.tap(find.byKey(const Key('stock')));
+        await tester.pump();
+        for (final run in [heartsRun, spadesRun, clubsRun]) {
+          select(tester, run);
+          await tester.pump();
+          await tester.tap(find.byKey(const Key('group-button')));
+          await tester.pump();
+        }
+        await tester.tap(find.byKey(const Key('show-button')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('stock-card-1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Got it'));
+        await tester.pump();
+        expect(
+          tester
+              .widget<Text>(
+                find.descendant(
+                  of: find.byKey(const Key('to-win')),
+                  matching: find.byType(Text),
+                ),
+              )
+              .data,
+          'Ready to win!',
+        );
+      }
+
+      testWidgets('discarding the spare card on the pile wins the round', (
+        tester,
+      ) async {
+        await showAndSeeTheJoker(tester);
+
+        select(tester, [twoOfDiamonds]);
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('discard-pile')));
+        await tester.pumpAndSettle();
+
+        expect(status(tester), 'You won the round.');
+        expect(find.text('You won the round!'), findsOneWidget);
+        await tester.pump(scoreboardDelay);
+        await tester.pumpAndSettle();
+      });
+
+      testWidgets('a winning discard by any gesture wins the round', (
+        tester,
+      ) async {
+        await showAndSeeTheJoker(tester);
+        final spare = stateOf(
+          tester,
+        ).hand.firstWhere((h) => h.card == twoOfDiamonds);
+
+        // Tapping, dragging and flicking a card all discard through here.
+        unawaited(controllerOf(tester).discard(spare.id));
+        await tester.pumpAndSettle();
+
+        expect(status(tester), 'You won the round.');
+        await tester.pump(scoreboardDelay);
+        await tester.pumpAndSettle();
+      });
     });
 
     testWidgets('Show and Group only appear when they can be used', (

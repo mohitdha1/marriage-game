@@ -241,7 +241,10 @@ class WinProgress extends HandProgress {
 
   /// How many more 3-card sets the unmatched cards still need to form, not
   /// counting the card about to be discarded: the unmatched cards divided by
-  /// 3, rounded up. 0 exactly when the hand can win this turn.
+  /// 3, rounded up. 0 exactly when the hand can win: after drawing, when it
+  /// holds a winning discard ([winningDiscards]); before, when every card is
+  /// already a winning hand, so discarding the card drawn from the stock
+  /// wins.
   final int setsToWin;
 
   /// The hand's maal points right now.
@@ -251,26 +254,34 @@ class WinProgress extends HandProgress {
 /// After seeing the joker by showing doublees: progress toward the 8th
 /// doublee that wins.
 class DubleeProgress extends HandProgress {
-  const DubleeProgress({required this.doublees, required this.maal});
+  const DubleeProgress({
+    required this.doublees,
+    required this.doubleesToWin,
+    required this.maal,
+  });
 
   /// Doublees made: the 7 shown, plus 1 if the cards held already include
   /// an 8th (jokers can pair with anything).
   final int doublees;
 
+  /// 1 until the hand can win, then 0, decided as for
+  /// [WinProgress.setsToWin].
+  final int doubleesToWin;
+
   final int maal;
 
   int get doubleesNeeded => PlayerHand.doubleesToShow + 1;
-
-  /// 1 until the 8th doublee is made, then 0: the hand can win this turn.
-  int get doubleesToWin => doublees >= doubleesNeeded ? 0 : 1;
 }
 
 /// How far [hand] has come, given the round's [jokers] (`null` until the
-/// player has seen them). [alterIsMaal] works as in [scoreMaal].
+/// player has seen them). [alterIsMaal] works as in [scoreMaal]. [mustKeep]
+/// is a card taken from the discard pile this turn, which can't be the
+/// winning discard.
 HandProgress handProgress(
   PlayerHand hand,
   Jokers? jokers, {
   bool alterIsMaal = true,
+  PlayingCard? mustKeep,
 }) {
   final cards = hand.cards;
   if (jokers == null || !hand.hasSeenJoker) {
@@ -287,6 +298,7 @@ HandProgress handProgress(
       doublees:
           hand.shownSets.length +
           (containsDoubleeWithJokers(cards, jokers) ? 1 : 0),
+      doubleesToWin: _canWin(hand, jokers, mustKeep) ? 0 : 1,
       maal: maal,
     );
   }
@@ -300,26 +312,22 @@ HandProgress handProgress(
         hand.shownSets.length +
         arrangement.length,
     unmatched: unmatched,
-    setsToWin: _setsToWin(hand, jokers, unmatched),
+    setsToWin: _canWin(hand, jokers, mustKeep)
+        ? 0
+        : max(1, (unmatched - (hand.hasDrawn ? 1 : 0) + 2) ~/ 3),
     maal: maal,
   );
 }
 
-/// See [WinProgress.setsToWin]. Before drawing, a hand whose cards are all
-/// in sets wins by discarding whatever it draws. After drawing, one card
-/// goes out with the discard, and 0 is confirmed by trying each discard,
-/// since a hand with every card in sets may have none it can spare.
-int _setsToWin(PlayerHand hand, Jokers jokers, int unmatched) {
-  final cards = hand.cards;
-  if (!hand.hasDrawn) return (unmatched + 2) ~/ 3;
-  if (unmatched <= 1) {
-    for (var i = 0; i < cards.length; i++) {
-      if (canSplitIntoSets([...cards.take(i), ...cards.skip(i + 1)], jokers)) {
-        return 0;
-      }
-    }
+/// Whether [hand] can win: after drawing, it holds a winning discard;
+/// before, its cards already make a winning hand, so it wins by discarding
+/// whatever it draws from the stock. Both use the round's one win check,
+/// [isWinningHand].
+bool _canWin(PlayerHand hand, Jokers jokers, PlayingCard? mustKeep) {
+  if (hand.hasDrawn) {
+    return winningDiscards(hand, jokers, mustKeep: mustKeep).isNotEmpty;
   }
-  return max(1, (unmatched - 1 + 2) ~/ 3);
+  return isWinningHand(hand.cards, hand.showKind!, jokers);
 }
 
 /// Every distinct 3-card pure sequence and tunnella that [cards] could
