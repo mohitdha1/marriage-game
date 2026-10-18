@@ -683,4 +683,70 @@ void main() {
       expect(() => MatchScore(3).addRound(round([5, -5])), throwsArgumentError);
     });
   });
+
+  group('MatchSummary', () {
+    RoundScore round(int winner, List<int> net) => RoundScore(
+      winner: winner,
+      maal: [for (final _ in net) const MaalBreakdown()],
+      net: net,
+    );
+    final rounds = [
+      round(0, [59, -26, -33]),
+      round(1, [-3, 13, -10]),
+      round(2, [-20, -20, 40]),
+    ];
+
+    test('totals the rounds and names the winner', () {
+      final summary = MatchSummary(rounds);
+
+      expect(summary.roundsPlayed, 3);
+      expect(summary.totals, [36, -33, -3]);
+      expect(summary.winners, [0]);
+    });
+
+    test('a tie has several winners', () {
+      final summary = MatchSummary([
+        round(0, [10, -10, 0]),
+        round(1, [-10, 10, 0]),
+      ]);
+
+      expect(summary.winners, [0, 1, 2]);
+    });
+
+    test('coins are the points times the stake, summing to zero', () {
+      final summary = MatchSummary(rounds);
+
+      expect(summary.coinsOf(0, 5), 180);
+      expect(summary.coinsOf(1, 5), -165);
+      expect(
+        [
+          for (var seat = 0; seat < 3; seat++) summary.coinsOf(seat, 5),
+        ].fold(0, (sum, n) => sum + n),
+        0,
+      );
+    });
+
+    test('each player\'s best round, the earliest if tied', () {
+      final summary = MatchSummary(rounds);
+
+      expect(summary.bestRoundOf(0), (seat: 0, round: 1, points: 59));
+      expect(summary.bestRoundOf(1), (seat: 1, round: 2, points: 13));
+      expect(summary.bestRoundOf(2), (seat: 2, round: 3, points: 40));
+      expect(
+        MatchSummary([
+          round(0, [5, -5]),
+          round(0, [5, -5]),
+        ]).bestRoundOf(0).round,
+        1,
+      );
+    });
+
+    test('the best round anyone had', () {
+      expect(MatchSummary(rounds).bestRound, (seat: 0, round: 1, points: 59));
+    });
+
+    test('needs at least one round', () {
+      expect(() => MatchSummary(const []), throwsArgumentError);
+    });
+  });
 }

@@ -408,3 +408,60 @@ class MatchScore {
     ];
   }
 }
+
+/// A player's best round: the round (counted from 1) in which the player
+/// at [seat] won the most [points].
+typedef BestRound = ({int seat, int round, int points});
+
+/// How a match stood when it ended: the rounds played, every player's
+/// total, who won, and the standout rounds.
+class MatchSummary {
+  MatchSummary(List<RoundScore> rounds) : rounds = List.unmodifiable(rounds) {
+    if (rounds.isEmpty) {
+      throw ArgumentError.value(rounds, 'rounds', 'must not be empty');
+    }
+    final score = MatchScore(rounds.first.net.length);
+    rounds.forEach(score.addRound);
+    totals = score.totals;
+    winners = score.leaders;
+  }
+
+  final List<RoundScore> rounds;
+
+  /// Each player's points over the whole match, by seat.
+  late final List<int> totals;
+
+  /// The seats with the highest total: more than one when tied.
+  late final List<int> winners;
+
+  int get roundsPlayed => rounds.length;
+
+  /// The coins the player at [seat] won (+) or lost (−) over the match,
+  /// with every point worth [stake] coins.
+  int coinsOf(int seat, int stake) =>
+      rounds.fold(0, (sum, round) => sum + round.coinsAt(stake)[seat]);
+
+  /// The round in which the player at [seat] did best; the earliest, if
+  /// several tie.
+  BestRound bestRoundOf(int seat) {
+    var best = 0;
+    for (var i = 1; i < rounds.length; i++) {
+      if (rounds[i].net[seat] > rounds[best].net[seat]) best = i;
+    }
+    return (seat: seat, round: best + 1, points: rounds[best].net[seat]);
+  }
+
+  /// The best round anyone had in the match; the earliest, and then the
+  /// lowest seat, if several tie.
+  BestRound get bestRound {
+    var best = bestRoundOf(0);
+    for (var seat = 1; seat < totals.length; seat++) {
+      final round = bestRoundOf(seat);
+      if (round.points > best.points ||
+          (round.points == best.points && round.round < best.round)) {
+        best = round;
+      }
+    }
+    return best;
+  }
+}

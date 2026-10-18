@@ -12,10 +12,18 @@ class WinCelebration extends StatefulWidget {
     super.key,
     required this.winnerName,
     required this.youWon,
+    this.title,
+    this.alignment = Alignment.center,
   });
 
   final String winnerName;
   final bool youWon;
+
+  /// The banner's words, in place of naming the round's winner.
+  final String? title;
+
+  /// Where the banner sits in the space the celebration covers.
+  final AlignmentGeometry alignment;
 
   /// How long the banner takes to pop in.
   static const popTime = Duration(milliseconds: 400);
@@ -86,7 +94,8 @@ class _WinCelebrationState extends State<WinCelebration>
         ],
       ),
       child: Text(
-        widget.youWon ? 'You won!' : '${widget.winnerName} won the round',
+        widget.title ??
+            (widget.youWon ? 'You won!' : '${widget.winnerName} won the round'),
         style: TextStyle(
           color: widget.youWon ? const Color(0xFF3E2723) : Colors.white,
           fontSize: 26,
@@ -105,7 +114,8 @@ class _WinCelebrationState extends State<WinCelebration>
                 painter: _ConfettiPainter(_confetti, _fall),
               ),
             ),
-          Center(
+          Align(
+            alignment: widget.alignment,
             child: ScaleTransition(
               scale: CurvedAnimation(parent: _pop, curve: Curves.elasticOut),
               child: FadeTransition(opacity: _pop, child: banner),

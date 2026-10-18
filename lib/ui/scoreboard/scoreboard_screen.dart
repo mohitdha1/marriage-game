@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,13 +8,15 @@ import '../state/table_controller.dart';
 import '../state/table_state.dart';
 import '../theme/table_felt.dart';
 import '../theme/table_theme.dart';
+import 'results_screen.dart';
 
 /// The match's scores: a line-by-line breakdown of one round (the latest by
 /// default; earlier rounds can be picked), and every player's result for
 /// each round with running totals.
 ///
 /// Once the current round is over, Next round deals the next one and returns
-/// to the table, and End match finishes the match and goes home. At a stake
+/// to the table, and End match finishes the match and shows its results
+/// ([ResultsScreen]). At a stake
 /// table, each result is also shown in coins.
 class ScoreboardScreen extends ConsumerStatefulWidget {
   const ScoreboardScreen({super.key});
@@ -136,11 +140,11 @@ class _ScoreboardScreenState extends ConsumerState<ScoreboardScreen> {
   }
 }
 
-/// Asks before ending the match, then ends it and goes back home.
+/// Asks before ending the match, then ends it and shows its results in
+/// place of the scoreboard.
 Future<void> _endMatch(BuildContext context) async {
-  final controller = ProviderScope.containerOf(
-    context,
-  ).read(tableProvider.notifier);
+  final container = ProviderScope.containerOf(context);
+  final controller = container.read(tableProvider.notifier);
   final go = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
@@ -161,8 +165,22 @@ Future<void> _endMatch(BuildContext context) async {
     ),
   );
   if (go != true || !context.mounted) return;
+  final state = container.read(tableProvider);
   controller.endMatch();
-  Navigator.of(context).popUntil((route) => route.isFirst);
+  unawaited(
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'results'),
+        builder: (_) => ResultsScreen(
+          summary: MatchSummary(state.roundScores),
+          names: state.seatNames,
+          you: state.view.you.seat,
+          stake: controller.stake,
+          sharesDevice: controller.sharesDevice,
+        ),
+      ),
+    ),
+  );
 }
 
 /// One round, item by item, for every player. Each player's items add up to

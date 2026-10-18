@@ -50,8 +50,8 @@ abstract class TableNotifier extends Notifier<TableState> {
   /// Deals the next round once the current one is over.
   void startNextRound();
 
-  /// Starts the match again with the same players: a fresh deal, and every
-  /// total back at zero.
+  /// Starts the match again with the same players and setup: a fresh deal,
+  /// and every total back at zero.
   void startNewMatch() => ref.invalidateSelf();
 
   /// The person has left the table, ending the match on this device.
@@ -75,6 +75,9 @@ abstract class TableNotifier extends Notifier<TableState> {
 
   /// Coins per point at a stake table; `null` for any other game.
   int? get stake => null;
+
+  /// Whether several people take turns on this device (pass-and-play).
+  bool get sharesDevice => false;
 
   // The person's own side.
 

@@ -256,6 +256,23 @@ class ResumeSlot {
 
 final resumeSlotProvider = Provider<ResumeSlot>((ref) => ResumeSlot());
 
+/// Holds the bots of a match being played again, by seat, so the rematch
+/// that's about to be built faces the same opponents.
+class RematchSlot {
+  Map<int, BotPersonality>? _bots;
+
+  void put(Map<int, BotPersonality> bots) => _bots = bots;
+
+  /// The bots waiting for the rematch, if any, leaving the slot empty.
+  Map<int, BotPersonality>? take() {
+    final bots = _bots;
+    _bots = null;
+    return bots;
+  }
+}
+
+final rematchSlotProvider = Provider<RematchSlot>((ref) => RematchSlot());
+
 /// Where the match in progress is saved.
 final savedMatchStoreProvider = Provider<SavedMatchStore>(
   (ref) => SavedMatchStore(ref.watch(preferencesProvider)),
@@ -360,6 +377,7 @@ class TableController extends TableNotifier {
     _thinkingTime = ref.watch(botThinkingTimeProvider);
     final random = _random = ref.watch(randomProvider);
     final saved = ref.read(resumeSlotProvider).take();
+    final rematch = ref.read(rematchSlotProvider).take();
     _ended = false;
     _firstSeat = saved?.start.firstSeat ?? 0;
     _roundNumber = saved?.roundNumber ?? 1;
@@ -398,9 +416,11 @@ class TableController extends TableNotifier {
       for (final seat in seats)
         if (!_people.contains(seat) && !_remote.containsKey(seat)) seat,
     ];
-    final personalities = saved == null
-        ? BotPersonality.pick(botSeats.length, random)
-        : [for (final seat in botSeats) saved.bots[seat]!];
+    final previous = saved?.bots ?? rematch;
+    final personalities =
+        previous != null && botSeats.every(previous.containsKey)
+        ? [for (final seat in botSeats) previous[seat]!]
+        : BotPersonality.pick(botSeats.length, random);
     _bots = {
       for (var i = 0; i < botSeats.length; i++)
         botSeats[i]: BotPlayer(
@@ -712,6 +732,20 @@ class TableController extends TableNotifier {
 
   @override
   int? get stake => _stake;
+
+  @override
+  bool get sharesDevice => _passAndPlay;
+
+  /// Starts the match again at the same table, with the same rules and the
+  /// same bots.
+  @override
+  void startNewMatch() {
+    ref.read(rematchSlotProvider).put({
+      for (final MapEntry(key: seat, value: bot) in _bots.entries)
+        seat: bot.personality,
+    });
+    super.startNewMatch();
+  }
 
   @override
   void submitShow({

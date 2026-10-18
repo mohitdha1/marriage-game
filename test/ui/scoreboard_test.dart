@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marriage_game/engine/scoring.dart';
+import 'package:marriage_game/ui/scoreboard/results_screen.dart';
 import 'package:marriage_game/ui/scoreboard/scoreboard_screen.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
 import 'package:marriage_game/ui/state/table_state.dart';
@@ -26,6 +27,9 @@ class FakeTableController extends TableController {
 
   @override
   int? get stake => fixedStake;
+
+  @override
+  bool get sharesDevice => false;
 
   @override
   void startNextRound() => nextRoundRequests++;
@@ -245,9 +249,8 @@ void main() {
     expect(find.text('table'), findsOneWidget);
   });
 
-  testWidgets('End match asks first, then ends the match and goes home', (
-    tester,
-  ) async {
+  testWidgets('End match asks first, then ends the match and shows the '
+      'results', (tester) async {
     final controller = await openScoreboard(tester, stateWith([round1]));
 
     await tester.tap(find.byKey(const Key('end-match')));
@@ -264,7 +267,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(controller.endMatchRequests, 1);
     expect(find.byType(ScoreboardScreen), findsNothing);
-    expect(find.text('table'), findsOneWidget);
+    expect(find.byType(ResultsScreen), findsOneWidget);
   });
 
   testWidgets('at a stake table, each result is shown in coins too', (
