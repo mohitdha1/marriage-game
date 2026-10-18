@@ -20,6 +20,7 @@ String describe(Round round) => [
     'seat $seat: ${hand.cards} opened ${hand.openingTunnellas} '
         'shown ${hand.shownSets} aside ${hand.keptAside} '
         '${hand.hasOpened} ${hand.hasDrawn} ${hand.showKind} '
+        'seen ${hand.hasSeenJoker} shown now ${hand.shownThisTurn} '
         'jokers ${round.jokersFor(seat)?.tiplu}',
   'stock ${round.stockCount}, discards ${round.discardPileCount} '
       'top ${round.topDiscard}',
@@ -99,8 +100,9 @@ void main() {
     test('records each move with what it needs to be made again', () {
       final round = table()
         ..draw(DrawSource.stock)
-        ..showPureSets([runA, runB, runC], tipluPosition: 1)
+        ..showPureSets([runA, runB, runC])
         ..discard(c(Suit.diamonds, Rank.ten))
+        ..pickTiplu(1)
         ..draw(DrawSource.discardPile);
 
       expect(round.log, [
@@ -112,12 +114,13 @@ void main() {
         isA<ShowMove>()
             .having((m) => m.kind, 'kind', ShowKind.pureSets)
             .having((m) => m.sets, 'sets', [runA, runB, runC])
-            .having((m) => m.tipluPosition, 'tipluPosition', 1),
+            .having((m) => m.tipluPosition, 'tipluPosition', isNull),
         isA<DiscardMove>().having(
           (m) => m.card,
           'card',
           c(Suit.diamonds, Rank.ten),
         ),
+        isA<PickTipluMove>().having((m) => m.position, 'position', 1),
         isA<DrawMove>().having(
           (m) => m.source,
           'source',
@@ -163,7 +166,9 @@ void main() {
               ],
             )
             ..draw(DrawSource.stock)
-            ..showPureSets([runA, runB, runC], tipluPosition: 1)
+            ..showPureSets([runA, runB, runC])
+            ..discard(c(Suit.diamonds, Rank.two))
+            ..pickTiplu(1)
             ..pickTiplu(0);
 
       expect(
@@ -177,9 +182,24 @@ void main() {
     test('brings a round back to where it was, mid-turn', () {
       final round = table()
         ..draw(DrawSource.stock)
-        ..showPureSets([runA, runB, runC], tipluPosition: 1);
+        ..showPureSets([runA, runB, runC]);
 
       expect(describe(replayOf(round)), describe(round));
+    });
+
+    test('brings back a pick owed after the discard, which then passes the '
+        'turn', () {
+      final round = table()
+        ..draw(DrawSource.stock)
+        ..showPureSets([runA, runB, runC])
+        ..discard(c(Suit.diamonds, Rank.two));
+
+      final replayed = replayOf(round);
+      expect(replayed.needsTipluPick, isTrue);
+      expect(describe(replayed), describe(round));
+
+      replayed.pickTiplu(1);
+      expect(replayed.currentSeat, 1);
     });
 
     test('brings back a tiplu picked again after a printed joker', () {
@@ -196,7 +216,8 @@ void main() {
               ],
             )
             ..draw(DrawSource.stock)
-            ..showPureSets([runA, runB, runC], tipluPosition: 1)
+            ..showPureSets([runA, runB, runC])
+            ..discard(c(Suit.diamonds, Rank.two))
             ..pickTiplu(1);
 
       final replayed = replayOf(round);

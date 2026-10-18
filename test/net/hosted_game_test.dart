@@ -36,7 +36,8 @@ final mohitsCards = [
 ];
 
 /// Bina's cards (on another device, seat 1): after drawing Q♦ she can show
-/// three runs, see the joker (7♥) and win by discarding 2♦.
+/// three runs, discard 2♦ and see the joker (7♥); on her next turn she
+/// wins by discarding K♠.
 final binasCards = [
   ...hearts,
   ...spades,
@@ -337,12 +338,22 @@ void main() {
       }
       guest.groupSelected();
     }
-    guest
-      ..showGroups()
-      ..pickTiplu(1);
+    guest.showGroups();
+    await game.settle();
+    expect(game.guestState.pickingTiplu, isFalse, reason: 'not before');
+
+    // The first to show picks the tiplu after the discard.
+    await guest.discard(game.guestState.hand.last.id);
+    await game.settle();
+    expect(game.guestState.view.youMustPickTiplu, isTrue);
+    expect(game.guestState.view.youPickTipluAgain, isFalse);
+    expect(game.guestState.pickingTiplu, isTrue);
+
+    guest.pickTiplu(1);
     await game.settle();
 
     expect(game.guestState.view.youMustPickTiplu, isTrue);
+    expect(game.guestState.view.youPickTipluAgain, isTrue);
     expect(game.guestState.pickingTiplu, isTrue);
     expect(game.hostState.view.opponents.single.laidDown.last, [man]);
 
@@ -369,7 +380,7 @@ void main() {
       );
       await game.settle();
 
-      // Bina draws Q♦, groups and shows her runs, picks 7♥, and wins on 2♦.
+      // Bina draws Q♦, groups and shows her runs, discards 2♦ and picks 7♥.
       final guest = game.guestTable..draw(DrawSource.stock);
       await game.settle();
       for (final set in [hearts, spades, clubs]) {
@@ -384,16 +395,27 @@ void main() {
         guest.groupSelected();
       }
       guest.showGroups();
+      await game.settle();
+      expect(game.guestState.groups, isEmpty);
+      expect(game.guestState.view.youHaveShown, isTrue);
+      expect(game.guestState.view.youHaveSeenJoker, isFalse);
+      await guest.discard(game.guestIdOf(twoOfDiamonds));
+      await game.settle();
       expect(game.guestState.pickingTiplu, isTrue);
       guest.pickTiplu(1);
       await game.settle();
       expect(game.guestState.revealingJoker, isTrue);
-      expect(game.guestState.groups, isEmpty);
       expect(game.guestState.view.youHaveSeenJoker, isTrue);
+      guest.dismissReveal();
 
+      // Mohit draws and throws what he drew; Bina draws 5♣ and wins by
+      // throwing K♠ (K♦ joins 10♦ J♦ Q♦, and 7♣ 8♥ 5♣ are a trial).
+      game.hostTable.draw(DrawSource.stock);
+      await game.hostTable.discard(game.hostState.hand.last.id);
+      await game.settle();
       guest
-        ..dismissReveal()
-        ..toggleSelected(game.guestIdOf(twoOfDiamonds))
+        ..draw(DrawSource.stock)
+        ..toggleSelected(game.guestIdOf(c(Suit.spades, Rank.king)))
         ..declareWin();
       await game.settle();
 

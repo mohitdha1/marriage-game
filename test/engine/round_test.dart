@@ -102,10 +102,24 @@ Round table({
   return round;
 }
 
-/// Seat 0 draws Q♦ and shows, picking 7♥ (now at position 1) as the tiplu.
+/// Seat 0 draws Q♦, shows, and discards 2♦; then, the first to show, picks
+/// 7♥ (now at position 1) as the tiplu. Seat 1 is next, and seat 0 holds
+/// K♠ K♦ 7♣ 10♦ J♦ Q♦ 8♥: a trial with a joker and a sequence with one.
 Round seat0HasShown({GameConfig? config}) => table(config: config)
   ..draw(DrawSource.stock)
-  ..showPureSets([runA, runB, runC], tipluPosition: 1);
+  ..showPureSets([runA, runB, runC])
+  ..discard(c(Suit.diamonds, Rank.two))
+  ..pickTiplu(1);
+
+/// After [seat0HasShown], seat 1 draws 2♣ and discards it, and seat 0
+/// draws 5♣, the last stock card. Discarding 5♣ wins; so does K♠ (K♦ joins
+/// 10♦ J♦ Q♦, and 7♣ 8♥ 5♣ are a trial of fives with two jokers).
+Round seat0Drew({GameConfig? config}) => seat0HasShown(config: config)
+  ..draw(DrawSource.stock)
+  ..discard(c(Suit.clubs, Rank.two))
+  ..draw(DrawSource.stock);
+
+final fiveOfClubs = c(Suit.clubs, Rank.five);
 
 int cardsHeldBy(PlayerHand hand) =>
     hand.cards.length +
@@ -307,12 +321,35 @@ void main() {
   });
 
   group('Picking the tiplu', () {
-    test('the first player to show picks it from the stock', () {
-      final round = seat0HasShown();
+    test('the first player to show picks it from the stock after their '
+        'discard, then the turn passes', () {
+      final round = table()
+        ..draw(DrawSource.stock)
+        ..showPureSets([runA, runB, runC]);
+      expect(round.isJokerChosen, isFalse);
+      expect(round.jokersFor(0), isNull, reason: 'not before the discard');
 
+      round.discard(c(Suit.diamonds, Rank.two));
+      expect(round.needsTipluPick, isTrue);
+      expect(round.currentSeat, 0, reason: 'the turn waits for the pick');
+      expect(() => round.draw(DrawSource.stock), throwsStateError);
+
+      round.pickTiplu(1);
       expect(round.isJokerChosen, isTrue);
       expect(round.jokersFor(0)!.tiplu, tiplu);
       expect(round.stockCount, 2, reason: 'Q♦ drawn, 7♥ taken out');
+      expect(round.needsTipluPick, isFalse);
+      expect(round.currentSeat, 1);
+    });
+
+    test('after drawing, the tiplu is never picked with the show', () {
+      final round = table()..draw(DrawSource.stock);
+
+      expect(
+        () => round.showPureSets([runA, runB, runC], tipluPosition: 1),
+        throwsArgumentError,
+      );
+      expect(round.hands[0].hasShown, isFalse);
     });
 
     test('players who have not shown cannot see it', () {
@@ -329,34 +366,43 @@ void main() {
       expect(round.hands[0].hasDrawn, isFalse);
     });
 
-    test('the first player to show must pick a position', () {
-      final round = table()..draw(DrawSource.stock);
+    test('the first player to show early must pick a position', () {
+      final round = table();
 
       expect(() => round.showPureSets([runA, runB, runC]), throwsArgumentError);
       expect(
-        () => round.showPureSets([runA, runB, runC], tipluPosition: 3),
+        () => round.showPureSets([runA, runB, runC], tipluPosition: 4),
         throwsArgumentError,
-        reason: 'only 3 cards left in the stock',
+        reason: 'only 4 cards in the stock',
       );
       expect(round.hands[0].hasSeenJoker, isFalse);
       expect(round.isJokerChosen, isFalse);
     });
 
+    test('the pick after the discard must be a stock position', () {
+      final round = table()
+        ..draw(DrawSource.stock)
+        ..showPureSets([runA, runB, runC])
+        ..discard(c(Suit.diamonds, Rank.two));
+
+      expect(() => round.pickTiplu(3), throwsArgumentError);
+      expect(round.isJokerChosen, isFalse);
+      expect(round.needsTipluPick, isTrue);
+    });
+
     test('a rejected show does not use up the tiplu', () {
-      final round = table()..draw(DrawSource.stock);
+      final round = table();
 
       expect(
         () => round.showPureSets([runA, runB, runD], tipluPosition: 1),
         throwsArgumentError,
       );
       expect(round.isJokerChosen, isFalse);
-      expect(round.stockCount, 3);
+      expect(round.stockCount, 4);
     });
 
     test('later players see the same tiplu and must not pick another', () {
-      final round = seat0HasShown()
-        ..discard(c(Suit.diamonds, Rank.ten))
-        ..draw(DrawSource.stock);
+      final round = seat0HasShown()..draw(DrawSource.stock);
 
       expect(
         () => round.showPureSets([runD, runE, runF], tipluPosition: 0),
@@ -364,7 +410,11 @@ void main() {
       );
 
       round.showPureSets([runD, runE, runF]);
+      expect(round.jokersFor(1), isNull, reason: 'not before the discard');
+      round.discard(c(Suit.clubs, Rank.two));
+      expect(round.needsTipluPick, isFalse);
       expect(round.jokersFor(1)!.tiplu, tiplu);
+      expect(round.currentSeat, 0);
     });
 
     test('the tiplu is out of play: it is never drawn, even after the stock '
@@ -412,30 +462,18 @@ void main() {
   });
 
   group('Winning', () {
-    test('draw, show and win all in the same turn', () {
-      final round = seat0HasShown()..declareWin(c(Suit.diamonds, Rank.two));
-
-      expect(round.isOver, isTrue);
-      expect(round.winner, 0);
-      expect(round.topDiscard, c(Suit.diamonds, Rank.two));
-    });
-
     test('a discard that leaves a winning hand wins the round', () {
-      final round = seat0HasShown();
-      // 2♦ wins, and so does K♠: K♦ with 10♦ J♦ Q♦, and 2♦ 7♣ 8♥ a trial.
+      final round = seat0Drew();
       expect(
         round.currentWinningDiscards,
-        unorderedEquals([
-          c(Suit.diamonds, Rank.two),
-          c(Suit.spades, Rank.king),
-        ]),
+        unorderedEquals([fiveOfClubs, c(Suit.spades, Rank.king)]),
       );
 
-      round.discard(c(Suit.diamonds, Rank.two));
+      round.discard(fiveOfClubs);
 
       expect(round.isOver, isTrue);
       expect(round.winner, 0);
-      expect(round.topDiscard, c(Suit.diamonds, Rank.two));
+      expect(round.topDiscard, fiveOfClubs);
       expect(round.events.last, isA<WonRound>());
       expect(round.currentWinningDiscards, isEmpty);
       // Saved and played again, it's the same win.
@@ -448,51 +486,96 @@ void main() {
       expect(replayed.winner, 0);
     });
 
+    test('declareWin wins with a winning discard too', () {
+      final round = seat0Drew()..declareWin(fiveOfClubs);
+
+      expect(round.isOver, isTrue);
+      expect(round.winner, 0);
+      expect(round.topDiscard, fiveOfClubs);
+    });
+
     test('any other discard passes the turn as usual', () {
-      final round = seat0HasShown()..discard(c(Suit.diamonds, Rank.ten));
+      final round = seat0Drew()..discard(c(Suit.hearts, Rank.eight));
 
       expect(round.isOver, isFalse);
       expect(round.currentSeat, 1);
       expect(round.events.last, isA<DiscardedCard>());
     });
 
+    test('no win on the turn of the show, even with a winning hand', () {
+      // Seat 0 draws Q♦ and shows; discarding 2♦ would leave a winning
+      // hand, but only from the next turn.
+      final round = table()
+        ..draw(DrawSource.stock)
+        ..showPureSets([runA, runB, runC]);
+
+      expect(round.currentWinningDiscards, isEmpty);
+      expect(
+        () => round.declareWin(c(Suit.diamonds, Rank.two)),
+        throwsStateError,
+      );
+
+      round.discard(c(Suit.diamonds, Rank.two));
+      expect(round.isOver, isFalse);
+    });
+
+    test('no win on the turn of an early show either', () {
+      // Shown before the first draw, so the joker is seen at once; still,
+      // the earliest win is the next turn.
+      final round = table()
+        ..showPureSets([runA, runB, runC], tipluPosition: 2)
+        ..draw(DrawSource.stock);
+
+      expect(round.hands[0].hasSeenJoker, isTrue);
+      expect(round.currentWinningDiscards, isEmpty);
+      expect(
+        () => round.declareWin(c(Suit.diamonds, Rank.two)),
+        throwsStateError,
+      );
+    });
+
     test('no winning discards before drawing or seeing the joker', () {
       expect(table().currentWinningDiscards, isEmpty);
       expect((table()..draw(DrawSource.stock)).currentWinningDiscards, isEmpty);
+      expect(seat0HasShown().currentWinningDiscards, isEmpty);
     });
 
     test('the card just taken from the discard pile is never a winning '
         'discard, so discarding it is refused rather than winning', () {
-      // Seat 0 takes a second 2♦; discarding a 2♦ would win, but a card
-      // matching the one just taken must be kept this turn.
-      final round = table(discardPile: [c(Suit.diamonds, Rank.two)])
-        ..draw(DrawSource.discardPile)
-        ..showPureSets([runA, runB, runC], tipluPosition: 2);
+      // Seat 1 discards 2♣; seat 0 takes it instead of drawing 5♣. Seat
+      // 0's other cards already win, so discarding 2♣ would too, but it
+      // must be kept this turn. (K♠ still wins: K♦ joins 10♦ J♦ Q♦, and
+      // 7♣ 8♥ 2♣ are a trial of twos.)
+      final round = seat0HasShown()
+        ..draw(DrawSource.stock)
+        ..discard(c(Suit.clubs, Rank.two))
+        ..draw(DrawSource.discardPile);
 
-      expect(round.currentWinningDiscards, isEmpty);
+      expect(round.currentWinningDiscards, [c(Suit.spades, Rank.king)]);
+      expect(() => round.discard(c(Suit.clubs, Rank.two)), throwsArgumentError);
       expect(
-        () => round.discard(c(Suit.diamonds, Rank.two)),
+        () => round.declareWin(c(Suit.clubs, Rank.two)),
         throwsArgumentError,
       );
       expect(round.isOver, isFalse);
     });
 
     test('a discard that leaves an unsplittable hand is rejected', () {
-      final round = seat0HasShown();
+      final round = seat0Drew();
 
-      // Discarding 10♦ instead leaves K♠ K♦ 7♣ J♦ Q♦ 8♥ 2♦, which can't
+      // Discarding 8♥ instead leaves K♠ K♦ 7♣ 10♦ J♦ Q♦ 5♣, which can't
       // all be made into sets.
       expect(
-        () => round.declareWin(c(Suit.diamonds, Rank.ten)),
+        () => round.declareWin(c(Suit.hearts, Rank.eight)),
         throwsArgumentError,
       );
       expect(round.isOver, isFalse);
       expect(round.currentSeat, 0);
-      expect(round.hands[0].cards, contains(c(Suit.diamonds, Rank.ten)));
+      expect(round.hands[0].cards, contains(c(Suit.hearts, Rank.eight)));
     });
 
     test('a card that is not in the hand cannot be the final discard', () {
-      final round = seat0HasShown();
+      final round = seat0Drew();
 
       expect(
         () => round.declareWin(c(Suit.hearts, Rank.ace)),
@@ -510,23 +593,13 @@ void main() {
     });
 
     test('a player must draw before winning', () {
-      final round = table()..showPureSets([runA, runB, runC], tipluPosition: 2);
+      final round = seat0HasShown()
+        ..draw(DrawSource.stock)
+        ..discard(c(Suit.clubs, Rank.two));
 
       expect(
-        () => round.declareWin(c(Suit.diamonds, Rank.two)),
+        () => round.declareWin(c(Suit.spades, Rank.king)),
         throwsStateError,
-      );
-    });
-
-    test('the card just taken from the discard pile cannot be the final '
-        'discard', () {
-      final round = table(discardPile: [c(Suit.diamonds, Rank.two)])
-        ..draw(DrawSource.discardPile)
-        ..showPureSets([runA, runB, runC], tipluPosition: 2);
-
-      expect(
-        () => round.declareWin(c(Suit.diamonds, Rank.two)),
-        throwsArgumentError,
       );
     });
 
@@ -543,23 +616,30 @@ void main() {
         ])
           [c(Suit.clubs, rank), c(Suit.clubs, rank)],
       ];
+      // Seat 0 draws Q♦, shows 7 doublees, discards Q♦ and picks 7♥; seat
+      // 1 draws and discards 2♣; seat 0 draws 5♣ and can win with it.
       Round dubleeTable(List<PlayingCard> extras) =>
           table(seat0: [...pairs.expand((pair) => pair), ...extras])
-            ..draw(DrawSource.stock) // Q♦
-            ..showDoublees(pairs, tipluPosition: 1);
+            ..draw(DrawSource.stock)
+            ..showDoublees(pairs)
+            ..discard(c(Suit.diamonds, Rank.queen))
+            ..pickTiplu(1)
+            ..draw(DrawSource.stock)
+            ..discard(c(Suit.clubs, Rank.two))
+            ..draw(DrawSource.stock);
 
       // A joker (7♣) pairs with K♠.
       final withJoker = dubleeTable([
         c(Suit.clubs, Rank.seven),
         c(Suit.spades, Rank.king),
-      ])..declareWin(c(Suit.diamonds, Rank.queen));
+      ])..declareWin(fiveOfClubs);
       expect(withJoker.winner, 0);
 
       // Two jokers (7♣ and 8♥) also make the 8th doublee.
       final twoJokers = dubleeTable([
         c(Suit.clubs, Rank.seven),
         c(Suit.hearts, Rank.eight),
-      ])..declareWin(c(Suit.diamonds, Rank.queen));
+      ])..declareWin(fiveOfClubs);
       expect(twoJokers.winner, 0);
 
       // K♠ and A♥: no pair, no joker.
@@ -567,14 +647,11 @@ void main() {
         c(Suit.spades, Rank.king),
         c(Suit.hearts, Rank.ace),
       ]);
-      expect(
-        () => noPair.declareWin(c(Suit.diamonds, Rank.queen)),
-        throwsArgumentError,
-      );
+      expect(() => noPair.declareWin(fiveOfClubs), throwsArgumentError);
     });
 
     test('nothing can happen once the round is over', () {
-      final round = seat0HasShown()..declareWin(c(Suit.diamonds, Rank.two));
+      final round = seat0Drew()..declareWin(fiveOfClubs);
 
       expect(() => round.draw(DrawSource.stock), throwsStateError);
       expect(() => round.discard(c(Suit.spades, Rank.king)), throwsStateError);
@@ -583,14 +660,25 @@ void main() {
 
   group('Joker-discard penalty', () {
     test('a seen player discarding a joker is counted', () {
-      final round = seat0HasShown()..discard(c(Suit.clubs, Rank.seven));
+      final round = seat0Drew()..discard(c(Suit.clubs, Rank.seven));
 
       expect(round.jokerDiscards, [1, 0]);
     });
 
+    test('the discard ending the turn of a show comes before the joker is '
+        'seen, so a joker discarded then is not counted', () {
+      final round = table()
+        ..draw(DrawSource.stock)
+        ..showPureSets([runA, runB, runC])
+        ..discard(c(Suit.clubs, Rank.seven))
+        ..pickTiplu(1);
+
+      expect(round.hands[0].hasSeenJoker, isTrue);
+      expect(round.jokerDiscards, [0, 0]);
+    });
+
     test('an unseen player discarding a joker is not counted', () {
       final round = seat0HasShown()
-        ..discard(c(Suit.diamonds, Rank.ten))
         ..draw(DrawSource.stock)
         ..discard(c(Suit.hearts, Rank.eight));
 
@@ -598,7 +686,7 @@ void main() {
     });
 
     test('nothing is counted when the house rule is off', () {
-      final round = seat0HasShown(
+      final round = seat0Drew(
         config: GameConfig(playerCount: 2, jokerDiscardPenaltyEnabled: false),
       )..discard(c(Suit.clubs, Rank.seven));
 
@@ -618,28 +706,36 @@ void main() {
               ],
             )
             ..draw(DrawSource.stock)
-            ..showPureSets([runA, runB, runC], tipluPosition: 1)
+            ..showPureSets([runA, runB, runC])
+            ..discard(c(Suit.diamonds, Rank.ten))
+            ..pickTiplu(1)
+            ..draw(DrawSource.stock)
+            ..discard(c(Suit.clubs, Rank.two))
+            ..draw(DrawSource.stock)
             ..discard(man);
 
       expect(round.jokerDiscards, [1, 0]);
     });
 
-    // From the top after drawing Q♦: 2♣ (0), a man card (1), another (2),
-    // then 5♣ (3).
-    Round manInTheStock() => table(
-      stockCards: [
-        c(Suit.clubs, Rank.five),
-        man,
-        man,
-        c(Suit.clubs, Rank.two),
-        c(Suit.diamonds, Rank.queen),
-      ],
-    )..draw(DrawSource.stock);
+    // Seat 0 draws Q♦, shows and discards 2♦, and must pick. From the top:
+    // 2♣ (0), a man card (1), another (2), then 5♣ (3).
+    Round manInTheStock() =>
+        table(
+            stockCards: [
+              c(Suit.clubs, Rank.five),
+              man,
+              man,
+              c(Suit.clubs, Rank.two),
+              c(Suit.diamonds, Rank.queen),
+            ],
+          )
+          ..draw(DrawSource.stock)
+          ..showPureSets([runA, runB, runC])
+          ..discard(c(Suit.diamonds, Rank.two));
 
     test('one picked as the tiplu is kept aside, and the picker picks '
         'again', () {
-      final round = manInTheStock()
-        ..showPureSets([runA, runB, runC], tipluPosition: 1);
+      final round = manInTheStock()..pickTiplu(1);
 
       expect(round.hands[0].hasSeenJoker, isTrue);
       expect(round.hands[0].keptAside, [man]);
@@ -647,6 +743,7 @@ void main() {
       expect(round.isJokerChosen, isFalse);
       expect(round.jokersFor(0), isNull);
       expect(round.needsTipluPick, isTrue);
+      expect(round.currentSeat, 0);
       expect(round.stockCount, 3);
       expect(round.events.last, isA<KeptAside>());
 
@@ -655,15 +752,16 @@ void main() {
       expect(round.needsTipluPick, isFalse);
       expect(round.jokersFor(0)!.tiplu, c(Suit.clubs, Rank.two));
       expect(round.hands[0].keptAside, [man]);
+      expect(round.currentSeat, 1);
     });
 
     test('nothing else can happen until the tiplu is picked', () {
-      final round = manInTheStock()
-        ..showPureSets([runA, runB, runC], tipluPosition: 1);
+      final round = manInTheStock()..pickTiplu(1);
 
-      expect(() => round.discard(c(Suit.diamonds, Rank.two)), throwsStateError);
+      expect(() => round.draw(DrawSource.stock), throwsStateError);
+      expect(() => round.discard(c(Suit.diamonds, Rank.ten)), throwsStateError);
       expect(
-        () => round.declareWin(c(Suit.diamonds, Rank.two)),
+        () => round.declareWin(c(Suit.diamonds, Rank.ten)),
         throwsStateError,
       );
       expect(() => round.pickTiplu(9), throwsArgumentError);
@@ -672,7 +770,7 @@ void main() {
 
     test('another man card is kept aside too, and the pick goes on', () {
       final round = manInTheStock()
-        ..showPureSets([runA, runB, runC], tipluPosition: 1)
+        ..pickTiplu(1)
         ..pickTiplu(1);
 
       expect(round.hands[0].keptAside, [man, man]);
@@ -731,7 +829,9 @@ void main() {
               ],
             )
             ..draw(DrawSource.stock)
-            ..showPureSets([runA, runB, runC], tipluPosition: 1);
+            ..showPureSets([runA, runB, runC])
+            ..discard(c(Suit.diamonds, Rank.two))
+            ..pickTiplu(1);
 
       expect(round.hands[0].keptAside, [superman]);
       expect(round.needsTipluPick, isTrue);
@@ -748,12 +848,16 @@ void main() {
     });
 
     test('settles the round, including joker-discard penalties', () {
-      // Seat 0 shows and discards a joker; seat 1 then shows and wins.
+      // Seat 1 shows after seat 0 and sees the joker; seat 0 discards a
+      // joker (7♣); seat 1 then wins with whatever comes from the
+      // reshuffled stock, holding 8♥ Q♣ Q♦: a trial with a joker.
       final round = seat0HasShown()
-        ..discard(c(Suit.clubs, Rank.seven))
         ..draw(DrawSource.stock) // 2♣
         ..showPureSets([runD, runE, runF])
-        ..declareWin(c(Suit.clubs, Rank.two));
+        ..discard(c(Suit.clubs, Rank.two))
+        ..draw(DrawSource.stock) // 5♣
+        ..discard(c(Suit.clubs, Rank.seven));
+      round.declareWin(round.draw(DrawSource.stock));
 
       final score = round.score();
 
@@ -777,10 +881,16 @@ void main() {
                   ? c(Suit.diamonds, Rank.seven)
                   : card,
           ],
-        )..draw(DrawSource.stock);
+        );
         return round
-          ..showPureSets([runA, runB, runC], tipluPosition: 1)
-          ..declareWin(c(Suit.diamonds, Rank.two));
+          ..draw(DrawSource.stock)
+          ..showPureSets([runA, runB, runC])
+          ..discard(c(Suit.diamonds, Rank.two))
+          ..pickTiplu(1)
+          ..draw(DrawSource.stock)
+          ..discard(c(Suit.clubs, Rank.two))
+          ..draw(DrawSource.stock)
+          ..declareWin(fiveOfClubs);
       }
 
       final withAlter = wonWith(GameConfig(playerCount: 2)).score();
@@ -833,17 +943,21 @@ void main() {
     });
 
     test('shows, discards and wins are recorded in order', () {
-      final round = seat0HasShown()..declareWin(c(Suit.diamonds, Rank.two));
+      final round = seat0Drew()..declareWin(fiveOfClubs);
 
       expect(round.events.map((e) => e.runtimeType), [
         DrewCard,
         ShowedSets,
+        DiscardedCard,
+        DrewCard,
+        DiscardedCard,
+        DrewCard,
         WonRound,
       ]);
       final shown = round.events[1] as ShowedSets;
       expect(shown.kind, ShowKind.pureSets);
       expect(shown.sets, [runA, runB, runC]);
-      expect((round.events[2] as WonRound).card, c(Suit.diamonds, Rank.two));
+      expect((round.events.last as WonRound).card, fiveOfClubs);
     });
 
     test('a discard records who discarded what', () {

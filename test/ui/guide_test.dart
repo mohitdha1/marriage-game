@@ -128,7 +128,7 @@ void main() {
       );
     });
 
-    test('the joker tip waits until the joker has been seen', () {
+    test('the joker tip waits until the joker has been seen', () async {
       final done = {GuideStep.draw, GuideStep.discard, GuideStep.sets};
       final container = containerWith();
       expect(stepOf(container, done), isNull);
@@ -148,12 +148,23 @@ void main() {
         controller.groupSelected();
       }
       controller.showGroups();
+      expect(
+        stepOf(container, done),
+        isNull,
+        reason: 'not seen until the discard',
+      );
+
+      final spare = container.read(tableProvider).hand.last.id;
+      await controller.discard(spare);
       expect(stepOf(container, done), isNull, reason: 'picking the tiplu');
 
       controller.pickTiplu(1);
       expect(stepOf(container, done), isNull, reason: 'the reveal is open');
 
       controller.dismissReveal();
+      expect(stepOf(container, done), isNull, reason: "the bot's turn");
+
+      await controller.botsSettled;
       expect(stepOf(container, done), GuideStep.joker);
     });
 

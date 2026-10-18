@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ import 'package:marriage_game/ui/home/home_screen.dart';
 import 'package:marriage_game/ui/sound/sound_effects.dart';
 import 'package:marriage_game/ui/state/house_rules.dart';
 import 'package:marriage_game/ui/state/table_controller.dart';
+import 'package:marriage_game/ui/state/table_state.dart';
 import 'package:marriage_game/ui/state/table_notifier.dart';
 import 'package:marriage_game/ui/table/table_screen.dart';
 import 'package:marriage_game/ui/telemetry/analytics.dart';
@@ -148,6 +150,10 @@ int idOf(WidgetTester tester, PlayingCard card) => ProviderScope.containerOf(
 ).read(tableProvider).hand.firstWhere((h) => h.card == card).id;
 
 /// Draws, shows three runs to see the joker and wins with 2♦.
+/// Shows on the first turn and wins on the next. Draws Q♦, shows the three
+/// runs, discards 2♦ and picks 7♥ as the tiplu; once the bot has played,
+/// draws a club and wins by discarding K♠ (K♦ joins 10♦ J♦ Q♦, and 7♣ 8♥
+/// make a trial with the club).
 Future<void> winRound(WidgetTester tester) async {
   final controller = controllerOf(tester)..draw(DrawSource.stock);
   for (final set in [heartsRun, spadesRun, clubsRun]) {
@@ -156,11 +162,28 @@ Future<void> winRound(WidgetTester tester) async {
     }
     controller.groupSelected();
   }
+  controller.showGroups();
+  unawaited(controller.discard(idOf(tester, twoOfDiamonds)));
   controller
-    ..showGroups()
     ..pickTiplu(1)
-    ..dismissReveal()
-    ..toggleSelected(idOf(tester, twoOfDiamonds))
+    ..dismissReveal();
+  await tester.pumpAndSettle();
+  // Among friends on one device, the other person plays their turn.
+  TableState state() => ProviderScope.containerOf(
+    tester.element(find.byType(TableScreen)),
+  ).read(tableProvider);
+  if (state().passingTo != null) {
+    controller
+      ..takeOver()
+      ..draw(DrawSource.stock);
+    unawaited(controller.discard(state().hand.last.id));
+    await tester.pumpAndSettle();
+    controller.takeOver();
+    await tester.pump();
+  }
+  controller
+    ..draw(DrawSource.stock)
+    ..toggleSelected(idOf(tester, c(Suit.spades, Rank.king)))
     ..declareWin();
   await tester.pump();
 }

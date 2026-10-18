@@ -32,7 +32,8 @@ abstract class TableNotifier extends Notifier<TableState> {
   void submitOpening(List<List<PlayingCard>> tunnellas);
 
   /// Shows [sets], made of the hand cards with [ids], to see the joker;
-  /// the first to show also picks the tiplu at [tipluPosition].
+  /// the first to show early, before drawing, also picks the tiplu at
+  /// [tipluPosition].
   void submitShow({
     required ShowKind kind,
     required List<List<PlayingCard>> sets,
@@ -259,24 +260,26 @@ abstract class TableNotifier extends Notifier<TableState> {
     submitOpening([for (final i in picks) choice[i]]);
   }
 
-  /// Shows the grouped sets to see the joker. If nobody has picked the tiplu
-  /// yet, the person picks it first ([pickTiplu]), then the sets are shown.
+  /// Shows the grouped sets to see the joker, which happens after the
+  /// discard. On an early show, before the first draw, the joker is seen
+  /// straight away, so if nobody has picked the tiplu yet the person picks
+  /// it first ([pickTiplu]), then the sets are shown.
   void showGroups() {
     if (!checkYourTurn()) return;
     if (state.groups.isEmpty) {
       postNotice('Group your sets first, then tap Show.');
       return;
     }
-    if (!state.view.isJokerChosen) {
+    if (!state.view.isJokerChosen && !state.view.youHaveDrawn) {
       state = state.copyWith(pickingTiplu: true);
       return;
     }
     _showGroups(tipluPosition: null);
   }
 
-  /// Picks the stock card at [position] (0 is the top) as the tiplu, and
-  /// shows the grouped sets; or, after a printed joker was picked, just picks
-  /// again.
+  /// Picks the stock card at [position] (0 is the top) as the tiplu: for an
+  /// early show, then shows the grouped sets; after the discard that
+  /// follows a show, or after a printed joker was picked, just picks.
   void pickTiplu(int position) {
     state = state.copyWith(pickingTiplu: false);
     if (state.view.youMustPickTiplu) {
@@ -287,7 +290,7 @@ abstract class TableNotifier extends Notifier<TableState> {
   }
 
   /// Closes the tiplu picker without showing, unless the sets are already
-  /// shown and a printed joker was picked: then the pick has to be made.
+  /// shown: then the pick has to be made.
   void cancelTipluPick() {
     if (state.view.youMustPickTiplu) return;
     state = state.copyWith(pickingTiplu: false);

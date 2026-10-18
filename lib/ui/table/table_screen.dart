@@ -723,7 +723,8 @@ class _TableScreenState extends ConsumerState<TableScreen> {
                               stockCount: table.stockCount,
                               onPick: controller.pickTiplu,
                               onCancel: controller.cancelTipluPick,
-                              again: table.youMustPickTiplu,
+                              mustPick: table.youMustPickTiplu,
+                              again: table.youPickTipluAgain,
                             ),
                           ),
                         if (state.revealingJoker && jokers != null)
@@ -850,7 +851,12 @@ String statusLine(TableState state) {
         : '${thinking.single.name} is thinking…';
   }
   if (!table.youHaveDrawn) return 'Your turn: draw a card.';
-  if (table.youHaveSeenJoker) return 'Discard a card, or win.';
+  if (table.youHaveSeenJoker && !table.youHaveShownThisTurn) {
+    return 'Discard a card, or win.';
+  }
+  if (table.youHaveShown && !table.youHaveSeenJoker) {
+    return 'Discard a card to see the joker.';
+  }
   return 'Select a card to discard.';
 }
 
@@ -977,15 +983,16 @@ class _ActionBar extends StatelessWidget {
     final table = state.view;
     final selected = state.singleSelected;
     final buttons = [
-      if (!table.youHaveSeenJoker && state.selected.length >= 2)
+      if (!table.youHaveShown && state.selected.length >= 2)
         _button('group-button', 'Group', controller.groupSelected),
       if (state.groups.isNotEmpty)
         _button('clear-groups-button', 'Ungroup', controller.clearGroups),
-      if (!table.youHaveSeenJoker &&
-          table.isYourTurn &&
-          state.groups.isNotEmpty)
+      if (!table.youHaveShown && table.isYourTurn && state.groups.isNotEmpty)
         _button('show-button', 'Show', controller.showGroups),
-      if (table.youHaveSeenJoker && table.isYourTurn && table.youHaveDrawn)
+      if (table.youHaveSeenJoker &&
+          !table.youHaveShownThisTurn &&
+          table.isYourTurn &&
+          table.youHaveDrawn)
         _button(
           'win-button',
           'Win',

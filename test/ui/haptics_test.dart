@@ -124,6 +124,7 @@ void main() {
 
     testWidgets('winning buzzes for the win only', (tester) async {
       final haptics = await pumpTable(tester);
+      // Shows on the first turn, and wins on the next by discarding K♠.
       final controller = controllerOf(tester)..draw(DrawSource.stock);
       for (final set in [heartsRun, spadesRun, clubsRun]) {
         for (final card in set) {
@@ -131,11 +132,17 @@ void main() {
         }
         controller.groupSelected();
       }
+      controller.showGroups();
+      unawaited(controller.discard(idOf(tester, twoOfDiamonds)));
       controller
-        ..showGroups()
         ..pickTiplu(1)
-        ..toggleSelected(idOf(tester, twoOfDiamonds));
+        ..dismissReveal();
+      await tester.pumpAndSettle();
+      controller
+        ..draw(DrawSource.stock)
+        ..toggleSelected(idOf(tester, c(Suit.spades, Rank.king)));
       await tester.pump();
+      haptics.buzzed.clear();
 
       controller.declareWin();
       await tester.pump();

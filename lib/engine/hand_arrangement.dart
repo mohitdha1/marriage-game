@@ -110,7 +110,8 @@ List<List<PlayingCard>> _allDoublees(List<PlayingCard> cards) {
 ///
 /// Before the joker is seen ([jokers] is `null`) only the pure sets a show
 /// accepts count (see [isShowPureSet]), since those are all a player can
-/// use. Afterwards, any
+/// use; once the player has [shown], though, natural trials count too,
+/// since they'll finish the hand once the joker is seen. Afterwards, any
 /// set that can finish a hand counts, jokers included (see
 /// [isFinishingSet]). Sets longer than [maxSetSize] aren't tried, which keeps
 /// the search fast and loses nothing: a long run still counts through its
@@ -119,9 +120,13 @@ List<List<PlayingCard>> bestArrangement(
   List<PlayingCard> cards,
   Jokers? jokers, {
   int maxSetSize = 5,
+  bool shown = false,
 }) {
-  bool isSet(List<PlayingCard> set) =>
-      jokers == null ? isShowPureSet(set) : isFinishingSet(set, jokers);
+  bool isSet(List<PlayingCard> set) => switch (jokers) {
+    null when shown => isTunnella(set) || isTrial(set) || isPureSequence(set),
+    null => isShowPureSet(set),
+    final jokers => isFinishingSet(set, jokers),
+  };
   bool isWild(PlayingCard card) =>
       card.isSuperman || (jokers?.isWild(card) ?? false);
   int covered(List<List<PlayingCard>> sets) =>
@@ -189,10 +194,12 @@ int maxCoverage(
   List<PlayingCard> cards,
   Jokers? jokers, {
   int maxSetSize = 5,
+  bool shown = false,
 }) => bestArrangement(
   cards,
   jokers,
   maxSetSize: maxSetSize,
+  shown: shown,
 ).fold(0, (total, set) => total + set.length);
 
 /// How far a player's hand has come, as a hand helper would show it. Which

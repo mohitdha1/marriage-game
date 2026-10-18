@@ -868,8 +868,9 @@ void main() {
       final sevenOfClubs = c(Suit.clubs, Rank.seven);
       final dialog = find.byKey(const Key('joker-discard-dialog'));
 
-      /// Draws, shows the three runs and picks 7♥ as the tiplu, which makes
-      /// the 7♣ in hand a joker.
+      /// Draws, shows the three runs, discards 2♦ and picks 7♥ as the
+      /// tiplu, which makes the 7♣ in hand a joker; then, once the bot has
+      /// played, draws again.
       Future<void> seeTheJoker(WidgetTester tester) async {
         await pumpTable(tester, yourHand: winnableHand);
         final controller = controllerOf(tester)..draw(DrawSource.stock);
@@ -877,10 +878,17 @@ void main() {
           select(tester, run);
           controller.groupSelected();
         }
+        controller.showGroups();
+        unawaited(
+          controller.discard(
+            stateOf(tester).hand.firstWhere((h) => h.card == twoOfDiamonds).id,
+          ),
+        );
         controller
-          ..showGroups()
           ..pickTiplu(1)
           ..dismissReveal();
+        await tester.pumpAndSettle();
+        controller.draw(DrawSource.stock);
         await tester.pump();
       }
 
@@ -908,12 +916,12 @@ void main() {
           select(tester, run);
           controller.groupSelected();
         }
-        controller
-          ..showGroups()
-          ..pickTiplu(1)
-          ..dismissReveal();
+        controller.showGroups();
         // Completes once the bot has played, which the pumping lets it do.
         unawaited(controller.discard(idOf(tester, queenOfDiamonds)));
+        controller
+          ..pickTiplu(1)
+          ..dismissReveal();
         await tester.pumpAndSettle();
         expect(stateOf(tester).view.isYourTurn, isTrue);
         final before = stateOf(tester).hand.map((c) => c.card).toList();
@@ -1006,7 +1014,7 @@ void main() {
         tester,
       ) async {
         await seeTheJoker(tester);
-        // 10♦, since discarding 2♦ or K♠ would win the round.
+        // 10♦, since discarding K♠ or the club just drawn would win.
         final ten = c(Suit.diamonds, Rank.ten);
         select(tester, [ten]);
         await tester.pump();
@@ -1019,9 +1027,8 @@ void main() {
       });
     });
 
-    testWidgets('draw, group, show, pick the tiplu, see it revealed, and win', (
-      tester,
-    ) async {
+    testWidgets('draw, group, show, discard, pick the tiplu, see it '
+        'revealed, and win the next turn', (tester) async {
       await pumpTable(tester, yourHand: winnableHand);
       expect(find.byKey(const Key('joker-chip')), findsNothing);
 
@@ -1054,10 +1061,22 @@ void main() {
       }
       expect(stateOf(tester).groups, hasLength(3));
 
-      // First to show: pick the tiplu from the face-down stock.
+      // Show lays the sets down; the joker comes after the discard.
       await tester.tap(find.byKey(const Key('show-button')));
       await tester.pump();
+      expect(find.byType(TipluPicker), findsNothing);
+      expect(find.byKey(const Key('your-laid-down-sets')), findsOneWidget);
+      expect(find.byKey(const Key('show-button')), findsNothing);
+      expect(status(tester), 'Discard a card to see the joker.');
+
+      // First to show: after the discard, pick the tiplu from the
+      // face-down stock.
+      select(tester, [twoOfDiamonds]);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('discard-pile')));
+      await tester.pump();
       expect(find.byType(TipluPicker), findsOneWidget);
+      expect(find.text('Cancel'), findsNothing, reason: 'the pick is owed');
       await tester.tap(find.byKey(const Key('stock-card-1')));
       await tester.pump();
 
@@ -1069,11 +1088,13 @@ void main() {
         'The joker is 7♥',
       );
       await tester.tap(find.text('Got it'));
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(find.byType(JokerReveal), findsNothing);
 
-      // After the joker: the one unmatched card can be discarded to win, and
-      // the maal badge shows (8♥ is the poplu, worth 2).
+      // The bot has played; it's your turn. Every card left is in a set, so
+      // the hand is ready to win, and the maal badge shows (8♥ is the
+      // poplu, worth 2).
+      expect(stateOf(tester).view.isYourTurn, isTrue);
       expect(find.byKey(const Key('dub-count')), findsNothing);
       expect(badge('to-win'), 'Ready to win!');
       expect(badge('maal-badge'), 'Maal 2');
@@ -1087,7 +1108,9 @@ void main() {
         ),
         findsNWidgets(2), // 7♣ and 8♥
       );
-      expect(find.byKey(const Key('your-laid-down-sets')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('stock')));
+      await tester.pump();
 
       // Win is offered only for a card whose discard wins.
       select(tester, [c(Suit.diamonds, Rank.ten)]);
@@ -1096,7 +1119,7 @@ void main() {
       expect(tester.widget<FilledButton>(win).onPressed, isNull);
 
       controllerOf(tester).toggleSelected(stateOf(tester).selected.single);
-      select(tester, [twoOfDiamonds]);
+      select(tester, [c(Suit.spades, Rank.king)]);
       await tester.pump();
       expect(tester.widget<FilledButton>(win).onPressed, isNotNull);
       await tester.tap(win);
@@ -1123,24 +1146,28 @@ void main() {
     });
 
     group('Ready to win', () {
-      /// Draws Q♦, shows the three runs and picks 7♥ as the tiplu, which
-      /// leaves 2♦ as the only card to spare: the badge says Ready to win.
-      Future<void> showAndSeeTheJoker(WidgetTester tester) async {
+      /// Shows on the first turn: draws Q♦, shows the three runs, discards
+      /// 2♦ and picks 7♥ as the tiplu. Once the bot has played, every card
+      /// left is in a set, and the badge says Ready to win; then draws a
+      /// club, the one spare card.
+      Future<HandCard> readyAndDrawn(WidgetTester tester) async {
         await pumpTable(tester, yourHand: winnableHand);
-        await tester.tap(find.byKey(const Key('stock')));
-        await tester.pump();
+        final controller = controllerOf(tester)..draw(DrawSource.stock);
         for (final run in [heartsRun, spadesRun, clubsRun]) {
           select(tester, run);
-          await tester.pump();
-          await tester.tap(find.byKey(const Key('group-button')));
-          await tester.pump();
+          controller.groupSelected();
         }
-        await tester.tap(find.byKey(const Key('show-button')));
-        await tester.pump();
-        await tester.tap(find.byKey(const Key('stock-card-1')));
+        controller.showGroups();
+        unawaited(
+          controller.discard(
+            stateOf(tester).hand.firstWhere((h) => h.card == twoOfDiamonds).id,
+          ),
+        );
+        controller
+          ..pickTiplu(1)
+          ..dismissReveal();
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Got it'));
-        await tester.pump();
+        expect(stateOf(tester).view.isYourTurn, isTrue);
         expect(
           tester
               .widget<Text>(
@@ -1152,14 +1179,19 @@ void main() {
               .data,
           'Ready to win!',
         );
+        controller.draw(DrawSource.stock);
+        await tester.pump();
+        return stateOf(tester).hand.firstWhere(
+          (h) => h.card.suit == Suit.clubs && h.card.rank != Rank.seven,
+        );
       }
 
       testWidgets('discarding the spare card on the pile wins the round', (
         tester,
       ) async {
-        await showAndSeeTheJoker(tester);
+        final spare = await readyAndDrawn(tester);
 
-        select(tester, [twoOfDiamonds]);
+        controllerOf(tester).toggleSelected(spare.id);
         await tester.pump();
         await tester.tap(find.byKey(const Key('discard-pile')));
         await tester.pumpAndSettle();
@@ -1173,10 +1205,7 @@ void main() {
       testWidgets('a winning discard by any gesture wins the round', (
         tester,
       ) async {
-        await showAndSeeTheJoker(tester);
-        final spare = stateOf(
-          tester,
-        ).hand.firstWhere((h) => h.card == twoOfDiamonds);
+        final spare = await readyAndDrawn(tester);
 
         // Tapping, dragging and flicking a card all discard through here.
         unawaited(controllerOf(tester).discard(spare.id));
@@ -1184,6 +1213,35 @@ void main() {
 
         expect(status(tester), 'You won the round.');
         await tester.pump(scoreboardDelay);
+        await tester.pumpAndSettle();
+      });
+
+      testWidgets('the turn of the show never wins, whatever is discarded', (
+        tester,
+      ) async {
+        await pumpTable(tester, yourHand: winnableHand);
+        final controller = controllerOf(tester)..draw(DrawSource.stock);
+        for (final run in [heartsRun, spadesRun, clubsRun]) {
+          select(tester, run);
+          controller.groupSelected();
+        }
+        controller.showGroups();
+        await tester.pump();
+
+        expect(find.byKey(const Key('win-button')), findsNothing);
+        expect(find.byKey(const Key('to-win')), findsNothing);
+        expect(status(tester), 'Discard a card to see the joker.');
+
+        // 2♦ would leave a winning hand, but only from the next turn.
+        unawaited(
+          controller.discard(
+            stateOf(tester).hand.firstWhere((h) => h.card == twoOfDiamonds).id,
+          ),
+        );
+        await tester.pump();
+        expect(stateOf(tester).view.winner, isNull);
+        expect(find.byType(TipluPicker), findsOneWidget);
+        controller.pickTiplu(1);
         await tester.pumpAndSettle();
       });
     });

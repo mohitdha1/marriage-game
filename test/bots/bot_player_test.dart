@@ -90,7 +90,9 @@ void main() {
 
   // After drawing Q♦, this hand can show 3 pure sets, pick 7♥ (the only
   // stock card left) as the tiplu, and win.
-  Round winnableRound() => roundFor(
+  /// Seat 0 holds three runs to show, then K♠ K♦ 7♣ 10♦ J♦ 8♥ 2♦; Q♦ is
+  /// on top of the stock, 7♥ under it.
+  Round showableRound() => roundFor(
     [
       ...heartsRun,
       ...spadesRun,
@@ -106,6 +108,38 @@ void main() {
     stock: [c(Suit.hearts, Rank.seven), c(Suit.diamonds, Rank.queen)],
   );
 
+  /// Seat 0 has drawn Q♦, shown, discarded 2♦ and picked 7♥ as the tiplu;
+  /// seat 1 has drawn an ace and discarded it. Seat 0 holds K♠ K♦ 7♣ 10♦
+  /// J♦ Q♦ 8♥ (a trial and a sequence, each with a joker), so whatever it
+  /// draws next, it can win.
+  Round winnableRound() =>
+      roundFor(
+          [
+            ...heartsRun,
+            ...spadesRun,
+            ...clubsRun,
+            c(Suit.spades, Rank.king),
+            c(Suit.diamonds, Rank.king),
+            c(Suit.clubs, Rank.seven),
+            c(Suit.diamonds, Rank.ten),
+            c(Suit.diamonds, Rank.jack),
+            c(Suit.hearts, Rank.eight),
+            c(Suit.diamonds, Rank.two),
+          ],
+          stock: [
+            c(Suit.hearts, Rank.ace),
+            c(Suit.hearts, Rank.ace),
+            c(Suit.hearts, Rank.seven),
+            c(Suit.diamonds, Rank.queen),
+          ],
+        )
+        ..draw(DrawSource.stock)
+        ..showPureSets([heartsRun, spadesRun, clubsRun])
+        ..discard(c(Suit.diamonds, Rank.two))
+        ..pickTiplu(0)
+        ..draw(DrawSource.stock)
+        ..discard(c(Suit.hearts, Rank.ace));
+
   group('Opening', () {
     test('shows every tunnella, up to 3', () {
       final four = [
@@ -120,20 +154,30 @@ void main() {
 
   group('Showing and winning', () {
     for (final difficulty in [BotDifficulty.medium, BotDifficulty.hard]) {
-      test(
-        '${difficulty.name} shows, picks the tiplu and wins when it can',
-        () {
-          final round = winnableRound();
+      test('${difficulty.name} shows, then picks the tiplu after its '
+          'discard, and doesn\'t win that turn', () {
+        final round = showableRound();
 
-          final turn = bot(difficulty).takeTurn(round);
+        final turn = bot(difficulty).takeTurn(round);
 
-          expect(turn.shown, hasLength(3));
-          expect(turn.pickedTiplu, isTrue);
-          expect(round.jokersFor(0)!.tiplu, c(Suit.hearts, Rank.seven));
-          expect(turn.won, isTrue);
-          expect(round.winner, 0);
-        },
-      );
+        expect(turn.shown, hasLength(3));
+        expect(turn.won, isFalse);
+        expect(turn.discarded, isNotNull);
+        expect(turn.pickedTiplu, isTrue);
+        expect(round.jokersFor(0)!.tiplu, c(Suit.hearts, Rank.seven));
+        expect(round.isOver, isFalse);
+        expect(round.currentSeat, 1);
+      });
+
+      test('${difficulty.name} wins on a later turn when it can', () {
+        final round = winnableRound();
+
+        final turn = bot(difficulty).takeTurn(round);
+
+        expect(turn.won, isTrue);
+        expect(turn.pickedTiplu, isFalse);
+        expect(round.winner, 0);
+      });
     }
 
     test('every bot shows a pure set the Superman completes', () {
@@ -166,7 +210,7 @@ void main() {
           // Three of the five stock cards are man cards, so the bot often
           // picks one and has to pick again.
           final round = roundFor(
-            winnableRound().hands[0].cards,
+            showableRound().hands[0].cards,
             stock: [
               const PlayingCard.man(),
               c(Suit.hearts, Rank.seven),
@@ -186,6 +230,37 @@ void main() {
           keptAny |= aside.isNotEmpty;
         }
         expect(keptAny, isTrue, reason: '$difficulty never picked a man card');
+      }
+    });
+
+    test('having shown, medium and hard keep a natural trial together '
+        'before the joker is seen', () {
+      for (final difficulty in [BotDifficulty.medium, BotDifficulty.hard]) {
+        final queens = [
+          c(Suit.clubs, Rank.queen),
+          c(Suit.diamonds, Rank.queen),
+          c(Suit.hearts, Rank.queen),
+        ];
+        final round = roundFor(
+          [...heartsRun, ...spadesRun, ...clubsRun, ...queens],
+          stock: [c(Suit.hearts, Rank.ten), c(Suit.hearts, Rank.jack)],
+          // Nothing worth taking from the pile, so the bot draws J♥.
+          topDiscard: c(Suit.diamonds, Rank.eight),
+        );
+
+        final turn = bot(difficulty).takeTurn(round);
+
+        expect(turn.shown, hasLength(3), reason: '$difficulty');
+        expect(
+          turn.discarded,
+          c(Suit.hearts, Rank.jack),
+          reason: '$difficulty',
+        );
+        expect(
+          round.hands[0].cards,
+          containsAll(queens),
+          reason: '$difficulty',
+        );
       }
     });
 

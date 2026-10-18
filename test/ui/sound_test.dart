@@ -201,14 +201,19 @@ void main() {
       await tester.pump();
       sounds.played.clear();
 
-      controller
-        ..showGroups()
-        ..pickTiplu(1);
+      // The joker is seen after the discard, once the tiplu is picked.
+      controller.showGroups();
       await tester.pump();
-      expect(sounds.played, [Sfx.jokerReveal]);
+      expect(sounds.played, isEmpty);
+      unawaited(controller.discard(idOf(tester, twoOfDiamonds)));
+      await tester.pump();
+      expect(sounds.played, [Sfx.cardSnap]);
 
-      controller.toggleSelected(idOf(tester, twoOfDiamonds));
+      controller.pickTiplu(1);
       await tester.pump();
+      expect(sounds.played, [Sfx.cardSnap, Sfx.jokerReveal]);
+
+      await tester.pumpAndSettle();
       expect(sounds.played.where((s) => s == Sfx.jokerReveal), hasLength(1));
     });
 
@@ -222,6 +227,7 @@ void main() {
       tester,
     ) async {
       final sounds = await pumpTable(tester);
+      // Shows on the first turn, and wins on the next by discarding K♠.
       final controller = controllerOf(tester)..draw(DrawSource.stock);
       for (final set in [heartsRun, spadesRun, clubsRun]) {
         for (final card in set) {
@@ -229,10 +235,15 @@ void main() {
         }
         controller.groupSelected();
       }
+      controller.showGroups();
+      unawaited(controller.discard(idOf(tester, twoOfDiamonds)));
       controller
-        ..showGroups()
         ..pickTiplu(1)
-        ..toggleSelected(idOf(tester, twoOfDiamonds));
+        ..dismissReveal();
+      await tester.pumpAndSettle();
+      controller
+        ..draw(DrawSource.stock)
+        ..toggleSelected(idOf(tester, c(Suit.spades, Rank.king)));
       await tester.pump();
       sounds.played.clear();
 
@@ -250,25 +261,39 @@ void main() {
     });
 
     testWidgets('a bot winning plays the gentler tone', (tester) async {
+      // The bot holds 3 runs and a trial of queens: it shows on its first
+      // turn and wins on its second.
       final sounds = await pumpTable(
         tester,
         botHand: [
           ...run(Suit.spades, [Rank.jack, Rank.queen, Rank.king]),
           ...run(Suit.clubs, [Rank.four, Rank.five, Rank.six]),
           ...run(Suit.diamonds, [Rank.ace, Rank.two, Rank.three]),
-          c(Suit.hearts, Rank.eight),
           c(Suit.clubs, Rank.queen),
           c(Suit.diamonds, Rank.queen),
+          c(Suit.hearts, Rank.queen),
         ],
-        stock: [c(Suit.hearts, Rank.seven), c(Suit.clubs, Rank.two)],
+        stock: [
+          c(Suit.clubs, Rank.two),
+          c(Suit.spades, Rank.nine),
+          c(Suit.hearts, Rank.four),
+          c(Suit.hearts, Rank.ten),
+        ],
       );
       final controller = controllerOf(tester)..tapDiscardPile();
       await tester.pump();
 
-      sounds.played.clear();
       // Widget tests run on fake time, so the bot's turn happens as the test
       // pumps rather than by awaiting the discard.
       unawaited(controller.discard(idOf(tester, c(Suit.hearts, Rank.three))));
+      await tester.pumpAndSettle();
+      controller.draw(DrawSource.stock);
+      await tester.pump();
+      sounds.played.clear();
+      final drawn = ProviderScope.containerOf(
+        tester.element(find.byType(TableScreen)),
+      ).read(tableProvider).hand.last.id;
+      unawaited(controller.discard(drawn));
       await tester.pumpAndSettle();
 
       expect(sounds.played.last, Sfx.roundOver);

@@ -3,15 +3,17 @@ import 'package:flutter/material.dart';
 import 'card_view.dart';
 
 /// Shown when the human player is the first to show: the stock is spread out
-/// face down, and they tap any card to make it the tiplu. [again] says
-/// their last pick was a printed joker, kept aside; there's no cancelling then,
-/// since the sets are already shown.
+/// face down, and they tap any card to make it the tiplu. [mustPick] says
+/// the sets are already shown (the discard after them is made, or a
+/// printed joker was picked), so there's no cancelling. [again] says their
+/// last pick was a printed joker, kept aside.
 class TipluPicker extends StatelessWidget {
   const TipluPicker({
     super.key,
     required this.stockCount,
     required this.onPick,
     required this.onCancel,
+    this.mustPick = false,
     this.again = false,
   });
 
@@ -20,6 +22,7 @@ class TipluPicker extends StatelessWidget {
   /// Called with the picked card's position in the stock, 0 being the top.
   final void Function(int position) onPick;
   final VoidCallback onCancel;
+  final bool mustPick;
   final bool again;
 
   @override
@@ -60,7 +63,7 @@ class TipluPicker extends StatelessWidget {
                   ),
                 ),
               ),
-              if (!again) ...[
+              if (!mustPick && !again) ...[
                 const SizedBox(height: 8),
                 TextButton(onPressed: onCancel, child: const Text('Cancel')),
               ],

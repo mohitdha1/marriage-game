@@ -98,15 +98,21 @@ bool isWinningHand(
 
 /// The cards [hand] could discard now to finish the round, each listed
 /// once: those that leave an [isWinningHand]. Empty unless the player has
-/// drawn, shown and seen the [jokers]. [mustKeep], a card taken from the
-/// discard pile this turn, can't be discarded, so is never one.
+/// drawn and seen the [jokers], and didn't show this turn. [mustKeep], a
+/// card taken from the discard pile this turn, can't be discarded, so is
+/// never one.
 List<PlayingCard> winningDiscards(
   PlayerHand hand,
   Jokers jokers, {
   PlayingCard? mustKeep,
 }) {
   final route = hand.showKind;
-  if (route == null || !hand.hasSeenJoker || !hand.hasDrawn) return const [];
+  if (route == null ||
+      !hand.hasSeenJoker ||
+      !hand.hasDrawn ||
+      hand.shownThisTurn) {
+    return const [];
+  }
   final cards = hand.cards;
   return [
     for (final card in cards.toSet())

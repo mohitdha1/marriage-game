@@ -60,6 +60,15 @@ PlayerHand seenHand({
   final hand = PlayerHand(dealt)..showOpeningTunnellas(opening);
   if (drawn != null) hand.draw(drawn);
   hand.showPureSets(sets);
+  // After drawing, the joker is seen with the discard that ends the show's
+  // turn; the card discarded comes back the next turn, so the hand holds
+  // what it did.
+  if (drawn != null) {
+    final out = hand.cards.first;
+    hand
+      ..discard(out)
+      ..draw(out);
+  }
   return hand;
 }
 
@@ -331,7 +340,9 @@ void main() {
             ])
             ..showOpeningTunnellas([])
             ..draw(c(Suit.spades, Rank.queen))
-            ..showDoublees(pairs);
+            ..showDoublees(pairs)
+            ..discard(c(Suit.spades, Rank.queen))
+            ..draw(c(Suit.spades, Rank.queen));
 
       final result = scoreRound(
         hands: [dubleeWinner, seenHand(), unseenHand()],

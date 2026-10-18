@@ -260,15 +260,24 @@ void main() {
   });
 
   group('PlayerHand.showPureSets', () {
-    test('after drawing, 3 pure sets sees the joker', () {
+    test('after drawing, 3 pure sets see the joker once the discard is '
+        'made', () {
       final hand = openedHand(noTunnellaCards())..draw(drawnCard);
 
       hand.showPureSets([heartsRun, spadesRun, diamondsRun]);
 
-      expect(hand.hasSeenJoker, isTrue);
+      expect(hand.hasShown, isTrue);
+      expect(hand.shownThisTurn, isTrue);
       expect(hand.showKind, ShowKind.pureSets);
       expect(hand.shownSets, [heartsRun, spadesRun, diamondsRun]);
       expect(hand.cards.length, 22 - 10);
+      // Not yet: the joker comes after the discard.
+      expect(hand.hasSeenJoker, isFalse);
+      expect(hand.visibleJokers(jokers), isNull);
+
+      hand.discard(drawnCard);
+      expect(hand.hasSeenJoker, isTrue);
+      expect(hand.shownThisTurn, isFalse);
       expect(hand.visibleJokers(jokers), same(jokers));
     });
 
@@ -283,7 +292,7 @@ void main() {
 
       hand.showPureSets([heartsRun, spadesRun]);
 
-      expect(hand.hasSeenJoker, isTrue);
+      expect(hand.hasShown, isTrue);
       expect(hand.shownSets, [heartsRun, spadesRun]);
       expect(hand.openingTunnellas, [kingTunnella]);
     });
@@ -301,11 +310,13 @@ void main() {
       expect(hand.cards.length, 11);
     });
 
-    test('sets ready from the deal can be shown before the first draw', () {
+    test('sets ready from the deal can be shown before the first draw, '
+        'seeing the joker at once', () {
       final hand = openedHand(noTunnellaCards())
         ..showPureSets([heartsRun, spadesRun, diamondsRun]);
 
       expect(hand.hasSeenJoker, isTrue);
+      expect(hand.shownThisTurn, isTrue);
       expect(hand.hasDrawn, isFalse);
       expect(hand.cards.length, 11);
 
@@ -350,7 +361,7 @@ void main() {
             ..draw(kingTunnella.first)
             ..showPureSets([heartsRun, spadesRun, kingTunnella]);
 
-      expect(hand.hasSeenJoker, isTrue);
+      expect(hand.hasShown, isTrue);
       expect(hand.openingTunnellas, isEmpty);
     });
 
@@ -365,7 +376,7 @@ void main() {
 
       hand.showPureSets([heartsRun, longRun, diamondsRun]);
 
-      expect(hand.hasSeenJoker, isTrue);
+      expect(hand.hasShown, isTrue);
     });
 
     test('a trial does not count as a pure set', () {
@@ -466,15 +477,19 @@ void main() {
   });
 
   group('PlayerHand.showDoublees', () {
-    test('showing 7 doublees after drawing sees the joker', () {
+    test('showing 7 doublees after drawing sees the joker after the '
+        'discard', () {
       final hand = openedHand(doubleesCards())..draw(drawnCard);
 
       hand.showDoublees(doublees);
 
-      expect(hand.hasSeenJoker, isTrue);
+      expect(hand.hasSeenJoker, isFalse);
       expect(hand.showKind, ShowKind.doublees);
       expect(hand.shownSets, doublees);
       expect(hand.cards.length, 22 - 14);
+
+      hand.discard(drawnCard);
+      expect(hand.hasSeenJoker, isTrue);
       expect(hand.visibleJokers(jokers), same(jokers));
     });
 

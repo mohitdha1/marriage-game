@@ -61,8 +61,9 @@ Round playedRound() {
     ..showOpeningTunnellas(0, [])
     ..showOpeningTunnellas(1, [])
     ..draw(DrawSource.stock)
-    ..showPureSets([hearts, spades, clubs], tipluPosition: 1)
+    ..showPureSets([hearts, spades, clubs])
     ..discard(c(Suit.spades, Rank.king))
+    ..pickTiplu(1)
     ..draw(DrawSource.discardPile)
     ..discard(c(Suit.spades, Rank.six));
   return round;

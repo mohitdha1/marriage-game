@@ -40,8 +40,11 @@ class HowToPlayScreen extends ConsumerWidget {
       'Before you can use jokers, show 3 pure sets (sequences or '
           'tunnellas with no jokers) or 7 doublees (pairs of identical '
           'cards). Tunnellas you\'re dealt are shown at the start and count '
-          'toward the 3. The first player to show picks the joker card '
-          '(the tiplu) from the stock.',
+          'toward the 3. Show after you draw; you see the joker once you\'ve '
+          'discarded, and the first player to show then picks the joker '
+          'card (the tiplu) from the stock. You can\'t win on the turn you '
+          'show. If your 3 pure sets came straight from the deal, you can '
+          'show before your first draw and see the joker at once.',
     ),
     (
       'Jokers',

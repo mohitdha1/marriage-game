@@ -59,8 +59,9 @@ String numbersOf(List<PlayingCard> hand, List<PlayingCard> cards) {
 
 void main() {
   // The human player (seat 0) holds 3 pure runs plus K♠ K♦ 7♣ 10♦ J♦ 8♥ 2♦.
-  // Drawing Q♦ and picking 7♥ as the tiplu lets them show and then win by
-  // discarding 2♦.
+  // Drawing Q♦, they show, discard 2♦ and pick 7♥ as the tiplu; on their
+  // next turn they win by discarding K♠ (K♦ joins 10♦ J♦ Q♦, and 7♣ 8♥
+  // make a trial with whatever club they draw).
   final heartsRun = run(Suit.hearts, [Rank.three, Rank.four, Rank.five]);
   final spadesRun = run(Suit.spades, [Rank.two, Rank.three, Rank.four]);
   final clubsRun = run(Suit.clubs, [Rank.nine, Rank.ten, Rank.jack]);
@@ -96,9 +97,16 @@ void main() {
   );
 
   group('You vs a bot', () {
-    test('draw, show, pick the tiplu and win in one turn', () {
+    test('draw, show, discard and pick the tiplu; win on the next turn', () {
       final afterDraw = [...yourCards, queen];
       final afterShow = [...extras, queen];
+      final king = c(Suit.spades, Rank.king);
+      // Next turn's draw is a club (2♣ or 5♣, whichever the bot leaves),
+      // so K♠ has the same number either way.
+      final nextTurn = [
+        ...[...afterShow]..remove(two),
+        c(Suit.clubs, Rank.two),
+      ];
       final game = ScriptedGame(
         dealRound: knownDeal,
         input: [
@@ -106,8 +114,10 @@ void main() {
           'show ${numbersOf(afterDraw, heartsRun)}, '
               '${numbersOf(afterDraw, spadesRun)}, '
               '${numbersOf(afterDraw, clubsRun)}',
+          'discard ${numbersOf(afterShow, [two])}',
           '2', // the tiplu: 7♥ is second from the top after Q♦ is drawn
-          'win ${numbersOf(afterShow, [two])}',
+          'draw',
+          'win ${numbersOf(nextTurn, [king])}',
           'n',
         ],
       );
@@ -116,10 +126,11 @@ void main() {
 
       expect(game.text, contains('You play first'));
       expect(game.text, contains('You drew Q♦.'));
+      expect(game.text, contains('You see the joker after your discard'));
       expect(game.text, contains('you pick the tiplu'));
-      expect(game.text, contains('saw the joker'));
+      expect(game.text, contains('You see the joker.'));
       expect(game.text, contains('Joker: tiplu 7♥, jhiplu 6♥, poplu 8♥'));
-      expect(game.text, contains('You discard 2♦ and WIN the round!'));
+      expect(game.text, contains('You discard K♠ and WIN the round!'));
       expect(game.text, contains('You won the round. The tiplu was 7♥.'));
       expect(game.text, contains('Match totals after 1 round'));
       expect(game.game.match.rounds.single.winner, 0);

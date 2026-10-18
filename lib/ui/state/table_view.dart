@@ -10,6 +10,7 @@ class SeatView {
     required this.seat,
     required this.name,
     required this.cardCount,
+    this.hasShown = false,
     this.hasSeenJoker = false,
     this.laidDown = const [],
     this.avatarColor,
@@ -22,7 +23,11 @@ class SeatView {
   /// Cards still held, not counting any laid down.
   final int cardCount;
 
-  /// Whether this player has shown their sets and seen the joker.
+  /// Whether this player has shown their sets (or doublees).
+  final bool hasShown;
+
+  /// Whether this player has seen the joker: once the discard after their
+  /// show is made, or straight after an early show.
   final bool hasSeenJoker;
 
   /// Sets this player has laid face up: opening tunnellas, then the sets
@@ -53,6 +58,8 @@ class TableView {
     required this.winner,
     this.isJokerChosen = false,
     this.youMustPickTiplu = false,
+    this.youPickTipluAgain = false,
+    this.youHaveShownThisTurn = false,
     this.yourJokers,
     this.pureSetsStillNeeded = PlayerHand.pureSetsToShow,
     this.events = const [],
@@ -74,6 +81,7 @@ class TableView {
         seat: seat,
         name: nameOf(seat),
         cardCount: hand.cards.length,
+        hasShown: hand.hasShown,
         hasSeenJoker: hand.hasSeenJoker,
         laidDown: [
           ...hand.openingTunnellas,
@@ -100,6 +108,11 @@ class TableView {
       winner: round.winner == null ? null : seatView(round.winner!),
       isJokerChosen: round.isJokerChosen,
       youMustPickTiplu: round.needsTipluPick && round.currentSeat == humanSeat,
+      youPickTipluAgain:
+          round.needsTipluPick &&
+          round.currentSeat == humanSeat &&
+          yours.keptAside.isNotEmpty,
+      youHaveShownThisTurn: yours.shownThisTurn,
       yourJokers: round.jokersFor(humanSeat),
       pureSetsStillNeeded: yours.pureSetsStillNeeded,
       events: round.events,
@@ -129,9 +142,17 @@ class TableView {
   /// Whether anyone has picked the tiplu yet.
   final bool isJokerChosen;
 
-  /// Whether the human player picked a printed joker as the tiplu and must
-  /// pick again.
+  /// Whether the human player must pick the tiplu before play goes on:
+  /// they were the first to show and have just discarded, or they picked a
+  /// printed joker and pick again.
   final bool youMustPickTiplu;
+
+  /// Whether that pick is a second (or later) one, after a printed joker.
+  final bool youPickTipluAgain;
+
+  /// Whether the human player showed this turn, so can't win until their
+  /// next.
+  final bool youHaveShownThisTurn;
 
   /// The jokers, once the human player has seen them; otherwise `null`.
   final Jokers? yourJokers;
@@ -142,6 +163,8 @@ class TableView {
 
   /// Everything every player has seen happen this round, oldest first.
   final List<TableEvent> events;
+
+  bool get youHaveShown => you.hasShown;
 
   bool get youHaveSeenJoker => you.hasSeenJoker;
 

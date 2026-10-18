@@ -79,10 +79,10 @@ type:
 |---|---|
 | `draw` or `d` | Draw from the stock |
 | `take` or `t` | Take the top card of the discard pile |
-| `show 1 2 3, 4 5 6, 7 8 9` | Show pure sets to see the joker |
-| `doublees 1 2, 3 4, …` | Show 7 doublees to see the joker |
-| `discard 5` or `x 5` | Discard a card and end your turn |
-| `win 5` | Discard a card and finish the round |
+| `show 1 2 3, 4 5 6, 7 8 9` | Show pure sets; you see the joker after your discard |
+| `doublees 1 2, 3 4, …` | Show 7 doublees; you see the joker after your discard |
+| `discard 5` or `x 5` | Discard a card and end your turn (a discard that leaves a winning hand wins) |
+| `win 5` | Discard a card and finish the round (not on the turn you show) |
 | `hand` or `h` | Show the table and your hand again |
 | `help` | List the commands |
 | `quit` or `q` | Stop the game |

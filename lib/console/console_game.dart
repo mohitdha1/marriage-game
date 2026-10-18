@@ -242,8 +242,18 @@ class ConsoleGame {
             _humanShow(round, seat, args, doublees: true);
           case 'discard' || 'x':
             final card = _cardAt(round, seat, args);
+            final sawJoker = round.hands[seat].hasSeenJoker;
             round.discard(card);
-            writeLine('You discarded $card.');
+            if (round.isOver) {
+              writeLine('You discard $card and WIN the round!');
+            } else {
+              writeLine('You discarded $card.');
+              _pickTiplu(round, first: true);
+              if (!sawJoker && round.hands[seat].hasSeenJoker) {
+                writeLine('You see the joker.');
+                _printJoker(round, seat);
+              }
+            }
           case 'win':
             final card = _cardAt(round, seat, args);
             round.declareWin(card);
@@ -272,8 +282,10 @@ class ConsoleGame {
     final hand = _sortedHand(round, seat);
     final sets = _parseSets(args, hand);
 
+    // Only an early show, before the first draw, picks the tiplu with the
+    // show; after drawing, the first to show picks it after the discard.
     int? tipluPosition;
-    if (!round.isJokerChosen) {
+    if (!round.isJokerChosen && !round.hands[seat].hasDrawn) {
       writeLine(
         'You are the first to show, so you pick the tiplu. Choose a '
         'stock position from 1 (top) to ${round.stockCount}:',
@@ -290,24 +302,42 @@ class ConsoleGame {
     } else {
       round.showPureSets(sets, tipluPosition: tipluPosition);
     }
+    _pickTiplu(round, first: false);
+    if (round.hands[seat].hasSeenJoker) {
+      writeLine('You showed ${_sets(sets)} and saw the joker.');
+      _printJoker(round, seat);
+    } else {
+      writeLine(
+        'You showed ${_sets(sets)}. You see the joker after your discard, '
+        'and can win from your next turn.',
+      );
+    }
+    _printHand(round, seat);
+  }
+
+  /// Asks for the tiplu for as long as the round needs one picked: [first]
+  /// when the player is the first to show and has just discarded, and
+  /// again after each pick that was a printed joker.
+  void _pickTiplu(Round round, {required bool first}) {
+    var again = !first;
     while (round.needsTipluPick) {
       writeLine(
-        'That card can\'t be the joker, so it\'s kept aside as your maal. '
-        'Pick again, from 1 '
-        '(top) to ${round.stockCount}:',
+        again
+            ? 'That card can\'t be the joker, so it\'s kept aside as your '
+                  'maal. Pick again, from 1 (top) to ${round.stockCount}:'
+            : 'You were the first to show, so you pick the tiplu. Choose a '
+                  'stock position from 1 (top) to ${round.stockCount}:',
       );
       final picked = _parseNumbers(_read());
       if (picked != null && picked.length == 1) {
         try {
           round.pickTiplu(picked.single - 1);
+          again = true;
         } on ArgumentError catch (e) {
           writeLine('${e.message}');
         }
       }
     }
-    writeLine('You showed ${_sets(sets)} and saw the joker.');
-    _printJoker(round, seat);
-    _printHand(round, seat);
   }
 
   /// Turns "1 2 3, 4 5 6" into sets of cards from the numbered [hand].

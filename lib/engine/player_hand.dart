@@ -18,15 +18,18 @@ enum ShowKind {
 ///    the player is laid down (up to 3 — if they hold more, they pick which 3).
 ///    Only these tunnellas earn tunnella bonus points, and they count toward
 ///    the 3 pure sets needed to see the joker.
-/// 2. **Turns:** draw, optionally show, then discard. If the player already
-///    holds the rest of their 3 pure sets from the deal, they may also show
-///    them before their first draw.
+/// 2. **Turns:** draw, optionally show, then discard. A player who shows
+///    sees the joker once that turn's discard is made. If the player
+///    already holds the rest of their 3 pure sets from the deal, they may
+///    instead show them before their first draw (an early show), and see
+///    the joker straight away.
 ///
 /// Which player's turn it is, and where the drawn card comes from, are
 /// decided by the round, not here.
 ///
-/// Until a player shows, they haven't "seen" the joker: they can't use wild
-/// cards, and [visibleJokers] hides the round's jokers from them.
+/// Until a player sees the joker, they can't use wild cards, and
+/// [visibleJokers] hides the round's jokers from them. Nobody wins on the
+/// turn they show ([shownThisTurn]).
 class PlayerHand {
   PlayerHand(Iterable<PlayingCard> cards) : _cards = [...cards];
 
@@ -41,6 +44,8 @@ class PlayerHand {
   bool _hasOpened = false;
   bool _hasMadeFirstDraw = false;
   bool _hasDrawn = false;
+  bool _hasSeenJoker = false;
+  bool _shownThisTurn = false;
   ShowKind? _showKind;
 
   /// Cards still held, not counting any that have been shown.
@@ -68,7 +73,15 @@ class PlayerHand {
   /// How the player showed, or `null` if they haven't yet.
   ShowKind? get showKind => _showKind;
 
-  bool get hasSeenJoker => _showKind != null;
+  bool get hasShown => _showKind != null;
+
+  /// Whether the player has seen the joker: straight after an early show,
+  /// otherwise once the discard after their show is made.
+  bool get hasSeenJoker => _hasSeenJoker;
+
+  /// Whether the player showed this turn, which rules out winning until
+  /// their next turn.
+  bool get shownThisTurn => _shownThisTurn;
 
   /// How many pure sets [showPureSets] needs, after counting opening
   /// tunnellas.
@@ -114,8 +127,8 @@ class PlayerHand {
   }
 
   /// Keeps [card] aside, after the player picked it as the tiplu when it
-  /// can't be one (a printed joker). Only the player showing first picks, so they've seen
-  /// the joker.
+  /// can't be one (a printed joker). Only the player showing first picks,
+  /// once they've seen the joker.
   void keepAside(PlayingCard card) {
     if (!hasSeenJoker) {
       throw StateError('Only a player who has shown picks the tiplu');
@@ -136,7 +149,8 @@ class PlayerHand {
     _hasMadeFirstDraw = true;
   }
 
-  /// Ends the player's turn by removing one copy of [card] from their hand.
+  /// Ends the player's turn by removing one copy of [card] from their
+  /// hand. A player who has shown sees the joker now, if they hadn't yet.
   void discard(PlayingCard card) {
     if (!_hasDrawn) {
       throw StateError('Must draw before discarding');
@@ -145,13 +159,16 @@ class PlayerHand {
       throw ArgumentError.value(card, 'card', 'is not in the hand');
     }
     _hasDrawn = false;
+    _shownThisTurn = false;
+    if (hasShown) _hasSeenJoker = true;
   }
 
   /// Shows [pureSetsStillNeeded] pure sets — each a pure sequence (3 or more
   /// cards) or a tunnella, one of which may use the Superman for a card
-  /// (see [isShowPureSet]) — to see the joker. Allowed after drawing, or
-  /// before the player's first draw if the sets came straight from the deal.
-  /// If 3 opening tunnellas were shown, pass an empty list.
+  /// (see [isShowPureSet]) — to see the joker. Allowed after drawing, when
+  /// the joker is seen after the discard, or before the player's first draw
+  /// if the sets came straight from the deal, when it's seen at once. If 3
+  /// opening tunnellas were shown, pass an empty list.
   void showPureSets(List<List<PlayingCard>> sets) {
     _show(
       sets,
@@ -162,8 +179,9 @@ class PlayerHand {
     );
   }
 
-  /// Shows exactly 7 doublees, after drawing, to see the joker. The
-  /// Superman pairs with any card (see [isShowDoublee]).
+  /// Shows exactly 7 doublees, after drawing, to see the joker once the
+  /// discard is made. The Superman pairs with any card (see
+  /// [isShowDoublee]).
   void showDoublees(List<List<PlayingCard>> pairs) {
     _show(
       pairs,
@@ -183,8 +201,8 @@ class PlayerHand {
     required bool Function(List<PlayingCard>) isValidSet,
     required bool allowedBeforeFirstDraw,
   }) {
-    if (hasSeenJoker) {
-      throw StateError('Already showed and saw the joker');
+    if (hasShown) {
+      throw StateError('Already showed');
     }
     if (!_hasOpened) {
       throw StateError('Must make the opening show first');
@@ -216,6 +234,9 @@ class PlayerHand {
       ..addAll(remaining);
     _shownSets.addAll(sets.map((set) => [...set]));
     _showKind = kind;
+    _shownThisTurn = true;
+    // An early show, before any draw, sees the joker straight away.
+    if (!_hasDrawn) _hasSeenJoker = true;
   }
 
   /// Returns a copy of the hand with every card in [sets] removed. Removing

@@ -57,9 +57,15 @@ PlayerHand seenHand({
       ..draw(man)
       ..discard(out);
   }
-  return hand
+  hand
     ..draw(c(Suit.hearts, Rank.five))
     ..showPureSets(sets.toList());
+  // The joker is seen with the discard that ends the show's turn; the same
+  // card comes back next turn, so the hand holds what it did.
+  final out = hand.cards.first;
+  return hand
+    ..discard(out)
+    ..draw(out);
 }
 
 void main() {

@@ -35,15 +35,23 @@ final gappedRun = [
 ];
 
 /// Opened with nothing, holding [held] and the three pure sets to show.
-/// After drawing [drawn], the sets are shown.
+/// After drawing [drawn], the sets are shown; the joker is seen with the
+/// discard that ends that turn, and the card discarded comes back the next
+/// turn, so the hand holds what it did.
 PlayerHand shownWith(
   List<List<PlayingCard>> sets, {
   List<PlayingCard> held = const [],
   PlayingCard? drawn,
-}) => PlayerHand([...sets.expand((s) => s), ...held])
-  ..showOpeningTunnellas([])
-  ..draw(drawn ?? c(Suit.diamonds, Rank.two))
-  ..showPureSets(sets);
+}) {
+  final hand = PlayerHand([...sets.expand((s) => s), ...held])
+    ..showOpeningTunnellas([])
+    ..draw(drawn ?? c(Suit.diamonds, Rank.two))
+    ..showPureSets(sets);
+  final out = hand.cards.first;
+  return hand
+    ..discard(out)
+    ..draw(out);
+}
 
 void main() {
   group('The Superman card', () {

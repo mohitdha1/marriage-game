@@ -169,6 +169,24 @@ void main() {
   });
 
   group('bestArrangement', () {
+    test('after a show, before the joker, natural trials count too', () {
+      final queens = [
+        c(Suit.clubs, Rank.queen),
+        c(Suit.diamonds, Rank.queen),
+        c(Suit.hearts, Rank.queen),
+      ];
+      final cards = [...queens, ...heartsRun, c(Suit.spades, Rank.nine)];
+
+      // For a show, only pure sets count: the run, not the trial.
+      expect(bestArrangement(cards, null), [heartsRun]);
+      // Once shown, the trial will finish the hand, so it counts.
+      expect(
+        bestArrangement(cards, null, shown: true),
+        unorderedEquals([unorderedEquals(queens), heartsRun]),
+      );
+      expect(maxCoverage(cards, null, shown: true), 6);
+    });
+
     test('covers as many cards as possible', () {
       final cards = [
         ...run(Suit.clubs, [Rank.three, Rank.four, Rank.five, Rank.six]),
@@ -293,7 +311,8 @@ void main() {
     });
 
     group('sets to win', () {
-      // Shows three runs before the first draw, then holds [held].
+      // Shows three runs before the first draw and plays out that turn,
+      // drawing and discarding A♣; then holds [held].
       PlayerHand shown(List<PlayingCard> held) {
         final spadesRun = run(Suit.spades, [Rank.two, Rank.three, Rank.four]);
         final diamondsRun = run(Suit.diamonds, [
@@ -301,12 +320,33 @@ void main() {
           Rank.ten,
           Rank.jack,
         ]);
+        final spare = c(Suit.clubs, Rank.ace);
         return opened([...heartsRun, ...spadesRun, ...diamondsRun, ...held])
-          ..showPureSets([heartsRun, spadesRun, diamondsRun]);
+          ..showPureSets([heartsRun, spadesRun, diamondsRun])
+          ..draw(spare)
+          ..discard(spare);
       }
 
       int setsToWin(PlayerHand hand) =>
           (handProgress(hand, jokers) as WinProgress).setsToWin;
+
+      test('no count toward the win on the turn of the show', () {
+        // An early show sees the joker at once, but the hand can't win
+        // until its next turn, even holding only sets.
+        final spadesRun = run(Suit.spades, [Rank.two, Rank.three, Rank.four]);
+        final diamondsRun = run(Suit.diamonds, [
+          Rank.nine,
+          Rank.ten,
+          Rank.jack,
+        ]);
+        final hand =
+            opened([...heartsRun, ...spadesRun, ...diamondsRun, ...clubsRun])
+              ..showPureSets([heartsRun, spadesRun, diamondsRun])
+              ..draw(c(Suit.spades, Rank.ace));
+
+        expect(hand.hasSeenJoker, isTrue);
+        expect(setsToWin(hand), isNot(0));
+      });
 
       // K♠ K♦ with 7♣ (a joker) make a trial.
       final trial = [
@@ -378,10 +418,14 @@ void main() {
       // Two more cards that pair with nothing, so a discard still leaves
       // cards to make the 8th doublee from.
       final filler = [c(Suit.diamonds, Rank.queen), c(Suit.hearts, Rank.nine)];
+      // Draws A♠, shows and discards it, then draws A♠ again next turn.
+      final ace = c(Suit.spades, Rank.ace);
       PlayerHand dubleeHand(List<PlayingCard> extras) =>
           opened([...pairs.expand((p) => p), ...extras, ...filler])
-            ..draw(c(Suit.spades, Rank.ace))
-            ..showDoublees(pairs);
+            ..draw(ace)
+            ..showDoublees(pairs)
+            ..discard(ace)
+            ..draw(ace);
 
       final noPair =
           handProgress(dubleeHand([c(Suit.spades, Rank.king)]), jokers)
@@ -411,8 +455,9 @@ void main() {
 
     test('on the dublee route, ready to win only if the 8th doublee '
         'survives the discard', () {
-      // 7 doublees shown, then only K♠ and the K♠ just drawn: discarding
-      // either leaves one card, which is no doublee.
+      // 7 doublees shown (Q♦ drawn and discarded with the show), then only
+      // K♠ and the K♠ just drawn: discarding either leaves one card, which
+      // is no doublee.
       final pairs = [
         for (final rank in [
           Rank.two,
@@ -425,10 +470,13 @@ void main() {
         ])
           [c(Suit.clubs, rank), c(Suit.clubs, rank)],
       ];
+      final queen = c(Suit.diamonds, Rank.queen);
       final hand =
           opened([...pairs.expand((p) => p), c(Suit.spades, Rank.king)])
-            ..draw(c(Suit.spades, Rank.king))
-            ..showDoublees(pairs);
+            ..draw(queen)
+            ..showDoublees(pairs)
+            ..discard(queen)
+            ..draw(c(Suit.spades, Rank.king));
 
       final progress = handProgress(hand, jokers) as DubleeProgress;
       expect(progress.doublees, 8);

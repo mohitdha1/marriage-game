@@ -91,11 +91,16 @@ class RemoteTableController extends TableNotifier {
     final hand = reconcile(view.hand, sameRound ? previous.hand : const []);
     final ids = {for (final c in hand) c.id};
 
-    // Seeing the joker just now: the shown sets have gone, and the reveal
+    // Showing just now: the grouped sets have gone. Seeing the joker just
+    // now (after the discard, and the first to show's pick): the reveal
     // opens.
+    final justShown =
+        sameRound && !previous.view.youHaveShown && view.youHaveShown;
     final justSaw =
-        sameRound && !previous.view.youHaveSeenJoker && view.youHaveSeenJoker;
-    final groups = justSaw || !sameRound
+        sameRound &&
+        previous.view.yourJokers == null &&
+        view.yourJokers != null;
+    final groups = justShown || !sameRound
         ? const <List<int>>[]
         : [
             for (final group in previous.groups)

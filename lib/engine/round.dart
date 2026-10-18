@@ -22,12 +22,15 @@ enum DrawSource { stock, discardPile }
 ///    ([showOpeningTunnellas]) before anyone draws.
 /// 3. **Turns,** starting at `firstSeat` and going round the table: [draw]
 ///    from the stock or the discard pile, optionally show, then [discard].
-///    A discard that leaves a winning hand finishes the round, as does
-///    [declareWin], which only accepts one that does.
+///    A player who shows sees the joker after that discard, and can't win
+///    until a later turn. A discard that leaves a winning hand finishes the
+///    round, as does [declareWin], which only accepts one that does.
 ///
 /// The joker isn't chosen at the deal. The first player to show picks any
-/// card from the stock (`tipluPosition`, counted from the top) to be the
-/// tiplu. It goes face down under the stock and is never drawn, so this
+/// card from the stock to be the tiplu: after their discard, with
+/// [pickTiplu], before the turn passes on; or, after an early show before
+/// their first draw, as part of the show (`tipluPosition`, counted from the
+/// top). It goes face down under the stock and is never drawn, so this
 /// class simply takes it out of the stock. A printed joker (a man card or
 /// the Superman) can't be the tiplu: the picker keeps it aside as maal and
 /// picks again ([pickTiplu]).
@@ -157,6 +160,10 @@ class Round {
   int _currentSeat;
   Jokers? _jokers;
   PlayingCard? _takenFromDiscardPile;
+
+  /// Whether the tiplu being picked was owed after a discard, so choosing
+  /// it passes the turn on.
+  bool _pickEndsTurn = false;
   int? _winner;
   bool _needsTipluPick = false;
 
@@ -182,8 +189,9 @@ class Round {
   /// Whether the tiplu has been picked yet (by the first player to show).
   bool get isJokerChosen => _jokers != null;
 
-  /// Whether the current player picked a printed joker as the tiplu and must
-  /// pick again with [pickTiplu] before anything else happens.
+  /// Whether the current player must pick the tiplu with [pickTiplu]
+  /// before anything else happens: they were the first to show and have
+  /// just discarded, or their pick was a printed joker and they pick again.
   bool get needsTipluPick => _needsTipluPick;
 
   /// The jokers as seen by [seat]: `null` until that player has shown and
@@ -278,8 +286,10 @@ class Round {
   }
 
   /// The current player shows pure sets to see the joker. See
-  /// [PlayerHand.showPureSets]. The first player to show must also pass
-  /// [tipluPosition] to pick the tiplu; later players must not.
+  /// [PlayerHand.showPureSets]. The first player to show early, before
+  /// their first draw, must also pass [tipluPosition] to pick the tiplu;
+  /// everyone else must not (the first to show after drawing picks it after
+  /// their discard, with [pickTiplu]).
   void showPureSets(List<List<PlayingCard>> sets, {int? tipluPosition}) {
     _showThenPickTiplu(
       tipluPosition,
@@ -310,6 +320,11 @@ class Round {
     _checkTipluPosition(position);
     _takeTiplu(position);
     _log.add(PickTipluMove(position));
+    // A pick made after the discard ends the turn once a tiplu is chosen.
+    if (!_needsTipluPick && _pickEndsTurn) {
+      _pickEndsTurn = false;
+      _passTurn();
+    }
   }
 
   /// Ends the current player's turn by discarding [card], and passes the
@@ -325,8 +340,17 @@ class Round {
     _discardFromCurrentHand(card);
     _log.add(DiscardMove(card));
     _events.add(DiscardedCard(_currentSeat, card));
-    _currentSeat = (_currentSeat + 1) % _hands.length;
+    // The first to show, now seeing the joker, picks it before the turn
+    // passes on.
+    if (_jokers == null && _currentHand.hasSeenJoker) {
+      _needsTipluPick = true;
+      _pickEndsTurn = true;
+      return;
+    }
+    _passTurn();
   }
+
+  void _passTurn() => _currentSeat = (_currentSeat + 1) % _hands.length;
 
   /// The current player finishes the round by discarding [card], if what's
   /// left in their hand is a winning hand:
@@ -335,7 +359,8 @@ class Round {
   ///   trials or tunnellas (jokers allowed);
   /// * after showing doublees, the remaining cards hold an 8th doublee.
   ///
-  /// A player can draw, show, and win all in the same turn.
+  /// Nobody wins on the turn they show, so the earliest win is the turn
+  /// after.
   void declareWin(PlayingCard card) {
     _checkNotOver();
     _checkNoTipluPick();
@@ -345,6 +370,9 @@ class Round {
     }
     if (!hand.hasDrawn) {
       throw StateError('Must draw before winning');
+    }
+    if (hand.shownThisTurn) {
+      throw StateError("Can't win on the turn of a show");
     }
     _checkCanDiscard(card);
     final remaining = [...hand.cards];
@@ -394,12 +422,17 @@ class Round {
     _checkNotOver();
     _checkEveryoneOpened();
     _checkNoTipluPick();
-    if (_jokers != null) {
+    // Only an early show, before the first draw, picks the tiplu with
+    // the show; after drawing, the first to show picks after the discard.
+    final picksWithShow = _jokers == null && !_currentHand.hasDrawn;
+    if (!picksWithShow) {
       if (tipluPosition != null) {
         throw ArgumentError.value(
           tipluPosition,
           'tipluPosition',
-          'the tiplu has already been picked',
+          _jokers != null
+              ? 'the tiplu has already been picked'
+              : 'after drawing, the tiplu is picked after the discard',
         );
       }
       show();
@@ -446,12 +479,14 @@ class Round {
   void _discardFromCurrentHand(PlayingCard card) {
     _checkCanDiscard(card);
     final hand = _currentHand;
+    // Only a joker seen before this discard counts toward the penalty.
+    final seenBefore = hand.hasSeenJoker;
     hand.discard(card);
     _discardPile.add(card);
     _takenFromDiscardPile = null;
 
     final jokers = _jokers;
-    final seenWild = hand.hasSeenJoker && jokers != null && jokers.isWild(card);
+    final seenWild = seenBefore && jokers != null && jokers.isWild(card);
     if (config.jokerDiscardPenaltyEnabled && (card.isSuperman || seenWild)) {
       _jokerDiscards[_currentSeat]++;
     }

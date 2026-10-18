@@ -6,7 +6,6 @@ import '../engine/joker.dart';
 import '../engine/melds.dart';
 import '../engine/player_hand.dart';
 import '../engine/round.dart';
-import '../engine/win_check.dart';
 import 'bot_personality.dart';
 import 'hand_analysis.dart';
 import 'table_memory.dart';
@@ -84,7 +83,9 @@ class BotPlayer {
       findTunnellas(cards).take(PlayerHand.maxOpeningTunnellas).toList();
 
   /// Plays the whole of the current player's turn in [round]: draw, show
-  /// if it can, then win or discard.
+  /// if it can, then win or discard. The first to show picks the tiplu
+  /// after that discard. A turn with a show never wins; the earliest win
+  /// is the next turn.
   BotTurn takeTurn(Round round) {
     final seat = round.currentSeat;
     final hand = round.hands[seat];
@@ -110,43 +111,53 @@ class BotPlayer {
     }
 
     var shown = <List<PlayingCard>>[];
-    var pickedTiplu = false;
-    if (!hand.hasSeenJoker) {
+    if (!hand.hasShown) {
       final show = _chooseShow(hand, forDoublees);
       if (show != null) {
-        pickedTiplu = !round.isJokerChosen;
-        final position = pickedTiplu ? _pickTipluPosition(round) : null;
         if (show.doublees) {
-          round.showDoublees(show.sets, tipluPosition: position);
+          round.showDoublees(show.sets);
         } else {
-          round.showPureSets(show.sets, tipluPosition: position);
+          round.showPureSets(show.sets);
         }
-        _pickTipluAgain(round);
         shown = show.sets;
       }
     }
 
-    final winningCard = _findWinningDiscard(round, seat, mustKeep);
+    final winning = round.currentWinningDiscards;
+    // An Easy bot sometimes doesn't notice it could win, and breaks up its
+    // hand with a card that doesn't.
+    final missesWin =
+        winning.isNotEmpty &&
+        difficulty == BotDifficulty.easy &&
+        _random.nextDouble() < _easyMissedWin &&
+        hand.cards.any((card) => card != mustKeep && !winning.contains(card));
+    final winningCard = missesWin ? null : winning.firstOrNull;
     if (winningCard != null) {
       round.declareWin(winningCard);
       return BotTurn(
         drewFrom: source,
         drawn: drawn,
         shown: shown,
-        pickedTiplu: pickedTiplu,
         discarded: winningCard,
         won: true,
       );
     }
 
     final discard = chooseDiscard(
-      hand.cards,
+      [
+        for (final card in hand.cards)
+          if (!winning.contains(card)) card,
+      ],
       round.jokersFor(seat),
       mustKeep: mustKeep,
       memory: memory,
       keepPairs: forDoublees,
+      shown: hand.hasShown,
     );
     round.discard(discard);
+    // The first to show sees the joker with that discard, and picks it.
+    final pickedTiplu = round.needsTipluPick;
+    _pickTipluAgain(round);
     return BotTurn(
       drewFrom: source,
       drawn: drawn,
@@ -157,13 +168,16 @@ class BotPlayer {
   }
 
   /// The card to throw away from [cards], never [mustKeep] (a card just
-  /// taken from the discard pile). Ties go to the highest-ranked card.
+  /// taken from the discard pile). [shown] says the player has shown, so
+  /// natural trials count as sets even before the joker is seen. Ties go
+  /// to the highest-ranked card.
   PlayingCard chooseDiscard(
     List<PlayingCard> cards,
     Jokers? jokers, {
     PlayingCard? mustKeep,
     TableMemory? memory,
     bool keepPairs = false,
+    bool shown = false,
   }) {
     var candidates = cards.where((card) => card != mustKeep).toList()
       ..sort((a, b) => (b.rank?.order ?? 0).compareTo(a.rank?.order ?? 0));
@@ -171,6 +185,18 @@ class BotPlayer {
     if (difficulty == BotDifficulty.easy &&
         _random.nextDouble() < _easyCarelessDiscard) {
       return candidates[_random.nextInt(candidates.length)];
+    }
+
+    // Having shown, but before the joker comes with this discard, a Medium
+    // or Hard bot keeps the natural sets that will finish its hand.
+    if (shown && jokers == null && difficulty != BotDifficulty.easy) {
+      int coverage(PlayingCard card) =>
+          maxCoverage([...cards]..remove(card), null, shown: true);
+      final most = candidates.map(coverage).reduce(max);
+      candidates = [
+        for (final card in candidates)
+          if (coverage(card) == most) card,
+      ];
     }
 
     // A Medium bot never breaks up a finished pure set while it has other
@@ -242,7 +268,7 @@ class BotPlayer {
   bool playsForDoublees(PlayerHand hand) {
     if (difficulty != BotDifficulty.hard) return false;
     if (hand.showKind == ShowKind.doublees) return true;
-    if (hand.hasSeenJoker) return false;
+    if (hand.hasShown) return false;
     final pairs = countDoublees(hand.cards);
     return pairs >= dubleeRouteAt &&
         PlayerHand.doubleesToShow - pairs <
@@ -343,24 +369,6 @@ class BotPlayer {
       }
     }
     return best;
-  }
-
-  PlayingCard? _findWinningDiscard(
-    Round round,
-    int seat,
-    PlayingCard? mustKeep,
-  ) {
-    final jokers = round.jokersFor(seat);
-    if (jokers == null) return null;
-    if (difficulty == BotDifficulty.easy &&
-        _random.nextDouble() < _easyMissedWin) {
-      return null;
-    }
-    return winningDiscards(
-      round.hands[seat],
-      jokers,
-      mustKeep: mustKeep,
-    ).firstOrNull;
   }
 
   /// Picks again for as long as the picks are printed jokers, which are

@@ -715,9 +715,15 @@ class TableController extends TableNotifier {
   Future<void> discard(int cardId) async {
     final card = cardWithId(cardId);
     if (card == null || !checkYourTurn()) return;
-    if (_act(() => _round.discard(card), removing: {cardId})) {
-      await _advance();
+    final hadJokers = state.view.yourJokers != null;
+    if (!_act(() => _round.discard(card), removing: {cardId})) return;
+    _revealIfNew(hadJokers: hadJokers);
+    // The first to show picks the tiplu now; play goes on once they have.
+    if (state.view.youMustPickTiplu) {
+      state = state.copyWith(pickingTiplu: true);
+      return;
     }
+    await _advance();
   }
 
   @override
@@ -762,14 +768,27 @@ class TableController extends TableNotifier {
       }
     }, removing: ids);
     if (shown) {
-      state = state.copyWith(groups: [], revealingJoker: true);
+      state = state.copyWith(groups: []);
+      _revealIfNew(hadJokers: false);
       _offerPickAgain();
     }
   }
 
   @override
   void submitTipluPick(int position) {
-    if (_act(() => _round.pickTiplu(position))) _offerPickAgain();
+    final hadJokers = state.view.yourJokers != null;
+    if (!_act(() => _round.pickTiplu(position))) return;
+    _offerPickAgain();
+    _revealIfNew(hadJokers: hadJokers);
+    // A pick made after the discard passes the turn on.
+    if (!_round.needsTipluPick) unawaited(_advance());
+  }
+
+  /// Shows the joker reveal if the person has just seen the joker.
+  void _revealIfNew({required bool hadJokers}) {
+    if (!hadJokers && state.view.yourJokers != null) {
+      state = state.copyWith(revealingJoker: true);
+    }
   }
 
   /// Opens the tiplu picker again if the person's pick was a printed joker.
@@ -869,7 +888,11 @@ class TableController extends TableNotifier {
     });
     if (refusal != null) return refuse(refusal);
     _publish(notice: _winNotice());
-    if (message is MoveDiscard) unawaited(_advance());
+    // A discard ends the turn, unless the first to show still picks the
+    // tiplu; that pick then ends it.
+    if (message is MoveDiscard || message is MovePickTiplu) {
+      unawaited(_advance());
+    }
   }
 
   /// Listens to the player at [seat] on their device's current link.
